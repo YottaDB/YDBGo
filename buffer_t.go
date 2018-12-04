@@ -18,25 +18,9 @@ import (
 )
 
 // #include <stdlib.h>
-// #include <stdio.h>
-// #include <errno.h>
 // #include <string.h>
 // #include "libyottadb.h"
 // #include "libydberrors.h"
-// /* Equivalent of gparam_list in callg.h (not available to us) */
-// #define MAXVPARMS 36
-// typedef struct {
-//         intptr_t  n;
-//         uintptr_t arg[MAXVPARMS];
-// } gparam_list;
-// /* C routine to get around the cgo issue and its lack of support for variadic plist routines */
-// int ydb_go_lock_st(uint64_t tptoken, uintptr_t cvplist);
-// int YdB_vArIaDiC_pLiSt_TeSt();  /* Don't define parms here as variadic plist declarations gives cgo issues */
-// /* Note these defines also appear in the YdB_vArIaDiC_pLiSt_TeSt.c test routine so if they change there, change them here */
-// #define expectedargs	3
-// #define expectedval	42
-// #define expectedbuf1	"Buffer one"
-// #define expectedbuf2	"Buffer two"
 import "C"
 
 type BufferT struct { // Contains a single ydb_buffer_t struct
