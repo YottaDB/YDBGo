@@ -1,0 +1,75 @@
+image: golang:1.10-stretch
+
+cache:
+  paths:
+    - /apt-cache
+    - /go/src/github.com
+    - /go/src/golang.org
+    - /go/src/google.golang.org
+    - /go/src/gopkg.in
+
+stages:
+  - test
+  - build
+
+before_script:
+  - mkdir -p /go/src/go.yottadb.com/yottadb /go/src/_/builds
+  - cp -r $CI_PROJECT_DIR/* /go/src/go.yottadb.com/yottadb
+  - ln -s /go/src/go.yottadb.com/yottadb /go/src/_/builds/yottadb
+  - export GOPATH=/go
+  - export PATH=${GOPATH}/bin:$PATH
+  - go get -u github.com/golang/lint/golint
+  - apt-get update -y -qq
+  - apt-get install cmake tcsh {libconfig,libelf,libgcrypt,libgpg-error,libgpgme11,libicu,libncurses,libssl,zlib1g}-dev binutils file -y -qq
+  - curl -fSsLO https://gitlab.com/YottaDB/DB/YDB/-/archive/master/YDB-master.tar.gz
+  - tar xzf YDB-master.tar.gz
+  - cd YDB-master
+  - mkdir build && cd build
+  - cmake -D CMAKE_INSTALL_PREFIX:PATH=$PWD ../
+  - make -j `grep -c ^processor /proc/cpuinfo`
+  - make install
+  - cd yottadb_r*
+  - ./ydbinstall --force-install
+  - cd /go/src/go.yottadb.com/yottadb
+  - export ydb_dist=/usr/local/lib/yottadb/r123
+  - export ydb_gbldir=mumps.gld
+  - export ydb_routines=/usr/local/lib/yottadb/r123/libyottadbutil.so
+  - echo exit | /usr/local/lib/yottadb/r123/mumps -run ^GDE
+  - /usr/local/lib/yottadb/r123/mupip create
+
+unit_tests:
+  stage: test
+  script:
+    - go test -short $(go list ./... | grep -v /vendor/)
+
+race_detector:
+  stage: test
+  script:
+    - go test -race -short $(go list ./... | grep -v /vendor/)
+
+code_coverage:
+  stage: test
+  script:
+    - PKG_LIST=$(go list ./... | grep -v /vendor/)
+    - for package in ${PKG_LIST}; do
+    -  go test -covermode=count -coverprofile "cover/${package##*/}.cov" "$package" ;
+    - done
+    - tail -q -n +2 cover/*.cov >> cover/coverage.cov
+    - go tool cover -func=cover/coverage.cov
+
+code_coverage_report:
+  stage: test
+  script:
+    - go tool cover -html=cover/coverage.cov -o coverage.html
+  only:
+  - master
+
+lint_code:
+  stage: test
+  script:
+    - golint -set_exit_status $(go list ./... | grep -v /vendor/)
+
+build:
+  stage: build
+  script:
+    - go build -i -v go.yottadb.com/yottadb
