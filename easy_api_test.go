@@ -31,7 +31,7 @@ func TestLockST(t *testing.T) {
 	Assertnoerr(err, t)
 	err = dbkey.Subary.SetValStrLit(tptoken, 0, "Index0")
 	Assertnoerr(err, t)
-	err = dbkey.Subary.SetUsed(tptoken, 1)
+	err = dbkey.Subary.SetElemUsed(tptoken, 1)
 	Assertnoerr(err, t)
 	err = yottadb.LockST(tptoken, timeout, &dbkey) // 10 second timeout
 	Assertnoerr(err, t)
@@ -46,11 +46,11 @@ func TestDataE(t *testing.T) {
 	var dval uint32
 
 	// Create a few nodes so we can check DataE() on them
-	err = yottadb.SetE(tptoken, "val1", "^tdaNoSubs", []string{})
+	err = yottadb.SetValE(tptoken, "val1", "^tdaNoSubs", []string{})
 	Assertnoerr(err, t)
-	err = yottadb.SetE(tptoken, "val2", "^tdaSubs", []string{"sub1", "sub2"})
+	err = yottadb.SetValE(tptoken, "val2", "^tdaSubs", []string{"sub1", "sub2"})
 	Assertnoerr(err, t)
-	err = yottadb.SetE(tptoken, "val3", "^tdaSubs", []string{"sub1", "sub2", "sub3"})
+	err = yottadb.SetValE(tptoken, "val3", "^tdaSubs", []string{"sub1", "sub2", "sub3"})
 	Assertnoerr(err, t)
 	// Check against a non-existant node - should return 0
 	dval, err = yottadb.DataE(tptoken, "^noExistGbl", []string{})
@@ -84,11 +84,11 @@ func TestDeleteE(t *testing.T) {
 	var dval uint32
 
 	// Create a few nodes so we can check DataE() on them
-	err = yottadb.SetE(tptoken, "val1", "^tdaNoSubs", []string{})
+	err = yottadb.SetValE(tptoken, "val1", "^tdaNoSubs", []string{})
 	Assertnoerr(err, t)
-	err = yottadb.SetE(tptoken, "val2", "^tdaSubs", []string{"sub1", "sub2"})
+	err = yottadb.SetValE(tptoken, "val2", "^tdaSubs", []string{"sub1", "sub2"})
 	Assertnoerr(err, t)
-	err = yottadb.SetE(tptoken, "val3", "^tdaSubs", []string{"sub1", "sub2", "sub3"})
+	err = yottadb.SetValE(tptoken, "val3", "^tdaSubs", []string{"sub1", "sub2", "sub3"})
 	Assertnoerr(err, t)
 	err = yottadb.DeleteE(tptoken, GetYDB_DEL_TREE(), "^tdaSubs", []string{})
 	Assertnoerr(err, t)
@@ -103,39 +103,39 @@ func TestDeleteExclE(t *testing.T) {
 	var tptoken uint64 = yottadb.NOTTP
 	var err error
 
-	// We need to create 4 local variables to test this so do that first (thus also testing KeyT.SetE()
-	err = yottadb.SetE(tptoken, "I have a value", "var1", []string{"sub1", "sub2"})
+	// We need to create 4 local variables to test this so do that first (thus also testing KeyT.SetValE()
+	err = yottadb.SetValE(tptoken, "I have a value", "var1", []string{"sub1", "sub2"})
 	Assertnoerr(err, t)
-	err = yottadb.SetE(tptoken, "I wish I was a value", "var2", []string{})
+	err = yottadb.SetValE(tptoken, "I wish I was a value", "var2", []string{})
 	Assertnoerr(err, t)
-	err = yottadb.SetE(tptoken, "I was a value", "var3", []string{"sub1"})
+	err = yottadb.SetValE(tptoken, "I was a value", "var3", []string{"sub1"})
 	Assertnoerr(err, t)
-	err = yottadb.SetE(tptoken, "I AM A VALUE", "var4", []string{})
+	err = yottadb.SetValE(tptoken, "I AM A VALUE", "var4", []string{})
 	Assertnoerr(err, t)
-	_, err = yottadb.GetE(tptoken, "var1", []string{"sub1", "sub2"})
+	_, err = yottadb.ValE(tptoken, "var1", []string{"sub1", "sub2"})
 	// Now delete var1 and var3 by exclusively keeping var2 and var 4
 	err = yottadb.DeleteExclE(tptoken, []string{"var2", "var4"})
 	Assertnoerr(err, t)
 	// OK, delete done, see which vars exist
-	_, err = yottadb.GetE(tptoken, "var1", []string{"sub1", "sub2"}) // Expect this var to be gone
+	_, err = yottadb.ValE(tptoken, "var1", []string{"sub1", "sub2"}) // Expect this var to be gone
 	if nil == err {
 		t.Error("var1 found when it should have been deleted (no error occurred when fetched")
 	}
-	_, err = yottadb.GetE(tptoken, "var2", []string{})
+	_, err = yottadb.ValE(tptoken, "var2", []string{})
 	if nil != err {
 		t.Error("var2 not found when it should still exist (if ever existed)")
 	}
-	_, err = yottadb.GetE(tptoken, "var3", []string{"sub1"})
+	_, err = yottadb.ValE(tptoken, "var3", []string{"sub1"})
 	if nil == err {
 		t.Error("var3 found when it should have been deleted (no error occurred when fetched")
 	}
-	_, err = yottadb.GetE(tptoken, "var4", []string{})
+	_, err = yottadb.ValE(tptoken, "var4", []string{})
 	if nil != err {
 		t.Error("var4 not found when it should still exist (if ever existed)")
 	}
 }
 
-func TestGetE(t *testing.T) {
+func TestValE(t *testing.T) {
 	// Already tested in tests for TpST() and DeleteExclE()
 }
 
@@ -146,7 +146,7 @@ func TestIncrE(t *testing.T) {
 	var newvalBi int
 
 	// Create a simple subscripted node, then increment it, then fetch it and compare to returned value
-	err = yottadb.SetE(tptoken, "42", "^ivar", []string{"isub1"})
+	err = yottadb.SetValE(tptoken, "42", "^ivar", []string{"isub1"})
 	Assertnoerr(err, t)
 	newvalB, err = yottadb.IncrE(tptoken, "2", "^ivar", []string{"isub1"})
 	Assertnoerr(err, t)
@@ -156,7 +156,7 @@ func TestIncrE(t *testing.T) {
 		t.Error("The expected increment value is 44 but it is", newvalB)
 	}
 	// Fetch the value and verify same as what we got back from IncrST()
-	newvalA, err = yottadb.GetE(tptoken, "^ivar", []string{"isub1"})
+	newvalA, err = yottadb.ValE(tptoken, "^ivar", []string{"isub1"})
 	Assertnoerr(err, t)
 	if newvalA != newvalB {
 		t.Error("Returned and post-increment fetch values not same - db :", newvalA,
@@ -232,11 +232,11 @@ func TestNodeNextE(t *testing.T) {
 	subs[0] = []string{"sub0a", "sub0b", "sub0c", "sub0d"}
 	subs[1] = []string{"sub1a", "sub1b"}
 	subs[2] = []string{"sub2a", "sub2b", "sub2c-but a long sub2c comparatively"}
-	err = yottadb.SetE(tptoken, "val0", "^node", subs[0])
+	err = yottadb.SetValE(tptoken, "val0", "^node", subs[0])
 	Assertnoerr(err, t)
-	err = yottadb.SetE(tptoken, "val1", "^node", subs[1])
+	err = yottadb.SetValE(tptoken, "val1", "^node", subs[1])
 	Assertnoerr(err, t)
-	err = yottadb.SetE(tptoken, "val2", "^node", subs[2])
+	err = yottadb.SetValE(tptoken, "val2", "^node", subs[2])
 	Assertnoerr(err, t)
 	subscrary = []string{""}
 	// Loop to test NodeNextST()
@@ -244,7 +244,7 @@ func TestNodeNextE(t *testing.T) {
 		t.Log("   Starting NodeNextE() loop")
 	}
 	for i = 0; ; i++ {
-		err = sublst.SetUsed(tptoken, AryDim) // Reset each round to (re)set how many array elems are available
+		err = sublst.SetElemUsed(tptoken, AryDim) // Reset each round to (re)set how many array elems are available
 		Assertnoerr(err, t)
 		retsubs, err := yottadb.NodeNextE(tptoken, "^node", subscrary)
 		if nil != err {
@@ -279,7 +279,7 @@ func TestNodeNextE(t *testing.T) {
 		t.Log("   Starting NodePrevE() loop")
 	}
 	for i = 2; ; i-- {
-		err = sublst.SetUsed(tptoken, AryDim) // Reset each round to (re)set how many array elems are available
+		err = sublst.SetElemUsed(tptoken, AryDim) // Reset each round to (re)set how many array elems are available
 		Assertnoerr(err, t)
 		retsubs, err := yottadb.NodePrevE(tptoken, "^node", subscrary)
 		if nil != err {
@@ -310,7 +310,7 @@ func TestNodeNextE(t *testing.T) {
 	}
 }
 
-func TestSetE(t *testing.T) {
+func TestSetValE(t *testing.T) {
 	// Already tested in *MANY* tests above
 }
 
@@ -327,13 +327,13 @@ func TestSubNextE(t *testing.T) {
 	// Start with a clean slate
 	Dbdeleteall(tptoken, &errors, t)
 	// Create a simple 4 element array
-	err = yottadb.SetE(tptoken, "val0", "^dbvar", []string{"sub0"})
+	err = yottadb.SetValE(tptoken, "val0", "^dbvar", []string{"sub0"})
 	Assertnoerr(err, t)
-	err = yottadb.SetE(tptoken, "val1", "^dbvar", []string{"sub1"})
+	err = yottadb.SetValE(tptoken, "val1", "^dbvar", []string{"sub1"})
 	Assertnoerr(err, t)
-	err = yottadb.SetE(tptoken, "val2", "^dbvar", []string{"sub2"})
+	err = yottadb.SetValE(tptoken, "val2", "^dbvar", []string{"sub2"})
 	Assertnoerr(err, t)
-	err = yottadb.SetE(tptoken, "val3", "^dbvar", []string{"sub3"})
+	err = yottadb.SetValE(tptoken, "val3", "^dbvar", []string{"sub3"})
 	Assertnoerr(err, t)
 	// Initialize key with null subscript so find first one
 	subscrary = []string{""}
@@ -410,13 +410,13 @@ func TestTpE(t *testing.T) {
 	err = yottadb.TpE(tptoken, TpRtn_cgo(), nil, "BATCH", []string{"*"})
 	Assertnoerr(err, t)
 	// Fetch the two nodes to make sure they are there and have correct values
-	val1, err = yottadb.GetE(tptoken, "^Variable1A", []string{"Index0", "Index1", "Index2"})
+	val1, err = yottadb.ValE(tptoken, "^Variable1A", []string{"Index0", "Index1", "Index2"})
 	Assertnoerr(err, t)
 	if "The value of Variable1A" != val1 {
 		t.Errorf("The fetched value of ^Variable1A(\"Index0\",\"Index1\",\"Index2\") was not correct\n")
 		t.Logf("       Expected: 'The value of Variable1A', Received: '%s'\n", val1)
 	}
-	val2, err = yottadb.GetE(tptoken, "^Variable2B", []string{"Idx0", "Idx1"})
+	val2, err = yottadb.ValE(tptoken, "^Variable2B", []string{"Idx0", "Idx1"})
 	Assertnoerr(err, t)
 	if "The value of Variable2B" != val2 {
 		t.Error("The fetched value of ^Variable2B(\"Idx0\",\"Idx1\") was not correct\n")

@@ -74,7 +74,7 @@ func initkey(tptoken uint64, dbkey *KeyT, varname *string, subary *[]string) {
 			panic(fmt.Sprintf("YDB: Unexpected error with SetValStr(): %s", err))
 		}
 	}
-	err = (*dbkey).Subary.SetUsed(tptoken, subcnt)
+	err = (*dbkey).Subary.SetElemUsed(tptoken, subcnt)
 	if nil != err {
 		panic(fmt.Sprintf("YDB: Unexpected error with SetUsed(): %s", err))
 	}

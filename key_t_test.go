@@ -27,20 +27,19 @@ func TestDataSt(t *testing.T) {
 
 	ovalue.Alloc(64)
 	cvalue.Alloc(128)
-
 	// Create a few nodes so we can check DataST() on them
-	err = yottadb.SetE(tptoken, "val1", "^tdaNoSubs", []string{})
+	err = yottadb.SetValE(tptoken, "val1", "^tdaNoSubs", []string{})
 	Assertnoerr(err, t)
-	err = yottadb.SetE(tptoken, "val2", "^tdaSubs", []string{"sub1", "sub2"})
+	err = yottadb.SetValE(tptoken, "val2", "^tdaSubs", []string{"sub1", "sub2"})
 	Assertnoerr(err, t)
-	err = yottadb.SetE(tptoken, "val3", "^tdaSubs", []string{"sub1", "sub2", "sub3"})
+	err = yottadb.SetValE(tptoken, "val3", "^tdaSubs", []string{"sub1", "sub2", "sub3"})
 	Assertnoerr(err, t)
 	// Build query structs for DataST()
 	dbkey.Alloc(VarSiz, AryDim, SubSiz) // Reallocate the key
 	// Check against a non-existant node - should return 0
 	err = dbkey.Varnm.SetValStrLit(tptoken, "^noExistGbl")
 	Assertnoerr(err, t)
-	err = dbkey.Subary.SetUsed(tptoken, 0)
+	err = dbkey.Subary.SetElemUsed(tptoken, 0)
 	Assertnoerr(err, t)
 	dval, err := dbkey.DataST(tptoken)
 	Assertnoerr(err, t)
@@ -60,7 +59,7 @@ func TestDataSt(t *testing.T) {
 	Assertnoerr(err, t)
 	err = dbkey.Subary.SetValStrLit(tptoken, 0, "sub1")
 	Assertnoerr(err, t)
-	err = dbkey.Subary.SetUsed(tptoken, 1)
+	err = dbkey.Subary.SetElemUsed(tptoken, 1)
 	Assertnoerr(err, t)
 	dval, err = dbkey.DataST(tptoken)
 	Assertnoerr(err, t)
@@ -70,7 +69,7 @@ func TestDataSt(t *testing.T) {
 	// Check against a subscripted node with a value and descendants
 	err = dbkey.Subary.SetValStrLit(tptoken, 1, "sub2")
 	Assertnoerr(err, t)
-	err = dbkey.Subary.SetUsed(tptoken, 2)
+	err = dbkey.Subary.SetElemUsed(tptoken, 2)
 	Assertnoerr(err, t)
 	dval, err = dbkey.DataST(tptoken)
 	Assertnoerr(err, t)
@@ -103,16 +102,14 @@ func TestDeleteST(t *testing.T) {
 
 	defer dbkey.Free()
 	dbkey.Alloc(VarSiz, AryDim, SubSiz)
-
 	err = dbkey.Varnm.SetValStrLit(tptoken, "^tdaSubs")
 	Assertnoerr(err, t)
 	err = dbkey.Subary.SetValStrLit(tptoken, 0, "sub2")
 	Assertnoerr(err, t)
-	err = dbkey.Subary.SetUsed(tptoken, 1)
+	err = dbkey.Subary.SetElemUsed(tptoken, 1)
 	// TODO: we should check to make sure error messages are correctly filled out (!UL replaced with number)
 	Assertnoerr(err, t)
-
-	err = dbkey.Subary.SetUsed(tptoken, 0) // No subs are included
+	err = dbkey.Subary.SetElemUsed(tptoken, 0) // No subs are included
 	Assertnoerr(err, t)
 	err = dbkey.DeleteST(tptoken, YdbDelTree())
 	Assertnoerr(err, t)
@@ -123,8 +120,8 @@ func TestDeleteST(t *testing.T) {
 	}
 }
 
-func TestGetST(t *testing.T) {
-	// Not tested because it is already tested in TpST() via GetE()
+func TestValST(t *testing.T) {
+	// Not tested because it is already tested in TpST() via ValE()
 }
 
 func TestIncrST(t *testing.T) {
@@ -149,16 +146,16 @@ func TestIncrST(t *testing.T) {
 	Assertnoerr(err, t)
 	err = dbkey.Subary.SetValStrLit(tptoken, 0, "isub1")
 	Assertnoerr(err, t)
-	err = dbkey.Subary.SetUsed(tptoken, 1)
+	err = dbkey.Subary.SetElemUsed(tptoken, 1)
 	Assertnoerr(err, t)
 	err = dbval1.SetValStrLit(tptoken, "42")
 	Assertnoerr(err, t)
-	err = dbkey.SetST(tptoken, &dbval1) // Set the initial value into the node
+	err = dbkey.SetValST(tptoken, &dbval1) // Set the initial value into the node
 	err = incrval.SetValStrLit(tptoken, "2")
 	Assertnoerr(err, t)
 	err = dbkey.IncrST(tptoken, &incrval, &dbval2)
 	Assertnoerr(err, t)
-	newval2, err = dbval2.GetValStr(tptoken)
+	newval2, err = dbval2.ValStr(tptoken)
 	Assertnoerr(err, t)
 	newval2i, err = strconv.Atoi(*newval2)
 	Assertnoerr(err, t)
@@ -166,9 +163,9 @@ func TestIncrST(t *testing.T) {
 		t.Error("The expected increment value is 44 but it is", *newval2)
 	}
 	// Fetch the value and verify same as what we got back from IncrST()
-	err = dbkey.GetST(tptoken, &dbval1)
+	err = dbkey.ValST(tptoken, &dbval1)
 	Assertnoerr(err, t)
-	newval1, err = dbval1.GetValStr(tptoken)
+	newval1, err = dbval1.ValStr(tptoken)
 	if *newval1 != *newval2 {
 		t.Error("Returned and post-increment fetch values not same - db :", *newval1,
 			"  returned: ", *newval2)
@@ -191,7 +188,6 @@ func TestLockIncrSt(t *testing.T) {
 	dbval2.Alloc(128)
 	defer incrval.Free()
 	incrval.Alloc(16)
-
 	// Increment a given lock 3 times then start decrementing it and after each check, the lock
 	// should still be there until we've decremented the 3rd time after which the lock should
 	// NOT be there.
@@ -203,7 +199,7 @@ func TestLockIncrSt(t *testing.T) {
 	Assertnoerr(err, t)
 	err = dbkey.Subary.SetValStrLit(tptoken, 1, "Panic!")
 	Assertnoerr(err, t)
-	err = dbkey.Subary.SetUsed(tptoken, 2)
+	err = dbkey.Subary.SetElemUsed(tptoken, 2)
 	Assertnoerr(err, t)
 	err = dbkey.LockIncrST(tptoken, timeout) // Lock it 3 times
 	Assertnoerr(err, t)
@@ -247,31 +243,30 @@ func TestNodeNextST(t *testing.T) {
 	incrval.Alloc(16)
 	defer sublst.Free()
 	sublst.Alloc(AryDim, SubSiz)
-
 	// Need to start with a clean slate (empty database) so do that first
 	Dbdeleteall(tptoken, &errors, t)
 	var subs [3][]string
 	subs[0] = []string{"sub0a", "sub0b", "sub0c", "sub0d"}
 	subs[1] = []string{"sub1a", "sub1b"}
 	subs[2] = []string{"sub2a", "sub2b", "sub2c"}
-	err = yottadb.SetE(tptoken, "val0", "^node", subs[0])
+	err = yottadb.SetValE(tptoken, "val0", "^node", subs[0])
 	Assertnoerr(err, t)
-	err = yottadb.SetE(tptoken, "val1", "^node", subs[1])
+	err = yottadb.SetValE(tptoken, "val1", "^node", subs[1])
 	Assertnoerr(err, t)
-	err = yottadb.SetE(tptoken, "val2", "^node", subs[2])
+	err = yottadb.SetValE(tptoken, "val2", "^node", subs[2])
 	Assertnoerr(err, t)
 	err = dbkey.Varnm.SetValStrLit(tptoken, "^node") // Initial search var
 	Assertnoerr(err, t)
-	err = dbkey.Subary.SetUsed(tptoken, 0)
+	err = dbkey.Subary.SetElemUsed(tptoken, 0)
 	Assertnoerr(err, t)
-	err = sublst.SetUsed(tptoken, AryDim)
+	err = sublst.SetElemUsed(tptoken, AryDim)
 	Assertnoerr(err, t)
 	// Loop to test NodeNextST()
 	if DebugFlag {
 		t.Log("   Starting NodeNextST() loop")
 	}
 	for i = 0; ; i++ {
-		err = sublst.SetUsed(tptoken, AryDim) // Reset each round to (re)set how many array elems are available
+		err = sublst.SetElemUsed(tptoken, AryDim) // Reset each round to (re)set how many array elems are available
 		Assertnoerr(err, t)
 		err = dbkey.NodeNextST(tptoken, &sublst)
 		if nil != err {
@@ -301,7 +296,7 @@ func TestNodeNextST(t *testing.T) {
 			err = dbkey.Subary.SetValStr(tptoken, uint32(j), &v)
 			Assertnoerr(err, t)
 		}
-		err = dbkey.Subary.SetUsed(tptoken, uint32(len(*retsubsp)))
+		err = dbkey.Subary.SetElemUsed(tptoken, uint32(len(*retsubsp)))
 		Assertnoerr(err, t)
 	}
 	if 3 != i {
@@ -309,12 +304,12 @@ func TestNodeNextST(t *testing.T) {
 	}
 	// Next run the loop in reverse to refetch things using NodePrev()
 	dbkey.Subary.SetValStrLit(tptoken, 0, "~~~~~~~~~~") // Set a high-subscript so we find the "last node" doing a prev
-	dbkey.Subary.SetUsed(tptoken, 1)
+	dbkey.Subary.SetElemUsed(tptoken, 1)
 	if DebugFlag {
 		t.Log("   Starting NodePrevST() loop")
 	}
 	for i = 2; ; i-- {
-		err = sublst.SetUsed(tptoken, AryDim) // Reset each round to (re)set how many array elems are available
+		err = sublst.SetElemUsed(tptoken, AryDim) // Reset each round to (re)set how many array elems are available
 		Assertnoerr(err, t)
 		err = dbkey.NodePrevST(tptoken, &sublst)
 		if nil != err {
@@ -344,7 +339,7 @@ func TestNodeNextST(t *testing.T) {
 			err = dbkey.Subary.SetValStr(tptoken, uint32(j), &v)
 			Assertnoerr(err, t)
 		}
-		err = dbkey.Subary.SetUsed(tptoken, uint32(len(*retsubsp)))
+		err = dbkey.Subary.SetElemUsed(tptoken, uint32(len(*retsubsp)))
 		Assertnoerr(err, t)
 	}
 	if -1 != i {
@@ -353,8 +348,8 @@ func TestNodeNextST(t *testing.T) {
 
 }
 
-func TestSetST(t *testing.T) {
-	// Already tested in tests for IncrST(), TpST() directly and several other tests using SetE()
+func TestSetValST(t *testing.T) {
+	// Already tested in tests for IncrST(), TpST() directly and several other tests using SetValE()
 }
 
 func TestSubNextST(t *testing.T) {
@@ -377,24 +372,23 @@ func TestSubNextST(t *testing.T) {
 	sublst.Alloc(AryDim, SubSiz)
 	defer dbsub.Free()
 	dbsub.Alloc(16)
-
 	// Start with a clean slate
 	Dbdeleteall(tptoken, &errors, t)
 	// Create a simple 4 element array
-	err = yottadb.SetE(tptoken, "val0", "^dbvar", []string{"sub0"})
+	err = yottadb.SetValE(tptoken, "val0", "^dbvar", []string{"sub0"})
 	Assertnoerr(err, t)
-	err = yottadb.SetE(tptoken, "val1", "^dbvar", []string{"sub1"})
+	err = yottadb.SetValE(tptoken, "val1", "^dbvar", []string{"sub1"})
 	Assertnoerr(err, t)
-	err = yottadb.SetE(tptoken, "val2", "^dbvar", []string{"sub2"})
+	err = yottadb.SetValE(tptoken, "val2", "^dbvar", []string{"sub2"})
 	Assertnoerr(err, t)
-	err = yottadb.SetE(tptoken, "val3", "^dbvar", []string{"sub3"})
+	err = yottadb.SetValE(tptoken, "val3", "^dbvar", []string{"sub3"})
 	Assertnoerr(err, t)
 	// Initialize key with null subscript so find first one
 	err = dbkey.Varnm.SetValStrLit(tptoken, "^dbvar")
 	Assertnoerr(err, t)
 	err = dbkey.Subary.SetValStrLit(tptoken, 0, "")
 	Assertnoerr(err, t)
-	err = dbkey.Subary.SetUsed(tptoken, 1)
+	err = dbkey.Subary.SetElemUsed(tptoken, 1)
 	Assertnoerr(err, t)
 	// Start forward SubNextST() loop
 	if DebugFlag {
@@ -414,7 +408,7 @@ func TestSubNextST(t *testing.T) {
 			Assertnoerr(err, t) // Unknown error - cause panic
 		}
 		// Validate subname
-		retsub, err := dbsub.GetValStr(tptoken)
+		retsub, err := dbsub.ValStr(tptoken)
 		Assertnoerr(err, t)
 		expectsub := "sub" + strconv.Itoa(i)
 		if *retsub != expectsub {
@@ -448,7 +442,7 @@ func TestSubNextST(t *testing.T) {
 			Assertnoerr(err, t) // Unknown error - cause panic
 		}
 		// Validate subname
-		retsub, err := dbsub.GetValStr(tptoken)
+		retsub, err := dbsub.ValStr(tptoken)
 		Assertnoerr(err, t)
 		expectsub := "sub" + strconv.Itoa(i)
 		if *retsub != expectsub {

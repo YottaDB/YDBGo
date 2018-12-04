@@ -96,16 +96,16 @@ func (buftary *BufferTArray) Free() {
 	(*buftary).elemsUsed = 0
 }
 
-// GetAlloc() is a method to return elemsAlloc from a BufferTArray.
-func (buftary *BufferTArray) GetAlloc() uint32 {
-	printEntry("BufferTArray.GetAlloc()")
+// ElemAlloc() is a method to return elemsAlloc from a BufferTArray.
+func (buftary *BufferTArray) ElemAlloc() uint32 {
+	printEntry("BufferTArray.ElemAlloc()")
 	return (*buftary).elemsAlloc
 }
 
-// GetLenAlloc() is a method to retrieve the buffer allocation length associated with our BufferTArray.
+// ElemLenAlloc() is a method to retrieve the buffer allocation length associated with our BufferTArray.
 // Since all buffers are the same size in this array, just return the value from the first array entry.
-func (buftary *BufferTArray) GetLenAlloc(tptoken uint64) (uint32, error) {
-	printEntry("BufferTArray.GetLenAlloc")
+func (buftary *BufferTArray) ElemLenAlloc(tptoken uint64) (uint32, error) {
+	printEntry("BufferTArray.ElemLenAlloc")
 	cbuftary := (*buftary).cbuftary
 	if nil == cbuftary {
 		// Create an error to return
@@ -119,9 +119,9 @@ func (buftary *BufferTArray) GetLenAlloc(tptoken uint64) (uint32, error) {
 	return uint32(elemptr.len_alloc), nil
 }
 
-// GetLenUsed() is a method to retrieve the buffer used length associated with a given buffer referenced by its index.
-func (buftary *BufferTArray) GetLenUsed(tptoken uint64, idx uint32) (uint32, error) {
-	printEntry("BufferTArray.GetLenUsed()")
+// ElemLenUsed() is a method to retrieve the buffer used length associated with a given buffer referenced by its index.
+func (buftary *BufferTArray) ElemLenUsed(tptoken uint64, idx uint32) (uint32, error) {
+	printEntry("BufferTArray.ElemLenUsed()")
 	cbuftary := (*buftary).cbuftary
 	if nil == cbuftary {
 		// Create an error to return
@@ -144,17 +144,17 @@ func (buftary *BufferTArray) GetLenUsed(tptoken uint64, idx uint32) (uint32, err
 	return uint32(elemptr.len_used), nil
 }
 
-// GetUsed() is a method to return elemsUsed from a BufferTArray.
-func (buftary *BufferTArray) GetUsed() uint32 {
-	printEntry("BufferTArray.GetUsed()")
+// ElemUsed() is a method to return elemsUsed from a BufferTArray.
+func (buftary *BufferTArray) ElemUsed() uint32 {
+	printEntry("BufferTArray.ElemUsed()")
 	return (*buftary).elemsUsed
 }
 
-// GetValBAry() is a method to fetch the buffer of the indicated array element and return it as a byte array pointer.
-func (buftary *BufferTArray) GetValBAry(tptoken uint64, idx uint32) (*[]byte, error) {
+// ValBAry() is a method to fetch the buffer of the indicated array element and return it as a byte array pointer.
+func (buftary *BufferTArray) ValBAry(tptoken uint64, idx uint32) (*[]byte, error) {
 	var bary []byte
 
-	printEntry("BufferTArray.GetValBAry()")
+	printEntry("BufferTArray.ValBAry()")
 	elemcnt := (*buftary).elemsAlloc
 	if idx > (elemcnt - 1) {
 		// Create an error to return
@@ -190,11 +190,11 @@ func (buftary *BufferTArray) GetValBAry(tptoken uint64, idx uint32) (*[]byte, er
 	return &bary, nil
 }
 
-// GetValStr() is a method to fetch the buffer of the indicated array element and return it as a string pointer.
-func (buftary *BufferTArray) GetValStr(tptoken uint64, idx uint32) (*string, error) {
+// ValStr() is a method to fetch the buffer of the indicated array element and return it as a string pointer.
+func (buftary *BufferTArray) ValStr(tptoken uint64, idx uint32) (*string, error) {
 	var str string
 
-	printEntry("BufferTArray.GetValStr()")
+	printEntry("BufferTArray.ValStr()")
 	elemcnt := (*buftary).elemsAlloc
 	if idx > (elemcnt - 1) {
 		// Create an error to return
@@ -230,9 +230,9 @@ func (buftary *BufferTArray) GetValStr(tptoken uint64, idx uint32) (*string, err
 	return &str, nil
 }
 
-// SetLenUsed() is a method to set the len_used field of a given ydb_buffer_t struct in the BufferTArray.
-func (buftary *BufferTArray) SetLenUsed(tptoken uint64, idx, newLen uint32) error {
-	printEntry("BufferTArray.SetLenUsed()")
+// SetElemLenUsed() is a method to set the len_used field of a given ydb_buffer_t struct in the BufferTArray.
+func (buftary *BufferTArray) SetElemLenUsed(tptoken uint64, idx, newLen uint32) error {
+	printEntry("BufferTArray.SetElemLenUsed()")
 	elemcnt := (*buftary).elemsAlloc
 	if idx > (elemcnt - 1) {
 		// Create an error to return
@@ -265,9 +265,9 @@ func (buftary *BufferTArray) SetLenUsed(tptoken uint64, idx, newLen uint32) erro
 	return nil
 }
 
-// SetUsed() is a method to set the number of used buffers in the BufferTArray.
-func (buftary *BufferTArray) SetUsed(tptoken uint64, newUsed uint32) error {
-	printEntry("BufferTArray.SetUsed()")
+// SetElemUsed() is a method to set the number of used buffers in the BufferTArray.
+func (buftary *BufferTArray) SetElemUsed(tptoken uint64, newUsed uint32) error {
+	printEntry("BufferTArray.SetElemUsed()")
 	elemcnt := (*buftary).elemsAlloc
 	if newUsed > elemcnt {
 		// Create an error to return
@@ -336,6 +336,12 @@ func (buftary *BufferTArray) SetValStrLit(tptoken uint64, idx uint32, value stri
 	valuebary := []byte(value)
 	return buftary.SetValBAry(tptoken, idx, &valuebary)
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Simple (Threaded) API methods for BufferTArray
+//
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // DeleteExclST() is a method to delete all local variables EXCEPT the variables listed in the method BufferTArray.
 // If the input array is empty, then ALL local variables are deleted.

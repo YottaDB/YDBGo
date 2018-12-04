@@ -93,7 +93,7 @@ func DeleteExclE(tptoken uint64, varnames []string) error {
 			panic(fmt.Sprintf("YDB: Unexpected error with SetValStr(): %s", err))
 		}
 	}
-	err = vnames.SetUsed(tptoken, varnmcnt)
+	err = vnames.SetElemUsed(tptoken, varnmcnt)
 	if nil != err {
 		panic(fmt.Sprintf("YDB: Unexpected error with SetUsed(): %s", err))
 	}
@@ -101,14 +101,14 @@ func DeleteExclE(tptoken uint64, varnames []string) error {
 	return vnames.DeleteExclST(tptoken)
 }
 
-// Function to return the value found for varname(subary...)
-func GetE(tptoken uint64, varname string, subary []string) (string, error) {
+// ValE() is an STAPI function to return the value found for varname(subary...)
+func ValE(tptoken uint64, varname string, subary []string) (string, error) {
 	var dbkey KeyT
 	var dbvalue BufferT
 	var err error
 	var retval *string
 
-	printEntry("GetE()")
+	printEntry("ValE()")
 	defer dbkey.Free()
 	defer dbvalue.Free()
 	initkey(tptoken, &dbkey, &varname, &subary)
@@ -117,7 +117,7 @@ func GetE(tptoken uint64, varname string, subary []string) (string, error) {
 	// so loop till it fits.
 	for C.YDB_MAX_STR > easyAPIDefaultDataSize {
 		// dbvalue is allocated with current best-guess size of returning data
-		err = dbkey.GetST(tptoken, &dbvalue)
+		err = dbkey.ValST(tptoken, &dbvalue)
 		if nil != err {
 			// Check if we had an INVSTRLEN error (too small an output buffer)
 			errorcode := ErrorCode(err)
@@ -132,7 +132,7 @@ func GetE(tptoken uint64, varname string, subary []string) (string, error) {
 		}
 		break // No error so success and we are done!
 	}
-	retval, err = dbvalue.GetValStr(tptoken)
+	retval, err = dbvalue.ValStr(tptoken)
 	return *retval, err
 }
 
@@ -166,11 +166,11 @@ func IncrE(tptoken uint64, incr, varname string, subary []string) (string, error
 		err = NewError(int(rc))
 		return "", err
 	}
-	retval, err = dbvalue.GetValStr(tptoken)
+	retval, err = dbvalue.ValStr(tptoken)
 	return *retval, err
 }
 
-// LockE() is a function whose purpose is to release all locks then lock the locks designated. The variadic list
+// LockE() is a STAPI function whose purpose is to release all locks then lock the locks designated. The variadic list
 // is pairs of arguments with the first being a string containing the variable name and the second a string array
 // containing the subscripts if any for that variable (null list for no subscripts).
 func LockE(tptoken uint64, timeoutNsec uint64, namesnsubs ...interface{}) error {
@@ -228,7 +228,7 @@ func LockE(tptoken uint64, timeoutNsec uint64, namesnsubs ...interface{}) error 
 				panic(fmt.Sprintf("YDB: Unexpected error with SetValStr(): %s", err))
 			}
 		}
-		err = (*newKey).Subary.SetUsed(tptoken, uint32(subcnt))
+		err = (*newKey).Subary.SetElemUsed(tptoken, uint32(subcnt))
 		if nil != err {
 			panic(fmt.Sprintf("YDB: Unexpected error with SetValStr(): %s", err))
 		}
@@ -303,9 +303,9 @@ func NodeNextE(tptoken uint64, varname string, subary []string) ([]string, error
 			}
 			if int(C.YDB_ERR_INVSTRLEN) == errorcode {
 				// This is INVSTRLEN - the last valid subscript (as shown by elemsUsed) is the element
-				neededlen, err := dbsubs.GetLenUsed(tptoken, dbsubs.elemsUsed)
+				neededlen, err := dbsubs.ElemLenUsed(tptoken, dbsubs.elemsUsed)
 				if nil != err {
-					panic(fmt.Sprintf("YDB: Unexpected error with GetLenUsed(): %s", err))
+					panic(fmt.Sprintf("YDB: Unexpected error with ElemLenUsed(): %s", err))
 				}
 				easyAPIDefaultSubscrSize = neededlen
 				dbsubs.Alloc(easyAPIDefaultSubscrCnt, easyAPIDefaultSubscrSize) // Reallocate and reset dbsubs
@@ -320,9 +320,9 @@ func NodeNextE(tptoken uint64, varname string, subary []string) ([]string, error
 	subcnt := int(dbsubs.elemsUsed)
 	nextsubs := make([]string, subcnt)
 	for i := 0; i < subcnt; i++ {
-		nextsub, err := dbsubs.GetValStr(tptoken, uint32(i))
+		nextsub, err := dbsubs.ValStr(tptoken, uint32(i))
 		if nil != err {
-			panic(fmt.Sprintf("YDB: Unexpected error with GetValStr(): %s", err))
+			panic(fmt.Sprintf("YDB: Unexpected error with ValStr(): %s", err))
 		}
 		nextsubs[i] = *nextsub
 	}
@@ -357,9 +357,9 @@ func NodePrevE(tptoken uint64, varname string, subary []string) ([]string, error
 			}
 			if int(C.YDB_ERR_INVSTRLEN) == errorcode {
 				// This is INVSTRLEN - the last valid subscript (as shown by elemsUsed) is the element
-				neededlen, err := dbsubs.GetLenUsed(tptoken, dbsubs.elemsUsed)
+				neededlen, err := dbsubs.ElemLenUsed(tptoken, dbsubs.elemsUsed)
 				if nil != err {
-					panic(fmt.Sprintf("YDB: Unexpected error with GetLenUsed(): %s", err))
+					panic(fmt.Sprintf("YDB: Unexpected error with ElemLenUsed(): %s", err))
 				}
 				easyAPIDefaultSubscrSize = neededlen
 				dbsubs.Alloc(easyAPIDefaultSubscrCnt, easyAPIDefaultSubscrSize)
@@ -374,23 +374,23 @@ func NodePrevE(tptoken uint64, varname string, subary []string) ([]string, error
 	subcnt := int(dbsubs.elemsUsed)
 	nextsubs := make([]string, subcnt)
 	for i := 0; i < int(dbsubs.elemsUsed); i++ {
-		nextsub, err := dbsubs.GetValStr(tptoken, uint32(i))
+		nextsub, err := dbsubs.ValStr(tptoken, uint32(i))
 		if nil != err {
-			panic(fmt.Sprintf("YDB: Unexpected error with GetValStr(): %s", err))
+			panic(fmt.Sprintf("YDB: Unexpected error with ValStr(): %s", err))
 		}
 		nextsubs[i] = *nextsub
 	}
 	return nextsubs, nil
 }
 
-// Function to set a value into the given node (varname and subscripts)
-func SetE(tptoken uint64, value, varname string, subary []string) error {
+// SetValE() is a STAPI function to set a value into the given node (varname and subscripts)
+func SetValE(tptoken uint64, value, varname string, subary []string) error {
 	var dbkey KeyT
 	var dbvalue BufferT
 	var maxsublen, sublen, i uint32
 	var err error
 
-	printEntry("SetE()")
+	printEntry("SetValE()")
 	defer dbkey.Free()
 	defer dbvalue.Free()
 	subcnt := uint32(len(subary))
@@ -414,7 +414,7 @@ func SetE(tptoken uint64, value, varname string, subary []string) error {
 			panic(fmt.Sprintf("YDB: Unexpected error with SetValStr(): %s", err))
 		}
 	}
-	err = dbkey.Subary.SetUsed(tptoken, subcnt)
+	err = dbkey.Subary.SetElemUsed(tptoken, subcnt)
 	if nil != err {
 		panic(fmt.Sprintf("YDB: Unexpected error with SetUsed(): %s", err))
 	}
@@ -465,7 +465,7 @@ func SubNextE(tptoken uint64, varname string, subary []string) (string, error) {
 		}
 		break // No error so success and we are done!
 	}
-	retval, err = dbsub.GetValStr(tptoken)
+	retval, err = dbsub.ValStr(tptoken)
 	return *retval, err
 }
 
@@ -500,7 +500,7 @@ func SubPrevE(tptoken uint64, varname string, subary []string) (string, error) {
 		}
 		break // No error so success and we are done!
 	}
-	retval, err = dbsub.GetValStr(tptoken)
+	retval, err = dbsub.ValStr(tptoken)
 	return *retval, err
 }
 

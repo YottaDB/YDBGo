@@ -86,9 +86,9 @@ func (key *KeyT) DeleteST(tptoken uint64, deltype int) error {
 	return nil
 }
 
-// GetST() is a STAPI method to fetch the given node returning its value in retval.
-func (key *KeyT) GetST(tptoken uint64, retval *BufferT) error {
-	printEntry("KeyT.GetST()")
+// ValST() is a STAPI method to fetch the given node returning its value in retval.
+func (key *KeyT) ValST(tptoken uint64, retval *BufferT) error {
+	printEntry("KeyT.ValST()")
 	vargobuft := (&((*key).Varnm)).cbuft
 	subgobuftary := &((*key).Subary)
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer((*subgobuftary).cbuftary))
@@ -205,9 +205,9 @@ func (key *KeyT) NodePrevST(tptoken uint64, prev *BufferTArray) error {
 	return nil
 }
 
-// SetST() is a STAPI method to set the given value into the given node (glvn or SVN).
-func (key *KeyT) SetST(tptoken uint64, value *BufferT) error {
-	printEntry("KeyT.SetST()")
+// SetValST() is a STAPI method to set the given value into the given node (glvn or SVN).
+func (key *KeyT) SetValST(tptoken uint64, value *BufferT) error {
+	printEntry("KeyT.SetValST()")
 	cbuftary := (*C.ydb_buffer_t)(unsafe.Pointer((*key).Subary.cbuftary))
 	rc := C.ydb_set_st(C.uint64_t(tptoken), (*key).Varnm.cbuft, C.int((*key).Subary.elemsUsed), cbuftary,
 		(*value).cbuft)

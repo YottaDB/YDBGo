@@ -36,14 +36,14 @@ func TestStr2ZwrSt(t *testing.T) {
 	Assertnoerr(err, t)
 	err = ovalue.Str2ZwrST(tptoken, &cvalue)
 	Assertnoerr(err, t)
-	outstrp, err = cvalue.GetValStr(tptoken)
+	outstrp, err = cvalue.ValStr(tptoken)
 	Assertnoerr(err, t)
 	if DebugFlag {
 		t.Log("Str2ZwrS modified string:    ", *outstrp)
 	}
 	err = cvalue.Zwr2StrST(tptoken, &ovalue)
 	Assertnoerr(err, t)
-	outstrp, err = ovalue.GetValStr(tptoken)
+	outstrp, err = ovalue.ValStr(tptoken)
 	Assertnoerr(err, t)
 	if DebugFlag {
 		t.Log("Zwr2StrS re-modified string: ", *outstrp)

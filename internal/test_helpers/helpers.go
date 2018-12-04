@@ -111,10 +111,10 @@ func VerifyLockExists(lockvalidation []byte, errors *int, giveerror bool, t *tes
 // Routine to take a BufferTArray full of subscripts and turn it into a string array of the same subscripts
 //
 func Buftary2strary(tptoken uint64, buftary *yottadb.BufferTArray, t *testing.T) (*[]string, error) {
-	arraylen := int(buftary.GetUsed())
+	arraylen := int(buftary.ElemUsed())
 	retval := make([]string, arraylen)
 	for i := 0; arraylen > i; i++ {
-		subval, err := (*buftary).GetValStr(tptoken, uint32(i))
+		subval, err := (*buftary).ValStr(tptoken, uint32(i))
 		Assertnoerr(err, t)
 		retval[i] = *subval
 	}
@@ -156,7 +156,7 @@ func TestTpRtn(tptoken uint64, tpfnparm unsafe.Pointer) int {
 	if nil != tpfnparm {
 		fmt.Println("Non-zero value for parameter (no idea why)")
 	}
-	err = yottadb.SetE(tptoken, "I am not the value you seek", "^Variable1A", []string{})
+	err = yottadb.SetValE(tptoken, "I am not the value you seek", "^Variable1A", []string{})
 	if nil != err {
 		fmt.Println("First SetE error: ", err)
 	}
@@ -170,11 +170,11 @@ func TestTpRtn(tptoken uint64, tpfnparm unsafe.Pointer) int {
 	Assertnoerr(err, nil)
 	err = dbkey.Subary.SetValStrLit(tptoken, 2, "Index2")
 	Assertnoerr(err, nil)
-	err = dbkey.Subary.SetUsed(tptoken, 3)
+	err = dbkey.Subary.SetElemUsed(tptoken, 3)
 	Assertnoerr(err, nil)
 	err = dbval.SetValStrLit(tptoken, "The value of Variable1A")
 	Assertnoerr(err, nil)
-	err = dbkey.SetST(tptoken, &dbval)
+	err = dbkey.SetValST(tptoken, &dbval)
 	if nil != err {
 		fmt.Println("First SetS error: ", err)
 	}
@@ -186,9 +186,9 @@ func TestTpRtn(tptoken uint64, tpfnparm unsafe.Pointer) int {
 	Assertnoerr(err, nil)
 	err = dbval.SetValStrLit(tptoken, "The value of Variable2B")
 	Assertnoerr(err, nil)
-	err = dbkey.Subary.SetUsed(tptoken, 2)
+	err = dbkey.Subary.SetElemUsed(tptoken, 2)
 	Assertnoerr(err, nil)
-	err = dbkey.SetST(tptoken, &dbval)
+	err = dbkey.SetValST(tptoken, &dbval)
 	if nil != err {
 		fmt.Println("Second SetS error: ", err)
 		rc = yottadb.ErrorCode(err)

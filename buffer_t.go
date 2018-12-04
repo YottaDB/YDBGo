@@ -82,9 +82,9 @@ func (buft *BufferT) Free() {
 	}
 }
 
-// GetLenAlloc() is a method to fetch the ydb_buffer_t.len_alloc field containing the allocated length of the buffer.
-func (buft *BufferT) GetLenAlloc(tptoken uint64) (uint32, error) {
-	printEntry("BufferT.GetLenAlloc()")
+// LenAlloc() is a method to fetch the ydb_buffer_t.len_alloc field containing the allocated length of the buffer.
+func (buft *BufferT) LenAlloc(tptoken uint64) (uint32, error) {
+	printEntry("BufferT.LenAlloc()")
 	cbuftptr := (*buft).cbuft
 	if nil == cbuftptr {
 		// Create an error to return
@@ -97,10 +97,10 @@ func (buft *BufferT) GetLenAlloc(tptoken uint64) (uint32, error) {
 	return (uint32)((*cbuftptr).len_alloc), nil
 }
 
-// GetLenUsed() is a method to fetch the ydb_buffer_t.len_used field containing the used length of the buffer. Note
+// LenUsed() is a method to fetch the ydb_buffer_t.len_used field containing the used length of the buffer. Note
 // that if len_used > than len_alloc thus indicating a previous issue, an INVSTRLEN error is raised.
-func (buft *BufferT) GetLenUsed(tptoken uint64) (uint32, error) {
-	printEntry("BufferT.GetLenUsed()")
+func (buft *BufferT) LenUsed(tptoken uint64) (uint32, error) {
+	printEntry("BufferT.LenUsed()")
 	cbuftptr := (*buft).cbuft
 	if nil == cbuftptr {
 		// Create an error to return
@@ -122,11 +122,11 @@ func (buft *BufferT) GetLenUsed(tptoken uint64) (uint32, error) {
 	return uint32(lenused), nil
 }
 
-// GetValBAry() is a method to fetch the buffer contents as a byte array (returned as *[]byte to limit copies made).
-func (buft *BufferT) GetValBAry(tptoken uint64) (*[]byte, error) {
+// ValBAry() is a method to fetch the buffer contents as a byte array (returned as *[]byte to limit copies made).
+func (buft *BufferT) ValBAry(tptoken uint64) (*[]byte, error) {
 	var bary []byte
 
-	printEntry("BufferT.GetValBAry()")
+	printEntry("BufferT.ValBAry()")
 	cbuftptr := (*buft).cbuft
 	if nil == cbuftptr {
 		// Create an error to return
@@ -152,11 +152,11 @@ func (buft *BufferT) GetValBAry(tptoken uint64) (*[]byte, error) {
 	return &bary, nil
 }
 
-// GetValStr() is a method to fetch the buffer contents as a string (returned as *string to limit copies made).
-func (buft *BufferT) GetValStr(tptoken uint64) (*string, error) {
+// ValStr() is a method to fetch the buffer contents as a string (returned as *string to limit copies made).
+func (buft *BufferT) ValStr(tptoken uint64) (*string, error) {
 	var str string
 
-	printEntry("BufferT.GetValStr()")
+	printEntry("BufferT.ValStr()")
 	cbuftptr := (*buft).cbuft
 	if nil == cbuftptr {
 		// Create an error to return

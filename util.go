@@ -39,7 +39,7 @@ func MessageT(tptoken uint64, status int) (string, error) {
 		return "", err
 	}
 	// Returned string should be snug in the retval buffer. Pick it out so can return it as a string
-	msgptr, err := msgval.GetValStr(tptoken)
+	msgptr, err := msgval.ValStr(tptoken)
 	if nil != err {
 		panic(fmt.Sprintf("YDB: Unexpected error with GetValStr(): %s", err))
 	}
