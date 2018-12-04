@@ -1,0 +1,110 @@
+//////////////////////////////////////////////////////////////////
+//								//
+// Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	//
+// All rights reserved.						//
+//								//
+//	This source code contains the intellectual property	//
+//	of its copyright holder(s), and is made available	//
+//	under a license.  If you do not know the terms of	//
+//	the license, please stop and do not read further.	//
+//								//
+//////////////////////////////////////////////////////////////////
+
+package yottadb
+
+import (
+	"fmt"
+	"runtime"
+	"unsafe"
+)
+
+// #include "libyottadb.h"
+// #include "libydberrors.h"
+import "C"
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Miscellaneous functions
+//
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// max() is a function to provide max integer value between two given values.
+func max(x int, y int) int {
+	if x >= y {
+		return x
+	}
+	return y
+}
+
+// printEntry() is a function to print entry point of function when entered if debug flag is enabled.
+func printEntry(funcName string) {
+	if debugFlag {
+		_, file, line, ok := runtime.Caller(2)
+		if ok {
+			fmt.Println("Entered ", funcName, " from ", file, " at line ", line)
+		} else {
+			fmt.Println("Entered ", funcName)
+		}
+	}
+}
+
+// initkey() is a function to initialize a provided key with the provided varname and subscript array in string form.
+func initkey(tptoken uint64, dbkey *KeyT, varname *string, subary *[]string) {
+	var maxsublen, sublen, i uint32
+	var err error
+
+	subcnt := uint32(len(*subary))
+	maxsublen = 0
+	for i = 0; i < subcnt; i++ {
+		// Find maximum length of subscript so know how much to allocate
+		sublen = uint32(len((*subary)[i]))
+		if sublen > maxsublen {
+			maxsublen = sublen
+		}
+	}
+	(*dbkey).Alloc(uint32(len(*varname)), subcnt, maxsublen)
+	(*dbkey).Varnm.SetValStr(tptoken, varname)
+	if nil != err {
+		panic(fmt.Sprintf("YDB: Unexpected error with SetValStr(): %s", err))
+	}
+	// Load subscripts into KeyT (if any)
+	for i = 0; i < subcnt; i++ {
+		err = (*dbkey).Subary.SetValStr(tptoken, i, &((*subary)[i]))
+		if nil != err {
+			panic(fmt.Sprintf("YDB: Unexpected error with SetValStr(): %s", err))
+		}
+	}
+	err = (*dbkey).Subary.SetUsed(tptoken, subcnt)
+	if nil != err {
+		panic(fmt.Sprintf("YDB: Unexpected error with SetUsed(): %s", err))
+	}
+}
+
+// IsLittleEndian() is a function to determine endianness. Exposed in case anyone else wants to know.
+func IsLittleEndian() bool {
+	var bittest int = 0x01
+
+	if 0x01 == *(*byte)(unsafe.Pointer(&bittest)) {
+		return true
+	}
+	return false
+}
+
+// Exit() is a function to drive YDB's exit handler in case of panic or other non-normal shutdown that bypasses
+// atexit() that would normally drive the exit handler.
+func Exit() {
+	C.ydb_exit()
+}
+
+// Assertnoerror() function checks provided error code and give panic along with location if is an error.
+// Useful for test code especially - not particularly useful or proper for production code.
+func Assertnoerror(err error) {
+	if nil != err {
+		_, file, line, ok := runtime.Caller(1)
+		if ok {
+			panic(fmt.Sprintf("Assertion failure in %v at line %v with error: %v", file, line, err))
+		} else {
+			panic(fmt.Sprintf("Assertion failure: %v", err))
+		}
+	}
+}
