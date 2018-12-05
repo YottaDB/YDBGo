@@ -28,11 +28,13 @@ import (
 // } gparam_list;
 import "C"
 
+// variadicPlist structure is used to anchor the C parameter list used to call callg_nc() via
+// ydb_call_variadic_list_func_st().
 type variadicPlist struct { // Variadic plist support (not exported) needed by LockS() function
 	cvplist *C.gparam_list
 }
 
-// Method to allocate the variable plist C structure anchored in variadicPlist
+// alloc is a variadicPlist method to allocate the variable plist C structure anchored in variadicPlist
 func (vplist *variadicPlist) alloc() {
 	printEntry("variadicPlist.alloc()")
 	if nil != (*vplist).cvplist {
@@ -42,15 +44,16 @@ func (vplist *variadicPlist) alloc() {
 	(*vplist).cvplist = (*C.gparam_list)(C.malloc(C.size_t(C.sizeof_gparam_list)))
 }
 
-// Method to drive a variadic plist function with the given plist. The function pointer must be to a C routine as
-// cgo does not allow golang function pointers to be passed to C.
+// callVariadicPlistFuncSt is a variadicPlist method to drive a variadic plist function with the given
+// plist. The function pointer must be to a C routine as cgo does not allow golang function pointers to
+// be passed to C.
 func (vplist *variadicPlist) callVariadicPlistFuncST(tptoken uint64, vpfunc unsafe.Pointer) int {
 	printEntry("variadicPlist.callVariadicPlistFuncST()")
 	return int(C.ydb_call_variadic_plist_func_st(C.uint64_t(tptoken), (C.ydb_vplist_func)(vpfunc),
 		(C.uintptr_t)(uintptr(unsafe.Pointer((*vplist).cvplist)))))
 }
 
-// Method to release the allocated C buffer in this structure
+// free is a variadicPlist method to release the allocated C buffer in this structure.
 func (vplist *variadicPlist) free() {
 	printEntry("variadicPlist.free()")
 	if nil != (*vplist).cvplist {
@@ -59,7 +62,7 @@ func (vplist *variadicPlist) free() {
 	}
 }
 
-// Method to dump a variadic plist block for debugging purposes
+// dump is a variadicPlist method to dump a variadic plist block for debugging purposes
 func (vplist *variadicPlist) dump(tptoken uint64) {
 	printEntry("variadicPlist.dump()")
 	cvplist := (*vplist).cvplist
@@ -75,7 +78,8 @@ func (vplist *variadicPlist) dump(tptoken uint64) {
 	elemcnt := (*cvplist).n
 	fmt.Printf("   Total of %d (%x) elements in this variadic plist\n", elemcnt, elemcnt)
 	if C.MAXVPARMS < elemcnt {
-		// Reset elemcnt to max we support. Value is probably trash but what the lower loop displays might be interesting
+		// Reset elemcnt to max we support. Value is probably trash but what the lower loop displays
+		// might be interesting
 		elemcnt = C.MAXVPARMS
 		fmt.Println("     (Element count exceeds max - reset to ", elemcnt)
 	}
@@ -87,7 +91,7 @@ func (vplist *variadicPlist) dump(tptoken uint64) {
 	}
 }
 
-// Method to set the number of used elements in the variadic plist array
+// setUsed is a variadicPlist method to set the number of used elements in the variadic plist array
 func (vplist *variadicPlist) setUsed(tptoken uint64, newUsed uint32) error {
 	printEntry("variadicPlist.setUsed")
 	cvplist := (*vplist).cvplist
@@ -103,8 +107,8 @@ func (vplist *variadicPlist) setUsed(tptoken uint64, newUsed uint32) error {
 	return nil
 }
 
-// Method to set an entry to the variable plist - note the addresses we add here MUST point to C allocated
-// memory and NOT Golang allocated memory or a crash will result.
+// setVPlistParam is a varidicPlist method to set an entry to the variable plist - note the addresses we
+// add here MUST point to C allocated memory and NOT Golang allocated memory or a crash will result.
 func (vplist *variadicPlist) setVPlistParam(tptoken uint64, paramindx int, paramaddr uintptr) error {
 	printEntry("variadicPlist.setVPlistParm")
 	cvplist := (*vplist).cvplist

@@ -35,7 +35,7 @@ import "C"
 // are defined in buffer_t.go, bufer_t_array.go, and key_t.go with utilities being defined in util.go.
 //
 
-// LockST() is a STAPI function that releases all existing locks then locks the supplied variadic list of lock keys.
+// LockST is a STAPI function that releases all existing locks then locks the supplied variadic list of lock keys.
 func LockST(tptoken uint64, timeoutNsec uint64, lockname ...*KeyT) error {
 	var vplist variadicPlist
 	var lockcnt, namecnt int

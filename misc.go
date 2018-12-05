@@ -28,7 +28,7 @@ import "C"
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// max() is a function to provide max integer value between two given values.
+// max is a function to provide max integer value between two given values.
 func max(x int, y int) int {
 	if x >= y {
 		return x
@@ -36,7 +36,7 @@ func max(x int, y int) int {
 	return y
 }
 
-// printEntry() is a function to print entry point of function when entered if debug flag is enabled.
+// printEntry is a function to print entry point of function when entered if debug flag is enabled.
 func printEntry(funcName string) {
 	if debugFlag {
 		_, file, line, ok := runtime.Caller(2)
@@ -48,7 +48,7 @@ func printEntry(funcName string) {
 	}
 }
 
-// initkey() is a function to initialize a provided key with the provided varname and subscript array in string form.
+// initkey is a function to initialize a provided key with the provided varname and subscript array in string form.
 func initkey(tptoken uint64, dbkey *KeyT, varname *string, subary *[]string) {
 	var maxsublen, sublen, i uint32
 	var err error
@@ -80,9 +80,9 @@ func initkey(tptoken uint64, dbkey *KeyT, varname *string, subary *[]string) {
 	}
 }
 
-// IsLittleEndian() is a function to determine endianness. Exposed in case anyone else wants to know.
+// IsLittleEndian is a function to determine endianness. Exposed in case anyone else wants to know.
 func IsLittleEndian() bool {
-	var bittest int = 0x01
+	var bittest = 0x01
 
 	if 0x01 == *(*byte)(unsafe.Pointer(&bittest)) {
 		return true
@@ -90,13 +90,13 @@ func IsLittleEndian() bool {
 	return false
 }
 
-// Exit() is a function to drive YDB's exit handler in case of panic or other non-normal shutdown that bypasses
+// Exit is a function to drive YDB's exit handler in case of panic or other non-normal shutdown that bypasses
 // atexit() that would normally drive the exit handler.
 func Exit() {
 	C.ydb_exit()
 }
 
-// Assertnoerror() function checks provided error code and give panic along with location if is an error.
+// Assertnoerror function checks provided error code and give panic along with location if is an error.
 // Useful for test code especially - not particularly useful or proper for production code.
 func Assertnoerror(err error) {
 	if nil != err {

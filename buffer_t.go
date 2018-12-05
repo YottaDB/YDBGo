@@ -23,11 +23,13 @@ import (
 // #include "libydberrors.h"
 import "C"
 
+// BufferT is a golang structure that serves as an anchor point for a C allocated ydb_buffer_t structure used
+// to call the YottaDB C Simple APIs.
 type BufferT struct { // Contains a single ydb_buffer_t struct
 	cbuft *C.ydb_buffer_t // C flavor of the ydb_buffer_t struct
 }
 
-// Alloc() is a method to allocate the ydb_buffer_t C storage and allocate or re-allocate the buffer pointed
+// Alloc is a method to allocate the ydb_buffer_t C storage and allocate or re-allocate the buffer pointed
 // to by that struct.
 func (buft *BufferT) Alloc(bufSiz uint32) {
 	var cbuftptr *C.ydb_buffer_t
@@ -52,7 +54,7 @@ func (buft *BufferT) Alloc(bufSiz uint32) {
 	(*cbuftptr).len_alloc = C.uint(bufSiz)
 }
 
-// Dump() is a method to dump the contents of a BufferT block for debugging purposes.
+// Dump is a method to dump the contents of a BufferT block for debugging purposes.
 func (buft *BufferT) Dump() {
 	printEntry("BufferT.Dump()")
 	cbuftptr := (*buft).cbuft
@@ -68,7 +70,7 @@ func (buft *BufferT) Dump() {
 	fmt.Printf("\n")
 }
 
-// Free() is a method to release both the buffer and ydb_buffer_t block associate with the BufferT block.
+// Free is a method to release both the buffer and ydb_buffer_t block associate with the BufferT block.
 func (buft *BufferT) Free() {
 	printEntry("BufferT.Free()")
 	cbuftptr := (*buft).cbuft
@@ -82,7 +84,7 @@ func (buft *BufferT) Free() {
 	}
 }
 
-// LenAlloc() is a method to fetch the ydb_buffer_t.len_alloc field containing the allocated length of the buffer.
+// LenAlloc is a method to fetch the ydb_buffer_t.len_alloc field containing the allocated length of the buffer.
 func (buft *BufferT) LenAlloc(tptoken uint64) (uint32, error) {
 	printEntry("BufferT.LenAlloc()")
 	cbuftptr := (*buft).cbuft
@@ -97,7 +99,7 @@ func (buft *BufferT) LenAlloc(tptoken uint64) (uint32, error) {
 	return (uint32)((*cbuftptr).len_alloc), nil
 }
 
-// LenUsed() is a method to fetch the ydb_buffer_t.len_used field containing the used length of the buffer. Note
+// LenUsed is a method to fetch the ydb_buffer_t.len_used field containing the used length of the buffer. Note
 // that if len_used > than len_alloc thus indicating a previous issue, an INVSTRLEN error is raised.
 func (buft *BufferT) LenUsed(tptoken uint64) (uint32, error) {
 	printEntry("BufferT.LenUsed()")
@@ -122,7 +124,7 @@ func (buft *BufferT) LenUsed(tptoken uint64) (uint32, error) {
 	return uint32(lenused), nil
 }
 
-// ValBAry() is a method to fetch the buffer contents as a byte array (returned as *[]byte to limit copies made).
+// ValBAry is a method to fetch the buffer contents as a byte array (returned as *[]byte to limit copies made).
 func (buft *BufferT) ValBAry(tptoken uint64) (*[]byte, error) {
 	var bary []byte
 
@@ -152,7 +154,7 @@ func (buft *BufferT) ValBAry(tptoken uint64) (*[]byte, error) {
 	return &bary, nil
 }
 
-// ValStr() is a method to fetch the buffer contents as a string (returned as *string to limit copies made).
+// ValStr is a method to fetch the buffer contents as a string (returned as *string to limit copies made).
 func (buft *BufferT) ValStr(tptoken uint64) (*string, error) {
 	var str string
 
@@ -182,7 +184,7 @@ func (buft *BufferT) ValStr(tptoken uint64) (*string, error) {
 	return &str, nil
 }
 
-// SetLenUsed() is a method to set the used length of buffer in the ydb_buffer_t block (must be <= alloclen).
+// SetLenUsed is a method to set the used length of buffer in the ydb_buffer_t block (must be <= alloclen).
 func (buft *BufferT) SetLenUsed(tptoken uint64, newLen uint32) error {
 	printEntry("BufferT.SetLenUsed()")
 	cbuftptr := (*buft).cbuft
@@ -206,7 +208,7 @@ func (buft *BufferT) SetLenUsed(tptoken uint64, newLen uint32) error {
 	return nil
 }
 
-// SetValBAry() is a method to set a []byte array into the given buffer.
+// SetValBAry is a method to set a []byte array into the given buffer.
 func (buft *BufferT) SetValBAry(tptoken uint64, value *[]byte) error {
 	printEntry("BufferT.SetValBAry()")
 	cbuftptr := (*buft).cbuft
@@ -237,14 +239,14 @@ func (buft *BufferT) SetValBAry(tptoken uint64, value *[]byte) error {
 	return nil
 }
 
-// SetValStr() is a method to set a string into the given buffer.
+// SetValStr is a method to set a string into the given buffer.
 func (buft *BufferT) SetValStr(tptoken uint64, value *string) error {
 	printEntry("BufferT.SetValStr()")
 	valuebary := []byte(*value)
 	return buft.SetValBAry(tptoken, &valuebary)
 }
 
-// SetValStrLit() is a method to set a literal string into the given buffer.
+// SetValStrLit is a method to set a literal string into the given buffer.
 func (buft *BufferT) SetValStrLit(tptoken uint64, value string) error {
 	printEntry("BufferT.SetValStrLit()")
 	valuebary := []byte(value)
@@ -263,7 +265,7 @@ func (buft *BufferT) Str2ZwrST(tptoken uint64, zwr *BufferT) error {
 	return nil
 }
 
-// Zwr2StrST() is a STAPI method to take the given ZWRITE format string and return it as a normal ASCII string.
+// Zwr2StrST is a STAPI method to take the given ZWRITE format string and return it as a normal ASCII string.
 func (buft *BufferT) Zwr2StrST(tptoken uint64, str *BufferT) error {
 	printEntry("BufferT.Zwr2StrST()")
 	rc := C.ydb_zwr2str_st(C.uint64_t(tptoken), (*buft).cbuft, (*str).cbuft)

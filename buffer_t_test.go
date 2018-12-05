@@ -19,7 +19,8 @@ import (
 	"testing"
 )
 
-func TestStr2ZwrSt(t *testing.T) {
+// TestStr2ZwrSTAndZwr2StrST tests the Str2ZwrST() and Zwr2StrST() methods
+func TestStr2ZwrSTAndZwr2StrST(t *testing.T) {
 	var ovalue, cvalue yottadb.BufferT
 	var outstrp *string
 	var tptoken uint64 = yottadb.NOTTP
@@ -27,7 +28,6 @@ func TestStr2ZwrSt(t *testing.T) {
 
 	ovalue.Alloc(64)
 	cvalue.Alloc(128)
-
 	origstr := "This\tis\ta\ttest\tstring"
 	if DebugFlag {
 		fmt.Println("Original string unmodified:  ", origstr)

@@ -18,6 +18,7 @@ import (
 	"testing"
 )
 
+// TestDeleteExclST tests the DeleteExclST() method
 func TestDeleteExclST(t *testing.T) {
 	var namelst yottadb.BufferTArray
 	var tptoken uint64 = yottadb.NOTTP
@@ -61,7 +62,8 @@ func TestDeleteExclST(t *testing.T) {
 	}
 }
 
-func TestTpSt(t *testing.T) {
+// TestTpST tests the TpST() method by driving a transaction that sets a couple nodes them verifies they exist after the commit
+func TestTpST(t *testing.T) {
 	var novars yottadb.BufferTArray
 	var namelst yottadb.BufferTArray
 	var tptoken uint64 = yottadb.NOTTP

@@ -19,27 +19,6 @@ import (
 	"testing"
 )
 
-func TestLockST(t *testing.T) {
-	var dbkey yottadb.KeyT
-	var tptoken uint64 = yottadb.NOTTP
-	var err error
-	var timeout uint64
-	var errors int
-
-	dbkey.Alloc(VarSiz, AryDim, SubSiz) // Reallocate the key
-	err = dbkey.Varnm.SetValStrLit(tptoken, "^Variable1A")
-	Assertnoerr(err, t)
-	err = dbkey.Subary.SetValStrLit(tptoken, 0, "Index0")
-	Assertnoerr(err, t)
-	err = dbkey.Subary.SetElemUsed(tptoken, 1)
-	Assertnoerr(err, t)
-	err = yottadb.LockST(tptoken, timeout, &dbkey) // 10 second timeout
-	Assertnoerr(err, t)
-	VerifyLockExists([]byte("^Variable1A(\"Index0\")"), &errors, true, t)
-	err = yottadb.LockST(tptoken, 0) // Release all locks
-	Assertnoerr(err, t)
-}
-
 func TestDataE(t *testing.T) {
 	var tptoken uint64 = yottadb.NOTTP
 	var err error

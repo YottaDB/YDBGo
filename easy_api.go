@@ -24,11 +24,11 @@ import "C"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //
-// Functions making up the EasyAPI()
+// Functions making up the EasyAPI
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Function to return $DATA() value for a given variable subscripted or not.
+// DataE is a STAPI function to return $DATA() value for a given variable subscripted or not.
 func DataE(tptoken uint64, varname string, subary []string) (uint32, error) {
 	var retval C.uint
 	var dbkey KeyT
@@ -47,7 +47,7 @@ func DataE(tptoken uint64, varname string, subary []string) (uint32, error) {
 	return uint32(retval), nil
 }
 
-// Function to delete a node or a subtree (see DeleteST) given a deletion type and a varname/subscript set
+// DeleteE is a STAPI function to delete a node or a subtree (see DeleteST) given a deletion type and a varname/subscript set
 func DeleteE(tptoken uint64, deltype int, varname string, subary []string) error {
 	var dbkey KeyT
 	var err error
@@ -66,8 +66,8 @@ func DeleteE(tptoken uint64, deltype int, varname string, subary []string) error
 	return nil
 }
 
-// Function to do an exclusive delete by deleting all local variables except those root vars specified in the
-// variable name array. If the varname array is empty, all local variables are deleted.
+// DeleteExclE is a STAPI function to do an exclusive delete by deleting all local variables except those root vars specified
+// in the variable name array. If the varname array is empty, all local variables are deleted.
 func DeleteExclE(tptoken uint64, varnames []string) error {
 	var vnames BufferTArray
 	var maxvarnmlen, varnmcnt, varnmlen uint32
@@ -101,7 +101,7 @@ func DeleteExclE(tptoken uint64, varnames []string) error {
 	return vnames.DeleteExclST(tptoken)
 }
 
-// ValE() is an STAPI function to return the value found for varname(subary...)
+// ValE is an STAPI function to return the value found for varname(subary...)
 func ValE(tptoken uint64, varname string, subary []string) (string, error) {
 	var dbkey KeyT
 	var dbvalue BufferT
@@ -136,7 +136,7 @@ func ValE(tptoken uint64, varname string, subary []string) (string, error) {
 	return *retval, err
 }
 
-// Function to increment the given value by the given amount and return the new value
+// IncrE is a STAPI function to increment the given value by the given amount and return the new value
 func IncrE(tptoken uint64, incr, varname string, subary []string) (string, error) {
 	var dbkey KeyT
 	var dbvalue, incrval BufferT
@@ -170,7 +170,7 @@ func IncrE(tptoken uint64, incr, varname string, subary []string) (string, error
 	return *retval, err
 }
 
-// LockE() is a STAPI function whose purpose is to release all locks then lock the locks designated. The variadic list
+// LockE is a STAPI function whose purpose is to release all locks then lock the locks designated. The variadic list
 // is pairs of arguments with the first being a string containing the variable name and the second a string array
 // containing the subscripts if any for that variable (null list for no subscripts).
 func LockE(tptoken uint64, timeoutNsec uint64, namesnsubs ...interface{}) error {
@@ -237,7 +237,8 @@ func LockE(tptoken uint64, timeoutNsec uint64, namesnsubs ...interface{}) error 
 	return LockST(tptoken, timeoutNsec, parmlst...)
 }
 
-// Function to decrement the lock count of the given lock. When the count goes to 0, the lock is considered released
+// LockDecrE is a STAPI function to decrement the lock count of the given lock. When the count goes to 0, the lock
+// is considered released.
 func LockDecrE(tptoken uint64, varname string, subary []string) error {
 	var dbkey KeyT
 	var err error
@@ -255,7 +256,8 @@ func LockDecrE(tptoken uint64, varname string, subary []string) error {
 	return nil
 }
 
-// Function to increase the lock count of a given node within the specified timeout in nanoseconds.
+// LockIncrE is a STAPI function to increase the lock count of a given node within the specified timeout in
+// nanoseconds.
 func LockIncrE(tptoken uint64, timeoutNsec uint64, varname string, subary []string) error {
 	var dbkey KeyT
 	var err error
@@ -275,7 +277,7 @@ func LockIncrE(tptoken uint64, timeoutNsec uint64, varname string, subary []stri
 
 }
 
-// Function to return a string array of the subscripts that describe the next node
+// NodeNextE is a STAPI function to return a string array of the subscripts that describe the next node
 func NodeNextE(tptoken uint64, varname string, subary []string) ([]string, error) {
 	var dbkey KeyT
 	var dbsubs BufferTArray
@@ -329,7 +331,7 @@ func NodeNextE(tptoken uint64, varname string, subary []string) ([]string, error
 	return nextsubs, nil
 }
 
-// Function to return a string array of the subscripts that describe the next node
+// NodePrevE is a STAPI function to return a string array of the subscripts that describe the next node
 func NodePrevE(tptoken uint64, varname string, subary []string) ([]string, error) {
 	var dbkey KeyT
 	var dbsubs BufferTArray
@@ -383,7 +385,7 @@ func NodePrevE(tptoken uint64, varname string, subary []string) ([]string, error
 	return nextsubs, nil
 }
 
-// SetValE() is a STAPI function to set a value into the given node (varname and subscripts)
+// SetValE is a STAPI function to set a value into the given node (varname and subscripts)
 func SetValE(tptoken uint64, value, varname string, subary []string) error {
 	var dbkey KeyT
 	var dbvalue BufferT
@@ -434,7 +436,7 @@ func SetValE(tptoken uint64, value, varname string, subary []string) error {
 	return nil
 }
 
-// Function to return the next subscript at the current subscript level
+// SubNextE is a STAPI function to return the next subscript at the current subscript level
 func SubNextE(tptoken uint64, varname string, subary []string) (string, error) {
 	var dbkey KeyT
 	var dbsub BufferT
@@ -469,7 +471,7 @@ func SubNextE(tptoken uint64, varname string, subary []string) (string, error) {
 	return *retval, err
 }
 
-// Function to return the previous subscript at the current subscript level
+// SubPrevE is a STAPI function to return the previous subscript at the current subscript level
 func SubPrevE(tptoken uint64, varname string, subary []string) (string, error) {
 	var dbkey KeyT
 	var dbsub BufferT
@@ -504,7 +506,7 @@ func SubPrevE(tptoken uint64, varname string, subary []string) (string, error) {
 	return *retval, err
 }
 
-// Function to initiate a TP transaction
+// TpE is a STAPI function to initiate a TP transaction
 func TpE(tptoken uint64, tpfn unsafe.Pointer, tpfnparm unsafe.Pointer, transid string, varnames []string) error {
 	var vnames BufferTArray
 	var maxvarnmlen, varnmcnt, varnmlen uint32

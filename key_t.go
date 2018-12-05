@@ -27,7 +27,7 @@ type KeyT struct {
 	Subary BufferTArray
 }
 
-// Alloc() is a STAPI method to allocate both pieces of the KeyT according to the supplied parameters.
+// Alloc is a STAPI method to allocate both pieces of the KeyT according to the supplied parameters.
 // Parameters:
 //   varSiz  - Length of buffer for varname (current var max is 31).
 //   numSubs - Number of subscripts to supply (current subscript max is 31).
@@ -38,21 +38,21 @@ func (key *KeyT) Alloc(varSiz, numSubs, subSiz uint32) {
 	(&((*key).Subary)).Alloc(numSubs, subSiz)
 }
 
-// Dump() is a STAPI method to dump the contents of the KeyT structure.
+// Dump is a STAPI method to dump the contents of the KeyT structure.
 func (key *KeyT) Dump() {
 	printEntry("KeyT.Dump()")
 	(&((*key).Varnm)).Dump()
 	(&((*key).Subary)).Dump()
 }
 
-// Free() is a STAPI method to free both pieces of the KeyT structure.
+// Free is a STAPI method to free both pieces of the KeyT structure.
 func (key *KeyT) Free() {
 	printEntry("KeyT.Free()")
 	(&((*key).Varnm)).Free()
 	(&((*key).Subary)).Free()
 }
 
-// DataST() is a STAPI method to determine the status of a given node and its successors.
+// DataST is a STAPI method to determine the status of a given node and its successors.
 func (key *KeyT) DataST(tptoken uint64) (uint32, error) {
 	var retval C.uint
 
@@ -69,7 +69,7 @@ func (key *KeyT) DataST(tptoken uint64) (uint32, error) {
 	return uint32(retval), nil
 }
 
-// DeleteST() is a STAPI method to delete a node and perhaps its successors depending on the value of deltype. If
+// DeleteST is a STAPI method to delete a node and perhaps its successors depending on the value of deltype. If
 // deltype is C.YDB_DEL_NODE, only the given node is deleted if it exists. If the value instead is
 // C.YDB_DEL_TREE, then the tree starting at the given node is removed.
 func (key *KeyT) DeleteST(tptoken uint64, deltype int) error {
@@ -86,7 +86,7 @@ func (key *KeyT) DeleteST(tptoken uint64, deltype int) error {
 	return nil
 }
 
-// ValST() is a STAPI method to fetch the given node returning its value in retval.
+// ValST is a STAPI method to fetch the given node returning its value in retval.
 func (key *KeyT) ValST(tptoken uint64, retval *BufferT) error {
 	printEntry("KeyT.ValST()")
 	vargobuft := (&((*key).Varnm)).cbuft
@@ -102,7 +102,7 @@ func (key *KeyT) ValST(tptoken uint64, retval *BufferT) error {
 	return nil
 }
 
-// IncrST() is a STAPI method to increment a given node and return the new value.
+// IncrST is a STAPI method to increment a given node and return the new value.
 func (key *KeyT) IncrST(tptoken uint64, incr, retval *BufferT) error {
 	var incrcbuft unsafe.Pointer
 
@@ -126,7 +126,7 @@ func (key *KeyT) IncrST(tptoken uint64, incr, retval *BufferT) error {
 	return nil
 }
 
-// LockDecrST() is a STAPI method to decrement the lock-count of a given lock node.
+// LockDecrST is a STAPI method to decrement the lock-count of a given lock node.
 func (key *KeyT) LockDecrST(tptoken uint64) error {
 	printEntry("KeyT.LockDecrST()")
 	vargobuft := (&((*key).Varnm)).cbuft
@@ -140,7 +140,7 @@ func (key *KeyT) LockDecrST(tptoken uint64) error {
 	return nil
 }
 
-// LockInsrST() is a STAPI method to increment the lock-count of a given node lock with the given timeout in nano-seconds.
+// LockIncrST is a STAPI method to increment the lock-count of a given node lock with the given timeout in nano-seconds.
 func (key *KeyT) LockIncrST(tptoken uint64, timeoutNsec uint64) error {
 	printEntry("KeyT.LockIncrST()")
 	vargobuft := (&((*key).Varnm)).cbuft
@@ -155,7 +155,7 @@ func (key *KeyT) LockIncrST(tptoken uint64, timeoutNsec uint64) error {
 	return nil
 }
 
-// NodeNextST() is a STAPI method to return the next subscripted node for the given global - the node logically following the
+// NodeNextST is a STAPI method to return the next subscripted node for the given global - the node logically following the
 // specified node (returns *BufferTArray).
 func (key *KeyT) NodeNextST(tptoken uint64, next *BufferTArray) error {
 	printEntry("KeyT.NodeNextST()")
@@ -180,7 +180,7 @@ func (key *KeyT) NodeNextST(tptoken uint64, next *BufferTArray) error {
 	return nil
 }
 
-// NodePrevST() is a STAPI method to return the previous subscripted node for the given global - the node logically previous
+// NodePrevST is a STAPI method to return the previous subscripted node for the given global - the node logically previous
 // to the specified node (returns *BufferTArray).
 func (key *KeyT) NodePrevST(tptoken uint64, prev *BufferTArray) error {
 	printEntry("KeyT.NodePrevST()")
@@ -205,7 +205,7 @@ func (key *KeyT) NodePrevST(tptoken uint64, prev *BufferTArray) error {
 	return nil
 }
 
-// SetValST() is a STAPI method to set the given value into the given node (glvn or SVN).
+// SetValST is a STAPI method to set the given value into the given node (glvn or SVN).
 func (key *KeyT) SetValST(tptoken uint64, value *BufferT) error {
 	printEntry("KeyT.SetValST()")
 	cbuftary := (*C.ydb_buffer_t)(unsafe.Pointer((*key).Subary.cbuftary))
@@ -218,7 +218,7 @@ func (key *KeyT) SetValST(tptoken uint64, value *BufferT) error {
 	return nil
 }
 
-// SubNextST() is a STAPI method to return the next subscript following the specified node.
+// SubNextST is a STAPI method to return the next subscript following the specified node.
 func (key *KeyT) SubNextST(tptoken uint64, retval *BufferT) error {
 	printEntry("KeyT.SubNextST()")
 	vargobuft := (&((*key).Varnm)).cbuft
@@ -242,7 +242,7 @@ func (key *KeyT) SubNextST(tptoken uint64, retval *BufferT) error {
 	return nil
 }
 
-// SubPrevST() is a STAPI method to return the previous subscript following the specified node.
+// SubPrevST is a STAPI method to return the previous subscript following the specified node.
 func (key *KeyT) SubPrevST(tptoken uint64, retval *BufferT) error {
 	printEntry("KeyT.SubPrevST()")
 	vargobuft := (&((*key).Varnm)).cbuft

@@ -36,8 +36,7 @@ import (
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Test routine to checkout variadic parameter list methods. This routine needs to be here because it
-// tests/uses the non-exported variadicPlist type.
+// TestVariadicPlistHelper routine to checkout variadic parameter list methods.
 func TestVariadicPlistHelper(debugFlag bool, errors *int) error {
 	var vplist variadicPlist
 	var v1, v2 BufferT

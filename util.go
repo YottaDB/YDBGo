@@ -26,7 +26,7 @@ import "C"
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Function to return the error message (sans argument substitution) of a given error number
+// MessageT is a STAPI utility function to return the error message (sans argument substitution) of a given error number
 func MessageT(tptoken uint64, status int) (string, error) {
 	var msgval BufferT
 

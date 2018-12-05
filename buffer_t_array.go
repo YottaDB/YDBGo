@@ -33,7 +33,7 @@ type BufferTArray struct {
 	cbuftary   *[]C.ydb_buffer_t // C flavor of ydb_buffer_t array
 }
 
-// Alloc() is a method to allocate an array of 'numBufs' ydb_buffer_t structures anchored in this BufferTArray and also
+// Alloc is a method to allocate an array of 'numBufs' ydb_buffer_t structures anchored in this BufferTArray and also
 // for each of those buffers, allocate 'bufSiz' byte buffers anchoring them in the ydb_buffer_t structure.
 func (buftary *BufferTArray) Alloc(numBufs, bufSiz uint32) {
 	var i uint32
@@ -58,7 +58,7 @@ func (buftary *BufferTArray) Alloc(numBufs, bufSiz uint32) {
 	}
 }
 
-// Method to dump (print) the contents of this BufferTArray block
+// Dump is a STAPI method to dump (print) the contents of this BufferTArray block
 func (buftary *BufferTArray) Dump() {
 	printEntry("BufferTArray.Dump()")
 	cbuftary := (*buftary).cbuftary
@@ -74,7 +74,7 @@ func (buftary *BufferTArray) Dump() {
 	}
 }
 
-// Free() is a method to release all allocated C storage in a BufferTArray.
+// Free is a method to release all allocated C storage in a BufferTArray.
 func (buftary *BufferTArray) Free() {
 	printEntry("BufferTArray.Free()")
 	// Deallocate the buffers in each ydb_buffer_t
@@ -96,16 +96,16 @@ func (buftary *BufferTArray) Free() {
 	(*buftary).elemsUsed = 0
 }
 
-// ElemAlloc() is a method to return elemsAlloc from a BufferTArray.
+// ElemAlloc is a method to return elemsAlloc from a BufferTArray.
 func (buftary *BufferTArray) ElemAlloc() uint32 {
 	printEntry("BufferTArray.ElemAlloc()")
 	return (*buftary).elemsAlloc
 }
 
-// ElemLenAlloc() is a method to retrieve the buffer allocation length associated with our BufferTArray.
+// ElemLenAlloc is a method to retrieve the buffer allocation length associated with our BufferTArray.
 // Since all buffers are the same size in this array, just return the value from the first array entry.
 func (buftary *BufferTArray) ElemLenAlloc(tptoken uint64) (uint32, error) {
-	printEntry("BufferTArray.ElemLenAlloc")
+	printEntry("BufferTArray.ElemLenAlloc()")
 	cbuftary := (*buftary).cbuftary
 	if nil == cbuftary {
 		// Create an error to return
@@ -119,7 +119,7 @@ func (buftary *BufferTArray) ElemLenAlloc(tptoken uint64) (uint32, error) {
 	return uint32(elemptr.len_alloc), nil
 }
 
-// ElemLenUsed() is a method to retrieve the buffer used length associated with a given buffer referenced by its index.
+// ElemLenUsed is a method to retrieve the buffer used length associated with a given buffer referenced by its index.
 func (buftary *BufferTArray) ElemLenUsed(tptoken uint64, idx uint32) (uint32, error) {
 	printEntry("BufferTArray.ElemLenUsed()")
 	cbuftary := (*buftary).cbuftary
@@ -144,13 +144,13 @@ func (buftary *BufferTArray) ElemLenUsed(tptoken uint64, idx uint32) (uint32, er
 	return uint32(elemptr.len_used), nil
 }
 
-// ElemUsed() is a method to return elemsUsed from a BufferTArray.
+// ElemUsed is a method to return elemsUsed from a BufferTArray.
 func (buftary *BufferTArray) ElemUsed() uint32 {
 	printEntry("BufferTArray.ElemUsed()")
 	return (*buftary).elemsUsed
 }
 
-// ValBAry() is a method to fetch the buffer of the indicated array element and return it as a byte array pointer.
+// ValBAry is a method to fetch the buffer of the indicated array element and return it as a byte array pointer.
 func (buftary *BufferTArray) ValBAry(tptoken uint64, idx uint32) (*[]byte, error) {
 	var bary []byte
 
@@ -190,7 +190,7 @@ func (buftary *BufferTArray) ValBAry(tptoken uint64, idx uint32) (*[]byte, error
 	return &bary, nil
 }
 
-// ValStr() is a method to fetch the buffer of the indicated array element and return it as a string pointer.
+// ValStr is a method to fetch the buffer of the indicated array element and return it as a string pointer.
 func (buftary *BufferTArray) ValStr(tptoken uint64, idx uint32) (*string, error) {
 	var str string
 
@@ -230,7 +230,7 @@ func (buftary *BufferTArray) ValStr(tptoken uint64, idx uint32) (*string, error)
 	return &str, nil
 }
 
-// SetElemLenUsed() is a method to set the len_used field of a given ydb_buffer_t struct in the BufferTArray.
+// SetElemLenUsed is a method to set the len_used field of a given ydb_buffer_t struct in the BufferTArray.
 func (buftary *BufferTArray) SetElemLenUsed(tptoken uint64, idx, newLen uint32) error {
 	printEntry("BufferTArray.SetElemLenUsed()")
 	elemcnt := (*buftary).elemsAlloc
@@ -265,7 +265,7 @@ func (buftary *BufferTArray) SetElemLenUsed(tptoken uint64, idx, newLen uint32) 
 	return nil
 }
 
-// SetElemUsed() is a method to set the number of used buffers in the BufferTArray.
+// SetElemUsed is a method to set the number of used buffers in the BufferTArray.
 func (buftary *BufferTArray) SetElemUsed(tptoken uint64, newUsed uint32) error {
 	printEntry("BufferTArray.SetElemUsed()")
 	elemcnt := (*buftary).elemsAlloc
@@ -282,7 +282,7 @@ func (buftary *BufferTArray) SetElemUsed(tptoken uint64, newUsed uint32) error {
 	return nil
 }
 
-// SetValBAry() is a method to set a byte array (value) into the buffer at the given index (idx).
+// SetValBAry is a method to set a byte array (value) into the buffer at the given index (idx).
 func (buftary *BufferTArray) SetValBAry(tptoken uint64, idx uint32, value *[]byte) error {
 	printEntry("BufferTArray.SetValBAry()")
 	elemcnt := (*buftary).elemsAlloc
@@ -323,14 +323,14 @@ func (buftary *BufferTArray) SetValBAry(tptoken uint64, idx uint32, value *[]byt
 	return nil
 }
 
-// SetValStr() is a method to set a string (value) into the buffer at the given index (idx).
+// SetValStr is a method to set a string (value) into the buffer at the given index (idx).
 func (buftary *BufferTArray) SetValStr(tptoken uint64, idx uint32, value *string) error {
 	printEntry("BufferTArray.SetValStr()")
 	valuebary := []byte(*value)
 	return buftary.SetValBAry(tptoken, idx, &valuebary)
 }
 
-// SetValStrLit() is a method to set a string literal (value) into the buffer at the given index (idx).
+// SetValStrLit is a method to set a string literal (value) into the buffer at the given index (idx).
 func (buftary *BufferTArray) SetValStrLit(tptoken uint64, idx uint32, value string) error {
 	printEntry("BufferTArray.SetValStrLit()")
 	valuebary := []byte(value)
@@ -343,7 +343,7 @@ func (buftary *BufferTArray) SetValStrLit(tptoken uint64, idx uint32, value stri
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// DeleteExclST() is a method to delete all local variables EXCEPT the variables listed in the method BufferTArray.
+// DeleteExclST is a method to delete all local variables EXCEPT the variables listed in the method BufferTArray.
 // If the input array is empty, then ALL local variables are deleted.
 func (buftary *BufferTArray) DeleteExclST(tptoken uint64) error {
 	printEntry("BufferTArray.DeleteExclST()")
@@ -356,7 +356,7 @@ func (buftary *BufferTArray) DeleteExclST(tptoken uint64) error {
 	return nil
 }
 
-// TpST() is a STAPI method to invoke transaction processing.
+// TpST is a STAPI method to invoke transaction processing.
 // Parameters:
 // - tpfn     - C function pointer routine that either performs the transaction or immediately calls a Golang routine to
 //              perform the transaction. On return from that routine, the transaction is committed.
