@@ -14,8 +14,8 @@ package yottadb_test
 
 import (
 	"fmt"
-	"go.yottadb.com/yottadb"
-	. "go.yottadb.com/yottadb/internal/test_helpers"
+	"lang.yottadb.com/go/yottadb"
+	. "lang.yottadb.com/go/yottadb/internal/test_helpers"
 	"testing"
 )
 

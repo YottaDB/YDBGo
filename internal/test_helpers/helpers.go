@@ -15,7 +15,7 @@ package test_helpers
 import (
 	"bytes"
 	"fmt"
-	"go.yottadb.com/yottadb"
+	"lang.yottadb.com/go/yottadb"
 	"os"
 	"os/exec"
 	"runtime"

@@ -1,21 +1,14 @@
 image: golang:1.10-stretch
 
-cache:
-  paths:
-    - /apt-cache
-    - /go/src/github.com
-    - /go/src/golang.org
-    - /go/src/google.golang.org
-    - /go/src/gopkg.in
-
 stages:
   - test
   - build
+  - deploy
 
 before_script:
-  - mkdir -p /go/src/go.yottadb.com/yottadb /go/src/_/builds
-  - cp -r $CI_PROJECT_DIR/* /go/src/go.yottadb.com/yottadb
-  - ln -s /go/src/go.yottadb.com/yottadb /go/src/_/builds/yottadb
+  - mkdir -p /go/src/lang.yottadb.com/go/yottadb /go/src/_/builds
+  - cp -r $CI_PROJECT_DIR/* /go/src/lang.yottadb.com/go/yottadb
+  - ln -s /go/src/lang.yottadb.com/go/yottadb /go/src/_/builds/yottadb
   - export GOPATH=/go
   - export PATH=${GOPATH}/bin:$PATH
   - go get -u github.com/golang/lint/golint
@@ -30,7 +23,7 @@ before_script:
   - make install
   - cd yottadb_r*
   - ./ydbinstall --force-install
-  - cd /go/src/go.yottadb.com/yottadb
+  - cd /go/src/lang.yottadb.com/go/yottadb
   - export ydb_dist=/usr/local/lib/yottadb/r123
   - export ydb_gbldir=mumps.gld
   - export ydb_routines=/usr/local/lib/yottadb/r123/libyottadbutil.so
@@ -47,29 +40,41 @@ race_detector:
   script:
     - go test -race -short $(go list ./... | grep -v /vendor/)
 
-code_coverage:
+coverage:
   stage: test
   script:
     - PKG_LIST=$(go list ./... | grep -v /vendor/)
+    - mkdir -p $CI_PROJECT_DIR/cover
     - for package in ${PKG_LIST}; do
-    -  go test -covermode=count -coverprofile "cover/${package##*/}.cov" "$package" ;
+    -  go test -covermode=count -coverprofile "$CI_PROJECT_DIR/cover/${package##*/}.cov" "$package" ;
     - done
-    - tail -q -n +2 cover/*.cov >> cover/coverage.cov
-    - go tool cover -func=cover/coverage.cov
-
-code_coverage_report:
-  stage: test
-  script:
-    - go tool cover -html=cover/coverage.cov -o coverage.html
-  only:
-  - master
+    - echo mode":" count > $CI_PROJECT_DIR/cover/coverage.cov
+    - tail -q -n +2 $CI_PROJECT_DIR/cover/*.cov >> $CI_PROJECT_DIR/cover/coverage.cov
+    - go tool cover -func=$CI_PROJECT_DIR/cover/coverage.cov
+    - go tool cover -html=$CI_PROJECT_DIR/cover/coverage.cov -o $CI_PROJECT_DIR/cover/coverage.html
+  artifacts:
+    paths:
+      - cover/coverage.cov
+      - cover/coverage.html
 
 lint_code:
   stage: test
   script:
-    - golint -set_exit_status $(go list ./... | grep -v /vendor/)
+    - golint -set_exit_status $(go list ./... | grep -v /vendor/ | grep -v /internal/)
 
 build:
   stage: build
   script:
-    - go build -i -v go.yottadb.com/yottadb
+    - go build -i -v lang.yottadb.com/go/yottadb
+
+pages:
+  stage: deploy
+  dependencies:
+    - coverage
+  script:
+    - mkdir $CI_PROJECT_DIR/public
+    - mv cover/coverage.html $CI_PROJECT_DIR/public/
+  artifacts:
+    paths:
+      - public
+    expire_in: 30 days
