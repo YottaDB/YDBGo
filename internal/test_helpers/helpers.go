@@ -207,6 +207,20 @@ func CheckErrorExpectYDB_ERR_NODEEND(errorcode int) bool {
 	return false
 }
 
+func CheckErrorExpectYDB_ERR_STRUCTNOTALLOCD(errorcode int) bool {
+	if int(C.YDB_ERR_STRUCTNOTALLOCD) == errorcode {
+		return true
+	}
+	return false
+}
+
+func CheckErrorExpectYDB_ERR_INSUFFSUBS(errorcode int) bool {
+	if int(C.YDB_ERR_INSUFFSUBS) == errorcode {
+		return true
+	}
+	return false
+}
+
 func GetYDB_DEL_TREE() int {
 	return int(C.YDB_DEL_TREE)
 }

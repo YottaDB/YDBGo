@@ -15,6 +15,8 @@ package yottadb
 import (
 	"fmt"
 	"unsafe"
+	"io"
+	"os"
 )
 
 // #include <stdlib.h>
@@ -60,16 +62,20 @@ func (buftary *BufferTArray) Alloc(numBufs, bufSiz uint32) {
 
 // Dump is a STAPI method to dump (print) the contents of this BufferTArray block
 func (buftary *BufferTArray) Dump() {
+	buftary.DumpToWriter(os.Stdout)
+}
+
+func (buftary *BufferTArray) DumpToWriter(w io.Writer) {
 	printEntry("BufferTArray.Dump()")
 	cbuftary := (*buftary).cbuftary
 	if nil != cbuftary {
-		fmt.Printf("BufferTArray.Dump(): cbuftary: %p, elemsAlloc: %d, elemsUsed: %d\n", cbuftary,
+		fmt.Fprintf(w, "BufferTArray.Dump(): cbuftary: %p, elemsAlloc: %d, elemsUsed: %d\n", cbuftary,
 			(*buftary).elemsAlloc, (*buftary).elemsUsed)
 		for i := 0; int((*buftary).elemsUsed) > i; i++ {
 			elemptr := (*C.ydb_buffer_t)(unsafe.Pointer((uintptr(unsafe.Pointer(cbuftary)) +
 				uintptr(C.sizeof_ydb_buffer_t*i))))
 			valstr := C.GoStringN((*elemptr).buf_addr, C.int((*elemptr).len_used))
-			fmt.Printf("  %d: %s\n", i, valstr)
+			fmt.Fprintf(w, "  %d: %s\n", i, valstr)
 		}
 	}
 }

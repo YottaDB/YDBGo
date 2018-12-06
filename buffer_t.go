@@ -15,6 +15,8 @@ package yottadb
 import (
 	"fmt"
 	"unsafe"
+	"os"
+	"io"
 )
 
 // #include <stdlib.h>
@@ -56,18 +58,23 @@ func (buft *BufferT) Alloc(bufSiz uint32) {
 
 // Dump is a method to dump the contents of a BufferT block for debugging purposes.
 func (buft *BufferT) Dump() {
-	printEntry("BufferT.Dump()")
-	cbuftptr := (*buft).cbuft
-	fmt.Printf("BufferT.Dump(): cbuftptr: %p", cbuftptr)
-	if nil != cbuftptr {
-		fmt.Printf(", buf_addr: %v, len_alloc: %v, len_used: %v", (*cbuftptr).buf_addr,
-			(*cbuftptr).len_alloc, (*cbuftptr).len_used)
-		if 0 < (*cbuftptr).len_used {
-			strval := C.GoStringN((*cbuftptr).buf_addr, C.int((*cbuftptr).len_used))
-			fmt.Printf(", value: %s", strval)
-		}
-	}
-	fmt.Printf("\n")
+	buft.DumpToWriter(os.Stdout)
+}
+
+// DumpToWriter dumps a textual representation of this buffer to the writer
+func (buft *BufferT) DumpToWriter(w io.Writer) {
+    printEntry("BufferT.Dump()")
+    cbuftptr := (*buft).cbuft
+    fmt.Fprintf(w, "BufferT.Dump(): cbuftptr: %p", cbuftptr)
+    if nil != cbuftptr {
+        fmt.Fprintf(w, ", buf_addr: %v, len_alloc: %v, len_used: %v", (*cbuftptr).buf_addr,
+            (*cbuftptr).len_alloc, (*cbuftptr).len_used)
+        if 0 < (*cbuftptr).len_used {
+            strval := C.GoStringN((*cbuftptr).buf_addr, C.int((*cbuftptr).len_used))
+            fmt.Fprintf(w, ", value: %s", strval)
+        }
+    }
+    fmt.Fprintf(w, "\n")
 }
 
 // Free is a method to release both the buffer and ydb_buffer_t block associate with the BufferT block.

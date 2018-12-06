@@ -33,11 +33,13 @@ before_script:
 unit_tests:
   stage: test
   script:
+    - go get -t
     - go test -short $(go list ./... | grep -v /vendor/)
 
 race_detector:
   stage: test
   script:
+    - go get -t
     - go test -race -short $(go list ./... | grep -v /vendor/)
 
 coverage:
@@ -46,6 +48,7 @@ coverage:
     - PKG_LIST=$(go list ./... | grep -v /vendor/)
     - mkdir -p $CI_PROJECT_DIR/cover
     - for package in ${PKG_LIST}; do
+    -  go get -t
     -  go test -covermode=count -coverprofile "$CI_PROJECT_DIR/cover/${package##*/}.cov" "$package" ;
     - done
     - echo mode":" count > $CI_PROJECT_DIR/cover/coverage.cov

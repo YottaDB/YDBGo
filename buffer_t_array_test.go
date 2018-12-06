@@ -16,10 +16,12 @@ import (
 	"lang.yottadb.com/go/yottadb"
 	. "lang.yottadb.com/go/yottadb/internal/test_helpers"
 	"testing"
+	"bytes"
+	"github.com/stretchr/testify/assert"
 )
 
-// TestDeleteExclST tests the DeleteExclST() method
-func TestDeleteExclST(t *testing.T) {
+// TestBufTAryDeleteExclST tests the DeleteExclST() method
+func TestBufTAryDeleteExclST(t *testing.T) {
 	var namelst yottadb.BufferTArray
 	var tptoken uint64 = yottadb.NOTTP
 	var err error
@@ -62,8 +64,8 @@ func TestDeleteExclST(t *testing.T) {
 	}
 }
 
-// TestTpST tests the TpST() method by driving a transaction that sets a couple nodes them verifies they exist after the commit
-func TestTpST(t *testing.T) {
+// TestBufTAryTpSt tests the TpST() method by driving a transaction that sets a couple nodes them verifies they exist after the commit
+func TestBufTAryTpSt(t *testing.T) {
 	var novars yottadb.BufferTArray
 	var namelst yottadb.BufferTArray
 	var tptoken uint64 = yottadb.NOTTP
@@ -90,4 +92,227 @@ func TestTpST(t *testing.T) {
 		t.Logf("       Expected: 'The value of Variable2B', Received: '%s'\n", val2)
 		t.Fail()
 	}
+}
+
+func TestBufTAryDump(t *testing.T) {
+	var value, noalloc_value yottadb.BufferTArray
+	var tp = yottadb.NOTTP
+	var buf1 bytes.Buffer
+
+	// Dump from a nil buffer
+	noalloc_value.DumpToWriter(&buf1)
+
+	defer value.Free()
+	value.Alloc(10, 64)
+	value.SetValStrLit(tp, 0, "Hello")
+	value.SetElemUsed(tp, 1)
+	value.DumpToWriter(&buf1)
+	// BufferTArray dump does not show any info about included buffers, so no asserts for
+	//  that; it really only mentions used/available buffers
+	assert.Contains(t, buf1.String(), "10")
+	assert.Contains(t, buf1.String(), "Hello")
+}
+
+func TestBufTAryAlloc(t *testing.T) {
+	var value, noalloc_value yottadb.BufferTArray
+	//var tp = yottadb.NOTTP
+
+	// Try freeing a never Alloc'd buffer
+	value.Free()
+
+	// Try allocating a buffer then freeing it many times
+	value.Alloc(10, 64)
+	value.Free()
+	value.Free()
+
+	// Try allocing a size of
+	value.Alloc(0, 64)
+
+	// Try allocating a buffer multiple times without freeing
+	value.Alloc(10, 64)
+	value.Alloc(10, 64)
+
+	// Verify allocated size
+	r := value.ElemAlloc()
+	assert.Equal(t, r, uint32(10))
+
+	// Try getting ElemAlloc on non-alloced value
+	r = noalloc_value.ElemAlloc()
+	assert.Equal(t, r, uint32(0))
+}
+
+func TestBufTAryLenAlloc(t *testing.T) {
+	var value, noalloc_value yottadb.BufferTArray
+	var tp = yottadb.NOTTP
+
+	t.Skipf("Awaiting conclusion to how to handle Alloc(0)")
+
+	// Try getting length of non-alloc'd array
+	_, err := value.ElemLenAlloc(tp)
+	assert.NotNil(t, err)
+	// TODO: change this function to return 0
+	//assert.Equal(t, r, 0)
+
+	// Alloc a lenght of 0 and try to get it
+	value.Alloc(0, 64)
+	r, err := value.ElemLenAlloc(tp)
+	assert.NotNil(t, err)
+	assert.Equal(t, r, 0)
+
+	_, err = noalloc_value.ElemLenAlloc(tp)
+	assert.NotNil(t, err)
+}
+
+func TestBufTAryBAry(t *testing.T) {
+	var value yottadb.BufferTArray
+	var tp = yottadb.NOTTP
+
+	v := []byte("Hello")
+
+	// Get value from non-allocd value
+	r, err := value.ValBAry(tp, 0)
+	assert.NotNil(t, err)
+	assert.Nil(t, r)
+
+	// Alloc, but get value past the end
+	value.Alloc(10, 64)
+	r, err = value.ValBAry(tp, 11)
+	assert.NotNil(t, err)
+	assert.Nil(t, r)
+
+	// Get a valid value with no content
+	r, err = value.ValBAry(tp, 0)
+
+	// Get a value with some value
+	
+	err = value.SetValBAry(tp, 1, &v)
+	assert.Nil(t, err)
+	r, err = value.ValBAry(tp, 1)
+	assert.Nil(t, err)
+	assert.Equal(t, *r, v)
+
+	// Try set a value on out of bounds element
+	err = value.SetValBAry(tp, 11, &v)
+	assert.NotNil(t, err)
+
+	// Try to set a value on a freed structure
+	value.Free()
+	err = value.SetValBAry(tp, 0, &v)
+	assert.NotNil(t, err)
+	// Need to talk about which return value is correct
+	//errcode := yottadb.ErrorCode(err)
+	//assert.True(t, CheckErrorExpectYDB_ERR_INSUFFSUBS(errcode))
+}
+
+func TestBufTAryMultipleThreads(t *testing.T) {
+	var value yottadb.BufferTArray
+	var tp = yottadb.NOTTP
+
+	t.Skipf("Currently causes a great many problems; skip for now")
+
+	// Spawn off 100 threads which allocate the buffer
+	for i := 0; i < 100; i++ {
+		go (func() {
+			for j := 0; j < 1000; j++ {
+				value.Alloc(10, 64)
+			}
+		})()
+	}
+
+	// Spawn off 100 threads try to set things
+	for i := 0; i < 100; i++ {
+		go (func() {
+			for j := 0; j < 1000; j++ {
+				value.SetValStrLit(tp, 0, "Hello")
+			}
+		})()
+	}
+}
+
+func TestBufTAryElemLenUsed(t *testing.T) {
+	var value yottadb.BufferTArray
+	var tp = yottadb.NOTTP
+
+	t.Skipf("Return errors codes need to be updated in BufferTAry")
+
+	// Test non alloc'd structure
+	err := value.SetElemLenUsed(tp, 0, 0)
+	assert.NotNil(t, err)
+	r, err := value.ElemLenUsed(tp, 0)
+	assert.NotNil(t, err)
+	assert.Equal(t, r, 0)
+
+	// Allocate, then test with an element past the end
+	value.Alloc(10, 64)
+
+	err = value.SetElemLenUsed(tp, 11, 5)
+	assert.NotNil(t, err)
+	r, err = value.ElemLenUsed(tp, 11)
+	assert.NotNil(t, err)
+	assert.Equal(t, r, int32(0))
+
+	// Set a valid subscript to an invalid length
+	err = value.SetElemLenUsed(tp, 0, 100)
+	assert.NotNil(t, err)
+	r, err = value.ElemLenUsed(tp, 0)
+	assert.Nil(t, err)
+	assert.Equal(t, r, uint32(0))
+
+	// Get a valid length
+	err = value.SetElemLenUsed(tp, 0, 50)
+	assert.Nil(t, err)
+	r, err = value.ElemLenUsed(tp, 0)
+	assert.Nil(t, err)
+	assert.Equal(t, r, uint32(50))
+}
+
+func TestBufTAryValStr(t *testing.T) {
+	var value yottadb.BufferTArray
+	var tp = yottadb.NOTTP
+
+	// Test before Alloc
+	r, err := value.ValStr(tp, 0)
+	assert.NotNil(t, err)
+	assert.Nil(t, r)
+
+	value.Alloc(10, 50)
+
+	// Test after alloc, before setting value outside of range
+	r, err = value.ValStr(tp, 11)
+	assert.NotNil(t, err)
+	assert.Nil(t, r)
+
+	// Test after alloc, valid except not defined
+	r, err = value.ValStr(tp, 0)
+	assert.Nil(t, err)
+	assert.NotNil(t, r)
+	assert.Equal(t, *r, "")
+}
+
+func TestBufTAryElemUsed(t *testing.T) {
+	var value yottadb.BufferTArray
+	var tp = yottadb.NOTTP
+
+	// Test before Alloc
+	r := value.ElemUsed()
+	assert.Equal(t, r, uint32(0))
+
+	// Test set
+	err := value.SetElemUsed(tp, 0)
+	assert.Nil(t, err)
+
+	// Alloc, and test
+	value.Alloc(10, 50)
+
+	r = value.ElemUsed()
+	assert.Equal(t, r, uint32(0))
+
+	err = value.SetElemUsed(tp, 100)
+	assert.NotNil(t, err)
+
+	err = value.SetElemUsed(tp, 5)
+	assert.Nil(t, err)
+
+	r = value.ElemUsed()
+	assert.Equal(t, r, uint32(5))
 }
