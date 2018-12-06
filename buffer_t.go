@@ -31,12 +31,21 @@ type BufferT struct { // Contains a single ydb_buffer_t struct
 	cbuft *C.ydb_buffer_t // C flavor of the ydb_buffer_t struct
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Data manipulation methods for BufferT
+//
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // Alloc is a method to allocate the ydb_buffer_t C storage and allocate or re-allocate the buffer pointed
 // to by that struct.
 func (buft *BufferT) Alloc(bufSiz uint32) {
 	var cbuftptr *C.ydb_buffer_t
 
 	printEntry("BufferT.Alloc()")
+	if nil == buft {
+		panic("*BufferT receiver of Alloc() cannot be nil")
+	}
 	if nil != (*buft).cbuft {
 		// We already have a ydb_buffer_t, just get rid of current buffer for re-allocate
 		cbuftptr = (*buft).cbuft
@@ -58,6 +67,9 @@ func (buft *BufferT) Alloc(bufSiz uint32) {
 
 // Dump is a method to dump the contents of a BufferT block for debugging purposes.
 func (buft *BufferT) Dump() {
+	if nil == buft {
+		panic("*BufferT receiver of Dump() cannot be nil")
+	}
 	buft.DumpToWriter(os.Stdout)
 }
 
@@ -80,20 +92,25 @@ func (buft *BufferT) DumpToWriter(w io.Writer) {
 // Free is a method to release both the buffer and ydb_buffer_t block associate with the BufferT block.
 func (buft *BufferT) Free() {
 	printEntry("BufferT.Free()")
-	cbuftptr := (*buft).cbuft
-	if nil != cbuftptr {
-		// ydb_buffer_t block exists - free its buffer first if it exists
-		if nil != (*cbuftptr).buf_addr {
-			C.free(unsafe.Pointer((*cbuftptr).buf_addr))
+	if nil != buft {        // Ignore if buft is null already
+		cbuftptr := (*buft).cbuft
+		if nil != cbuftptr {
+			// ydb_buffer_t block exists - free its buffer first if it exists
+			if nil != (*cbuftptr).buf_addr {
+				C.free(unsafe.Pointer((*cbuftptr).buf_addr))
+			}
+			C.free(unsafe.Pointer(cbuftptr))
+			(*buft).cbuft = nil
 		}
-		C.free(unsafe.Pointer(cbuftptr))
-		(*buft).cbuft = nil
 	}
 }
 
 // LenAlloc is a method to fetch the ydb_buffer_t.len_alloc field containing the allocated length of the buffer.
 func (buft *BufferT) LenAlloc(tptoken uint64) (uint32, error) {
 	printEntry("BufferT.LenAlloc()")
+	if nil == buft {
+		panic("*BufferT receiver of LenAlloc() cannot be nil")
+	}
 	cbuftptr := (*buft).cbuft
 	if nil == cbuftptr {
 		// Create an error to return
@@ -110,6 +127,9 @@ func (buft *BufferT) LenAlloc(tptoken uint64) (uint32, error) {
 // that if len_used > than len_alloc thus indicating a previous issue, an INVSTRLEN error is raised.
 func (buft *BufferT) LenUsed(tptoken uint64) (uint32, error) {
 	printEntry("BufferT.LenUsed()")
+	if nil == buft {
+		panic("*BufferT receiver of LenUsed() cannot be nil")
+	}
 	cbuftptr := (*buft).cbuft
 	if nil == cbuftptr {
 		// Create an error to return
@@ -117,7 +137,7 @@ func (buft *BufferT) LenUsed(tptoken uint64) (uint32, error) {
 		if nil != err {
 			panic(fmt.Sprintf("YDB: Error fetching STRUCTNOTALLOCD: %s", err))
 		}
-		return 0xffffffff, &YDBError{(int)(C.YDB_ERR_STRUCTNOTALLOCD), errmsg}
+		return 0, &YDBError{(int)(C.YDB_ERR_STRUCTNOTALLOCD), errmsg}
 	}
 	lenalloc := (*cbuftptr).len_alloc
 	lenused := (*cbuftptr).len_used
@@ -126,7 +146,7 @@ func (buft *BufferT) LenUsed(tptoken uint64) (uint32, error) {
 		if nil != err {
 			panic(fmt.Sprintf("YDB: Error fetching INVSTRLEN: %s", err))
 		}
-		return 0xffffffff, &YDBError{(int)(C.YDB_ERR_INVSTRLEN), errmsg}
+		return 0, &YDBError{(int)(C.YDB_ERR_INVSTRLEN), errmsg}
 	}
 	return uint32(lenused), nil
 }
@@ -136,6 +156,9 @@ func (buft *BufferT) ValBAry(tptoken uint64) (*[]byte, error) {
 	var bary []byte
 
 	printEntry("BufferT.ValBAry()")
+	if nil == buft {
+		panic("*BufferT receiver of ValBAry() cannot be nil")
+	}
 	cbuftptr := (*buft).cbuft
 	if nil == cbuftptr {
 		// Create an error to return
@@ -156,7 +179,7 @@ func (buft *BufferT) ValBAry(tptoken uint64) (*[]byte, error) {
 		}
 		return &bary, &YDBError{(int)(C.YDB_ERR_INVSTRLEN), errmsg}
 	}
-	// The entire buffer is there so return that
+	// The entire buffer is there so return that.
 	bary = C.GoBytes(unsafe.Pointer(cbufptr), C.int(lenused))
 	return &bary, nil
 }
@@ -166,6 +189,9 @@ func (buft *BufferT) ValStr(tptoken uint64) (*string, error) {
 	var str string
 
 	printEntry("BufferT.ValStr()")
+	if nil == buft {
+		panic("*BufferT receiver of ValStr() cannot be nil")
+	}
 	cbuftptr := (*buft).cbuft
 	if nil == cbuftptr {
 		// Create an error to return
@@ -178,7 +204,7 @@ func (buft *BufferT) ValStr(tptoken uint64) (*string, error) {
 	lenalloc := (*cbuftptr).len_alloc
 	lenused := (*cbuftptr).len_used
 	cbufptr := (*cbuftptr).buf_addr
-	if lenused > lenalloc { // INVSTRLEN from last operation - return what we can and give error
+	if lenused > lenalloc {         // INVSTRLEN from last operation - return what we can and give error
 		str = C.GoStringN(cbufptr, C.int(lenalloc)) // Return what we can (alloc size)
 		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_INVSTRLEN))
 		if nil != err {
@@ -194,6 +220,9 @@ func (buft *BufferT) ValStr(tptoken uint64) (*string, error) {
 // SetLenUsed is a method to set the used length of buffer in the ydb_buffer_t block (must be <= alloclen).
 func (buft *BufferT) SetLenUsed(tptoken uint64, newLen uint32) error {
 	printEntry("BufferT.SetLenUsed()")
+	if nil == buft {
+		panic("*BufferT receiver of SetLenUsed() cannot be nil")
+	}
 	cbuftptr := (*buft).cbuft
 	if nil == cbuftptr {
 		// Create an error to return
@@ -218,6 +247,9 @@ func (buft *BufferT) SetLenUsed(tptoken uint64, newLen uint32) error {
 // SetValBAry is a method to set a []byte array into the given buffer.
 func (buft *BufferT) SetValBAry(tptoken uint64, value *[]byte) error {
 	printEntry("BufferT.SetValBAry()")
+	if nil == buft {
+		panic("*BufferT receiver of SetValBAry() cannot be nil")
+	}
 	cbuftptr := (*buft).cbuft
 	if nil == cbuftptr {
 		// Create an error to return
@@ -249,6 +281,9 @@ func (buft *BufferT) SetValBAry(tptoken uint64, value *[]byte) error {
 // SetValStr is a method to set a string into the given buffer.
 func (buft *BufferT) SetValStr(tptoken uint64, value *string) error {
 	printEntry("BufferT.SetValStr()")
+	if nil == buft {
+		panic("*BufferT receiver of SetValStr() cannot be nil")
+	}
 	valuebary := []byte(*value)
 	return buft.SetValBAry(tptoken, &valuebary)
 }
@@ -256,13 +291,28 @@ func (buft *BufferT) SetValStr(tptoken uint64, value *string) error {
 // SetValStrLit is a method to set a literal string into the given buffer.
 func (buft *BufferT) SetValStrLit(tptoken uint64, value string) error {
 	printEntry("BufferT.SetValStrLit()")
+	if nil == buft {
+		panic("*BufferT receiver of SetValStrLit() cannot be nil")
+	}
 	valuebary := []byte(value)
 	return buft.SetValBAry(tptoken, &valuebary)
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Simple (Threaded) API methods for BufferT
+//
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // Str2ZwrST is a STAPI method to take the given string and return it in ZWRITE format.
 func (buft *BufferT) Str2ZwrST(tptoken uint64, zwr *BufferT) error {
 	printEntry("BufferT.Str2ZwrST()")
+	if nil == buft {
+		panic("*BufferT receiver of Str2ZwrST() cannot be nil")
+	}
+	if nil == zwr {
+		panic("*BufferT 'zwr' parameter to Str2ZwrST() cannot be nil")
+	}
 	rc := C.ydb_str2zwr_st(C.uint64_t(tptoken), (*buft).cbuft, (*zwr).cbuft)
 	if C.YDB_OK != rc {
 		err := NewError(int(rc))
@@ -275,6 +325,12 @@ func (buft *BufferT) Str2ZwrST(tptoken uint64, zwr *BufferT) error {
 // Zwr2StrST is a STAPI method to take the given ZWRITE format string and return it as a normal ASCII string.
 func (buft *BufferT) Zwr2StrST(tptoken uint64, str *BufferT) error {
 	printEntry("BufferT.Zwr2StrST()")
+	if nil == buft {
+		panic("*BufferT receiver of Zwr2StrST() cannot be nil")
+	}
+	if nil == str {
+		panic("*BufferT 'str' parameter to Zwr2StrST() cannot be nil")
+	}
 	rc := C.ydb_zwr2str_st(C.uint64_t(tptoken), (*buft).cbuft, (*str).cbuft)
 	if C.YDB_OK != rc {
 		err := NewError(int(rc))

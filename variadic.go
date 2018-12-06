@@ -28,6 +28,13 @@ import (
 // } gparam_list;
 import "C"
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Variadic plist support for C (despite cgo not supporting it).
+//
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
 // variadicPlist structure is used to anchor the C parameter list used to call callg_nc() via
 // ydb_call_variadic_list_func_st().
 type variadicPlist struct { // Variadic plist support (not exported) needed by LockS() function
@@ -37,6 +44,9 @@ type variadicPlist struct { // Variadic plist support (not exported) needed by L
 // alloc is a variadicPlist method to allocate the variable plist C structure anchored in variadicPlist
 func (vplist *variadicPlist) alloc() {
 	printEntry("variadicPlist.alloc()")
+	if nil == vplist {
+		panic("*variadicPlist receiver of alloc() cannot be nil")
+	}
 	if nil != (*vplist).cvplist {
 		// Already allocated
 		return
@@ -49,6 +59,9 @@ func (vplist *variadicPlist) alloc() {
 // be passed to C.
 func (vplist *variadicPlist) callVariadicPlistFuncST(tptoken uint64, vpfunc unsafe.Pointer) int {
 	printEntry("variadicPlist.callVariadicPlistFuncST()")
+	if nil == vplist {
+		panic("*variadicPlist receiver of callVariadicPlistFuncST() cannot be nil")
+	}
 	return int(C.ydb_call_variadic_plist_func_st(C.uint64_t(tptoken), (C.ydb_vplist_func)(vpfunc),
 		(C.uintptr_t)(uintptr(unsafe.Pointer((*vplist).cvplist)))))
 }
@@ -56,7 +69,7 @@ func (vplist *variadicPlist) callVariadicPlistFuncST(tptoken uint64, vpfunc unsa
 // free is a variadicPlist method to release the allocated C buffer in this structure.
 func (vplist *variadicPlist) free() {
 	printEntry("variadicPlist.free()")
-	if nil != (*vplist).cvplist {
+	if (nil != vplist) && (nil != (*vplist).cvplist) {
 		C.free(unsafe.Pointer((*vplist).cvplist))
 		(*vplist).cvplist = nil
 	}
@@ -65,6 +78,9 @@ func (vplist *variadicPlist) free() {
 // dump is a variadicPlist method to dump a variadic plist block for debugging purposes
 func (vplist *variadicPlist) dump(tptoken uint64) {
 	printEntry("variadicPlist.dump()")
+	if nil == vplist {
+		panic("*variadicPlist receiver of dump() cannot be nil")
+	}
 	cvplist := (*vplist).cvplist
 	if nil == cvplist {
 		// Create an error to return
@@ -94,6 +110,9 @@ func (vplist *variadicPlist) dump(tptoken uint64) {
 // setUsed is a variadicPlist method to set the number of used elements in the variadic plist array
 func (vplist *variadicPlist) setUsed(tptoken uint64, newUsed uint32) error {
 	printEntry("variadicPlist.setUsed")
+	if nil == vplist {
+		panic("*variadicPlist receiver of setUsed() cannot be nil")
+	}
 	cvplist := (*vplist).cvplist
 	if nil == cvplist {
 		// Create an error to return
@@ -111,6 +130,9 @@ func (vplist *variadicPlist) setUsed(tptoken uint64, newUsed uint32) error {
 // add here MUST point to C allocated memory and NOT Golang allocated memory or a crash will result.
 func (vplist *variadicPlist) setVPlistParam(tptoken uint64, paramindx int, paramaddr uintptr) error {
 	printEntry("variadicPlist.setVPlistParm")
+	if nil == vplist {
+		panic("*variadicPlist receiver of setVPlistParam() cannot be nil")
+	}
 	cvplist := (*vplist).cvplist
 	if nil == cvplist {
 		// Create an error to return

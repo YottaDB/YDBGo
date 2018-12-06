@@ -27,6 +27,12 @@ type KeyT struct {
 	Subary BufferTArray
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Data manipulation methods for KeyT
+//
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // Alloc is a STAPI method to allocate both pieces of the KeyT according to the supplied parameters.
 // Parameters:
 //   varSiz  - Length of buffer for varname (current var max is 31).
@@ -34,6 +40,9 @@ type KeyT struct {
 //   subSiz  - Length of the buffers for subscript values.
 func (key *KeyT) Alloc(varSiz, numSubs, subSiz uint32) {
 	printEntry("KeyT.Alloc()")
+	if nil == key {
+		panic("*KeyT receiver of Alloc() cannot be nil")
+	}
 	(&((*key).Varnm)).Alloc(varSiz)
 	(&((*key).Subary)).Alloc(numSubs, subSiz)
 }
@@ -41,6 +50,9 @@ func (key *KeyT) Alloc(varSiz, numSubs, subSiz uint32) {
 // Dump is a STAPI method to dump the contents of the KeyT structure.
 func (key *KeyT) Dump() {
 	printEntry("KeyT.Dump()")
+	if nil == key {
+		panic("*KeyT receiver of Dump() cannot be nil")
+	}
 	(&((*key).Varnm)).Dump()
 	(&((*key).Subary)).Dump()
 }
@@ -48,15 +60,26 @@ func (key *KeyT) Dump() {
 // Free is a STAPI method to free both pieces of the KeyT structure.
 func (key *KeyT) Free() {
 	printEntry("KeyT.Free()")
-	(&((*key).Varnm)).Free()
-	(&((*key).Subary)).Free()
+	if nil != key {         // Ignore if no struct passed
+		(&((*key).Varnm)).Free()
+		(&((*key).Subary)).Free()
+	}
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Simple (Threaded) API methods for KeyT
+//
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // DataST is a STAPI method to determine the status of a given node and its successors.
 func (key *KeyT) DataST(tptoken uint64) (uint32, error) {
 	var retval C.uint
 
 	printEntry("KeyT.DataST()")
+	if nil == key {
+		panic("*KeyT receiver of DataST() cannot be nil")
+	}
 	vargobuft := (&((*key).Varnm)).cbuft
 	subgobuftary := &((*key).Subary)
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer((*subgobuftary).cbuftary))
@@ -64,7 +87,7 @@ func (key *KeyT) DataST(tptoken uint64) (uint32, error) {
 		&retval)
 	if C.YDB_OK != rc {
 		err := NewError(int(rc))
-		return 0xffffffff, err
+		return 0, err
 	}
 	return uint32(retval), nil
 }
@@ -74,6 +97,9 @@ func (key *KeyT) DataST(tptoken uint64) (uint32, error) {
 // C.YDB_DEL_TREE, then the tree starting at the given node is removed.
 func (key *KeyT) DeleteST(tptoken uint64, deltype int) error {
 	printEntry("KeyT.DeleteST()")
+	if nil == key {
+		panic("*KeyT receiver of DeleteST() cannot be nil")
+	}
 	vargobuft := (&((*key).Varnm)).cbuft
 	subgobuftary := &((*key).Subary)
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer((*subgobuftary).cbuftary))
@@ -89,6 +115,9 @@ func (key *KeyT) DeleteST(tptoken uint64, deltype int) error {
 // ValST is a STAPI method to fetch the given node returning its value in retval.
 func (key *KeyT) ValST(tptoken uint64, retval *BufferT) error {
 	printEntry("KeyT.ValST()")
+	if nil == key {
+		panic("*KeyT receiver of ValST() cannot be nil")
+	}
 	vargobuft := (&((*key).Varnm)).cbuft
 	subgobuftary := &((*key).Subary)
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer((*subgobuftary).cbuftary))
@@ -107,6 +136,9 @@ func (key *KeyT) IncrST(tptoken uint64, incr, retval *BufferT) error {
 	var incrcbuft unsafe.Pointer
 
 	printEntry("KeyT.IncrST()")
+	if nil == key {
+		panic("*KeyT receiver of IncrST() cannot be nil")
+	}
 	vargobuft := (&((*key).Varnm)).cbuft
 	subgobuftary := &((*key).Subary)
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer((*subgobuftary).cbuftary))
@@ -143,6 +175,9 @@ func (key *KeyT) LockDecrST(tptoken uint64) error {
 // LockIncrST is a STAPI method to increment the lock-count of a given node lock with the given timeout in nano-seconds.
 func (key *KeyT) LockIncrST(tptoken uint64, timeoutNsec uint64) error {
 	printEntry("KeyT.LockIncrST()")
+	if nil == key {
+		panic("*KeyT receiver of LockIncrST() cannot be nil")
+	}
 	vargobuft := (&((*key).Varnm)).cbuft
 	subgobuftary := &((*key).Subary)
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer((*subgobuftary).cbuftary))
@@ -159,6 +194,9 @@ func (key *KeyT) LockIncrST(tptoken uint64, timeoutNsec uint64) error {
 // specified node (returns *BufferTArray).
 func (key *KeyT) NodeNextST(tptoken uint64, next *BufferTArray) error {
 	printEntry("KeyT.NodeNextST()")
+	if nil == key {
+		panic("*KeyT receiver of NodeNextST() cannot be nil")
+	}
 	vargobuft := (&((*key).Varnm)).cbuft
 	subgobuftary := &((*key).Subary)
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer((*subgobuftary).cbuftary))
@@ -184,6 +222,9 @@ func (key *KeyT) NodeNextST(tptoken uint64, next *BufferTArray) error {
 // to the specified node (returns *BufferTArray).
 func (key *KeyT) NodePrevST(tptoken uint64, prev *BufferTArray) error {
 	printEntry("KeyT.NodePrevST()")
+	if nil == key {
+		panic("*KeyT receiver of NodePrevST() cannot be nil")
+	}
 	vargobuft := (&((*key).Varnm)).cbuft
 	subgobuftary := &((*key).Subary)
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer((*subgobuftary).cbuftary))
@@ -208,6 +249,9 @@ func (key *KeyT) NodePrevST(tptoken uint64, prev *BufferTArray) error {
 // SetValST is a STAPI method to set the given value into the given node (glvn or SVN).
 func (key *KeyT) SetValST(tptoken uint64, value *BufferT) error {
 	printEntry("KeyT.SetValST()")
+	if nil == key {
+		panic("*KeyT receiver of SetValST() cannot be nil")
+	}
 	cbuftary := (*C.ydb_buffer_t)(unsafe.Pointer((*key).Subary.cbuftary))
 	rc := C.ydb_set_st(C.uint64_t(tptoken), (*key).Varnm.cbuft, C.int((*key).Subary.elemsUsed), cbuftary,
 		(*value).cbuft)
@@ -221,6 +265,9 @@ func (key *KeyT) SetValST(tptoken uint64, value *BufferT) error {
 // SubNextST is a STAPI method to return the next subscript following the specified node.
 func (key *KeyT) SubNextST(tptoken uint64, retval *BufferT) error {
 	printEntry("KeyT.SubNextST()")
+	if nil == key {
+		panic("*KeyT receiver of SubNextST() cannot be nil")
+	}
 	vargobuft := (&((*key).Varnm)).cbuft
 	subgobuftary := &((*key).Subary)
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer((*subgobuftary).cbuftary))
@@ -245,6 +292,9 @@ func (key *KeyT) SubNextST(tptoken uint64, retval *BufferT) error {
 // SubPrevST is a STAPI method to return the previous subscript following the specified node.
 func (key *KeyT) SubPrevST(tptoken uint64, retval *BufferT) error {
 	printEntry("KeyT.SubPrevST()")
+	if nil == key {
+		panic("*KeyT receiver of SubPrevST() cannot be nil")
+	}
 	vargobuft := (&((*key).Varnm)).cbuft
 	subgobuftary := &((*key).Subary)
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer((*subgobuftary).cbuftary))

@@ -35,6 +35,13 @@ import "C"
 // are defined in buffer_t.go, bufer_t_array.go, and key_t.go with utilities being defined in util.go.
 //
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Simple (Threaded) API function(s)
+//
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
 // LockST is a STAPI function that releases all existing locks then locks the supplied variadic list of lock keys.
 func LockST(tptoken uint64, timeoutNsec uint64, lockname ...*KeyT) error {
 	var vplist variadicPlist
@@ -52,14 +59,14 @@ func LockST(tptoken uint64, timeoutNsec uint64, lockname ...*KeyT) error {
 		parmindx++
 	} else {
 		if IsLittleEndian() {
-			vplist.setVPlistParam(tptoken, parmindx, uintptr(timeoutNsec&0xffffffff))
+			vplist.setVPlistParam(tptoken, parmindx, uintptr(timeoutNsec & 0xffffffff))
 			parmindx++
-			vplist.setVPlistParam(tptoken, parmindx, uintptr(timeoutNsec>>32))
+			vplist.setVPlistParam(tptoken, parmindx, uintptr(timeoutNsec >> 32))
 			parmindx++
 		} else {
-			vplist.setVPlistParam(tptoken, parmindx, uintptr(timeoutNsec>>32))
+			vplist.setVPlistParam(tptoken, parmindx, uintptr(timeoutNsec >> 32))
 			parmindx++
-			vplist.setVPlistParam(tptoken, parmindx, uintptr(timeoutNsec&0xffffffff))
+			vplist.setVPlistParam(tptoken, parmindx, uintptr(timeoutNsec & 0xffffffff))
 			parmindx++
 		}
 	}

@@ -42,7 +42,7 @@ func DataE(tptoken uint64, varname string, subary []string) (uint32, error) {
 	rc := C.ydb_data_st(C.uint64_t(tptoken), vargobuft, C.int(dbkey.Subary.elemsUsed), subbuftary, &retval)
 	if C.YDB_OK != rc {
 		err = NewError(int(rc))
-		return 0xffffffff, err
+		return 0, err
 	}
 	return uint32(retval), nil
 }
