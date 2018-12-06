@@ -16,9 +16,10 @@ import (
 	"lang.yottadb.com/go/yottadb"
 	. "lang.yottadb.com/go/yottadb/internal/test_helpers"
 	"testing"
+	"github.com/stretchr/testify/assert"
 )
 
-func TestLockST(t *testing.T) {
+func TestSimpleAPILockST(t *testing.T) {
 	var dbkey yottadb.KeyT
 	var tptoken uint64 = yottadb.NOTTP
 	var err error
@@ -37,4 +38,20 @@ func TestLockST(t *testing.T) {
 	VerifyLockExists([]byte("^Variable1A(\"Index0\")"), &errors, true, t)
 	err = yottadb.LockST(tptoken, 0) // Release all locks
 	Assertnoerr(err, t)
+}
+
+func TestSimpleAPILockManyParms(t *testing.T) {
+	maxvparms := 36 // Currently hard coded in simple_api.go as a C decl.
+	var locks [](*yottadb.KeyT)
+
+	locks = make([](*yottadb.KeyT), maxvparms+1)
+
+	for i := 0; i < maxvparms+1; i++ {
+		var t yottadb.KeyT
+		t.Alloc(31, 31, 64)
+		locks[i] = &t
+	}
+
+	err := yottadb.LockST(yottadb.NOTTP, 0, locks...)
+	assert.NotNil(t, err)
 }
