@@ -36,7 +36,7 @@ func TestDataSt(t *testing.T) {
 	Assertnoerr(err, t)
 	// Build query structs for DataST()
 	dbkey.Alloc(VarSiz, AryDim, SubSiz) // Reallocate the key
-	// Check against a non-existant node - should return 0
+	// Check against a non-existent node - should return 0
 	err = dbkey.Varnm.SetValStrLit(tptoken, "^noExistGbl")
 	Assertnoerr(err, t)
 	err = dbkey.Subary.SetElemUsed(tptoken, 0)

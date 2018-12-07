@@ -50,5 +50,5 @@ func Example_transactionProcessing() {
 	}
 
 	/* Output: Hello from MyGoCallBack!
-*/
+	 */
 }

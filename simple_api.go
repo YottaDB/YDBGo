@@ -41,7 +41,6 @@ import "C"
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-
 // LockST is a STAPI function that releases all existing locks then locks the supplied variadic list of lock keys.
 func LockST(tptoken uint64, timeoutNsec uint64, lockname ...*KeyT) error {
 	var vplist variadicPlist
@@ -52,21 +51,21 @@ func LockST(tptoken uint64, timeoutNsec uint64, lockname ...*KeyT) error {
 	defer vplist.free()
 	vplist.alloc()
 	// Before we put the timeout parameter into the plist, we need to check our architecture. If this is 64 bit,
-	// we're fine and can procede but if we are 32 bit, then the 64 bit timeoutNsec parameter needs to be split
+	// we're fine and can proceed but if we are 32 bit, then the 64 bit timeoutNsec parameter needs to be split
 	// in half across two parms which will be reassembled in ydb_lock_s().
 	if 64 == strconv.IntSize {
 		vplist.setVPlistParam(tptoken, parmindx, uintptr(timeoutNsec))
 		parmindx++
 	} else {
 		if IsLittleEndian() {
-			vplist.setVPlistParam(tptoken, parmindx, uintptr(timeoutNsec & 0xffffffff))
+			vplist.setVPlistParam(tptoken, parmindx, uintptr(timeoutNsec&0xffffffff))
 			parmindx++
-			vplist.setVPlistParam(tptoken, parmindx, uintptr(timeoutNsec >> 32))
+			vplist.setVPlistParam(tptoken, parmindx, uintptr(timeoutNsec>>32))
 			parmindx++
 		} else {
-			vplist.setVPlistParam(tptoken, parmindx, uintptr(timeoutNsec >> 32))
+			vplist.setVPlistParam(tptoken, parmindx, uintptr(timeoutNsec>>32))
 			parmindx++
-			vplist.setVPlistParam(tptoken, parmindx, uintptr(timeoutNsec & 0xffffffff))
+			vplist.setVPlistParam(tptoken, parmindx, uintptr(timeoutNsec&0xffffffff))
 			parmindx++
 		}
 	}

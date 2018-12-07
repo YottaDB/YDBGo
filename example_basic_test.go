@@ -7,10 +7,10 @@ import (
 
 // Example_basic demonstrates the most basic features of YottaDB;
 // setting a value, getting a value, iterating through values,
-//  and deleting a value.
+// and deleting a value.
 //
 // It does this using methods from the easy API; if performance is a concern, considering using
-//  methods from the simple API (those methods on KeyT, BufferT, and BufferArrayT).
+// methods from the simple API (those methods on KeyT, BufferT, and BufferArrayT).
 func Example_easyAPI() {
 	// Set global node ["^hello", "world"] to "Go World"
 	err := yottadb.SetValE(yottadb.NOTTP, "Go World", "^hello", []string{"world"})

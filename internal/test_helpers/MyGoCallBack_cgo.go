@@ -12,5 +12,5 @@ int MyGoCallBack_cgo(uint64_t tptoken, void *tpfnparm) {
 import "C"
 
 func GetMyGoCallBackCgo() unsafe.Pointer {
-    return C.MyGoCallBack_cgo
+	return C.MyGoCallBack_cgo
 }

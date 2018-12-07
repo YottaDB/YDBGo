@@ -60,7 +60,7 @@ func (key *KeyT) Dump() {
 // Free is a STAPI method to free both pieces of the KeyT structure.
 func (key *KeyT) Free() {
 	printEntry("KeyT.Free()")
-	if nil != key {         // Ignore if no struct passed
+	if nil != key { // Ignore if no struct passed
 		(&((*key).Varnm)).Free()
 		(&((*key).Subary)).Free()
 	}

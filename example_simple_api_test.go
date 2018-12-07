@@ -7,11 +7,11 @@ import (
 
 // Example demonstrating the most basic features of YottaDB using the simple API;
 // setting a value, getting a value, iterating through values,
-//  and deleting a value.
+// and deleting a value.
 //
 // The SimpleAPI is somewhat more difficult to use than the EasyAPI, but is more
-//  more performant. It is recommended to use the SimpleAPI if you are building a
-//  performance critical application.
+// more performant. It is recommended to use the SimpleAPI if you are building a
+// performance critical application.
 func Example_simpleAPI() {
 	// Allocate a key to set our value equal too
 	var key1 yottadb.KeyT
@@ -25,7 +25,7 @@ func Example_simpleAPI() {
 	tptoken = yottadb.NOTTP
 
 	// Set global node ["^hello", "world"] to "Go World"
-	
+
 	// When using the simple API, you MUST always defer the Free of each structure,
 	//  as is allocates C memory which Go doesn't know to free!
 	defer key1.Free()
@@ -44,7 +44,7 @@ func Example_simpleAPI() {
 	}
 
 	// Create a bufer which is used to specify the value we will be setting the global to
-	// Reminder, you MUST always defer Free of each stucture you allocate
+	// Reminder, you MUST always defer Free of each structure you allocate
 	defer buff1.Free()
 	buff1.Alloc(64)
 	err = buff1.SetValStrLit(tptoken, "Go world")
@@ -57,7 +57,7 @@ func Example_simpleAPI() {
 	if err != nil {
 		panic(err)
 	}
-	
+
 	// Retrieve the value that was set
 	//  We can reuse the KeyT we already made for setting the value; hence part
 	//  of the performance gain
@@ -71,7 +71,7 @@ func Example_simpleAPI() {
 	if (*val1) != "" {
 		panic("Buffer not empty when it should be!")
 	}
-	err = key1.ValST(tptoken, &buff1);
+	err = key1.ValST(tptoken, &buff1)
 	if err != nil {
 		panic(err)
 	}
@@ -93,7 +93,7 @@ func Example_simpleAPI() {
 	if err != nil {
 		panic(err)
 	}
-	
+
 	err = key1.Subary.SetValStrLit(tptoken, 0, "Winterfell")
 	if err != nil {
 		panic(err)
@@ -110,7 +110,7 @@ func Example_simpleAPI() {
 	// Allocate a BufferT for return values; REMEMBER TO DEFER Free
 	defer cur_sub.Free()
 	cur_sub.Alloc(64)
-	
+
 	// Start iterating through the list at the start by setting the last subscript
 	//  to ""; stop when we get the error code meaning end
 	err = key1.Subary.SetValStrLit(tptoken, 0, "")

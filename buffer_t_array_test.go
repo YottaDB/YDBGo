@@ -13,11 +13,11 @@
 package yottadb_test
 
 import (
+	"bytes"
+	"github.com/stretchr/testify/assert"
 	"lang.yottadb.com/go/yottadb"
 	. "lang.yottadb.com/go/yottadb/internal/test_helpers"
 	"testing"
-	"bytes"
-	"github.com/stretchr/testify/assert"
 )
 
 // TestBufTAryDeleteExclST tests the DeleteExclST() method
@@ -152,7 +152,7 @@ func TestBufTAryLenAlloc(t *testing.T) {
 	//assert.Equal(t, r, 0)
 
 	t.Skipf("This still needs to be fixed")
-	// Alloc a lenght of 0 and try to get it
+	// Alloc a length of 0 and try to get it
 	value.Alloc(0, 64)
 	r, err := value.ElemLenAlloc(tp)
 	assert.Nil(t, err)
@@ -183,7 +183,7 @@ func TestBufTAryBAry(t *testing.T) {
 	r, err = value.ValBAry(tp, 0)
 
 	// Get a value with some value
-	
+
 	err = value.SetValBAry(tp, 1, &v)
 	assert.Nil(t, err)
 	r, err = value.ValBAry(tp, 1)

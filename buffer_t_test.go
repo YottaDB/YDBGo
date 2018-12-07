@@ -13,12 +13,12 @@
 package yottadb_test
 
 import (
+	"bytes"
 	"fmt"
+	"github.com/stretchr/testify/assert"
 	"lang.yottadb.com/go/yottadb"
 	. "lang.yottadb.com/go/yottadb/internal/test_helpers"
 	"testing"
-	"github.com/stretchr/testify/assert"
-	"bytes"
 )
 
 // TestStr2ZwrSTAndZwr2StrST tests the Str2ZwrST() and Zwr2StrST() methods
@@ -94,7 +94,7 @@ func TestLenAlloc(t *testing.T) {
 func TestAllocLargeValue(t *testing.T) {
 	var value yottadb.BufferT
 	var val uint32
-	
+
 	val = 1 << 31
 
 	defer value.Free()
@@ -122,7 +122,7 @@ func TestAlloc(t *testing.T) {
 	value.Alloc(10)
 	value.Free()
 	value.Free()
-	
+
 	// Test Alloc without free
 	defer ovalue.Free()
 	ovalue.Alloc(64)
@@ -205,9 +205,9 @@ func TestValStr(t *testing.T) {
 	assert.NotNil(t, err)
 
 	defer value.Free()
-	value.Alloc(length+1)
+	value.Alloc(length + 1)
 	defer value_store.Free()
-	value_store.Alloc(length-2)
+	value_store.Alloc(length - 2)
 
 	err = value.SetValStr(yottadb.NOTTP, &global_name)
 	assert.Nil(t, err)
@@ -216,7 +216,7 @@ func TestValStr(t *testing.T) {
 	assert.Equal(t, *str, global_name)
 	assert.Nil(t, err)*/
 
-//	std, err = value.
+	//	std, err = value.
 }
 
 func TestValBAry(t *testing.T) {

@@ -13,10 +13,10 @@
 package yottadb_test
 
 import (
+	"errors"
+	"github.com/stretchr/testify/assert"
 	"lang.yottadb.com/go/yottadb"
 	"testing"
-	"github.com/stretchr/testify/assert"
-	"errors"
 )
 
 func TestErrorErrorCode(t *testing.T) {

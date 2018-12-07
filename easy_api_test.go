@@ -31,7 +31,7 @@ func TestDataE(t *testing.T) {
 	Assertnoerr(err, t)
 	err = yottadb.SetValE(tptoken, "val3", "^tdaSubs", []string{"sub1", "sub2", "sub3"})
 	Assertnoerr(err, t)
-	// Check against a non-existant node - should return 0
+	// Check against a non-existent node - should return 0
 	dval, err = yottadb.DataE(tptoken, "^noExistGbl", []string{})
 	Assertnoerr(err, t)
 	if 0 != int(dval) {

@@ -10,7 +10,6 @@
 //								//
 //////////////////////////////////////////////////////////////////
 
-
 package yottadb // import "lang.yottadb.com/go/yottadb"
 
 // The following comment block is a Golang/cgo preamble defining C related things we need in this package
@@ -24,7 +23,7 @@ const NOTTP uint64 = 0
 
 const debugFlag bool = false
 
-var easyAPIDefaultDataSize uint32 = 256         // Init value - may grow - Base allocation for returned data values
-var easyAPIDefaultSubscrCnt uint32 = 10         // Init value - may grow - Base subscript count allocation for returned subscr list
-var easyAPIDefaultSubscrSize uint32 = 32        // Init value - may grow - Base subscript size allocation for returned subscr list
-var lastErrorRaised int                         // In case certain errors repeat - used to stop loops
+var easyAPIDefaultDataSize uint32 = 256  // Init value - may grow - Base allocation for returned data values
+var easyAPIDefaultSubscrCnt uint32 = 10  // Init value - may grow - Base subscript count allocation for returned subscr list
+var easyAPIDefaultSubscrSize uint32 = 32 // Init value - may grow - Base subscript size allocation for returned subscr list
+var lastErrorRaised int                  // In case certain errors repeat - used to stop loops

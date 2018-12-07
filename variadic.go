@@ -34,7 +34,6 @@ import "C"
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-
 // variadicPlist structure is used to anchor the C parameter list used to call callg_nc() via
 // ydb_call_variadic_list_func_st().
 type variadicPlist struct { // Variadic plist support (not exported) needed by LockS() function

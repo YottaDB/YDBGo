@@ -11,7 +11,7 @@
 //////////////////////////////////////////////////////////////////
 
 /*
-Package yottadb provides a Go wrapper for YottaDB, a high performance, transactional, NoSQL engine with proven speed and stability.
+Package yottadb provides a Go wrapper for YottaDB, a mature, high performance, transactional, NoSQL engine with proven speed and stability.
 
 YottaDB Quick Start
 
@@ -23,11 +23,11 @@ your operating system are older, and the Go wrapper does not work,
 please obtain and install a newer Golang implementation.
 
 This quickstart assumes that YottaDB has already been installed as
-described in at https://yottadb.com/product/get-started/. 
+described at https://yottadb.com/product/get-started/.
 
 After installing YottaDB, install the Go wrapper:
 
-    get get lang.yottadb.com/go/yottadb
+    go get lang.yottadb.com/go/yottadb
 
 Easy API
 
@@ -40,6 +40,7 @@ and are available in the yottadb package. They include:
     - DeleteExclE
     - IncrE
     - LockDecrE
+    - LockIncrE
     - LockE
     - NodeNextE
     - NodePrevE
@@ -55,19 +56,19 @@ Simple API
 
 The simple API provides a better one-to-one mapping to the underlying C API, and
 provides better performance at the cost of convenience. These functions are mostly
-encapsulated in the BufferT, BufferTArray, and KeyT data types, with the only function
+encapsulated in the BufferT, BufferTArray, and KeyT data structures, with the only function
 beloning to this API existing outside of these data types being LockST.
 
-When using any of the structure from the Simple API, it is very important to ensure that
+When using any of the structures from the Simple API, it is very important to ensure that
 myvar.Free() gets called on each of the allocated structures. The structures allocate underlying
 C structures which Go does not know how to free, and if Free() is not called that memory will
-be leaked.
+leak.
 
 Please see the Simple API example below for usage.
 
 Transactions in YottaDB
 
-Transactions provide a way to ensure that a series of database operations is all or nothing.
+YottaDB implements strong ACID transactions see https://en.wikipedia.org/wiki/ACID_(computer_science).
 Please review the documentation related to transactions in YottaDB at https://docs.yottadb.com/MultiLangProgGuide/MultiLangProgGuide.html#transaction-processing
 
 To use YottaDB transactions in Go, some "glue code" must be generated for each Go routine callback.

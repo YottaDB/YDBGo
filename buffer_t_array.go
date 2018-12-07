@@ -14,9 +14,9 @@ package yottadb
 
 import (
 	"fmt"
-	"unsafe"
 	"io"
 	"os"
+	"unsafe"
 )
 
 // #include <stdlib.h>
@@ -100,7 +100,7 @@ func (buftary *BufferTArray) Free() {
 		// Deallocate the buffers in each ydb_buffer_t
 		cbuftary := (*buftary).cbuftary
 		if nil == cbuftary {
-			return  // Nothing to do
+			return // Nothing to do
 		}
 		for i := 0; int((*buftary).elemsAlloc) > i; i++ {
 			elemptr := (*C.ydb_buffer_t)(unsafe.Pointer(uintptr(unsafe.Pointer(cbuftary)) +

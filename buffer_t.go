@@ -14,9 +14,9 @@ package yottadb
 
 import (
 	"fmt"
-	"unsafe"
-	"os"
 	"io"
+	"os"
+	"unsafe"
 )
 
 // #include <stdlib.h>
@@ -75,24 +75,24 @@ func (buft *BufferT) Dump() {
 
 // DumpToWriter dumps a textual representation of this buffer to the writer
 func (buft *BufferT) DumpToWriter(w io.Writer) {
-    printEntry("BufferT.Dump()")
-    cbuftptr := (*buft).cbuft
-    fmt.Fprintf(w, "BufferT.Dump(): cbuftptr: %p", cbuftptr)
-    if nil != cbuftptr {
-        fmt.Fprintf(w, ", buf_addr: %v, len_alloc: %v, len_used: %v", (*cbuftptr).buf_addr,
-            (*cbuftptr).len_alloc, (*cbuftptr).len_used)
-        if 0 < (*cbuftptr).len_used {
-            strval := C.GoStringN((*cbuftptr).buf_addr, C.int((*cbuftptr).len_used))
-            fmt.Fprintf(w, ", value: %s", strval)
-        }
-    }
-    fmt.Fprintf(w, "\n")
+	printEntry("BufferT.Dump()")
+	cbuftptr := (*buft).cbuft
+	fmt.Fprintf(w, "BufferT.Dump(): cbuftptr: %p", cbuftptr)
+	if nil != cbuftptr {
+		fmt.Fprintf(w, ", buf_addr: %v, len_alloc: %v, len_used: %v", (*cbuftptr).buf_addr,
+			(*cbuftptr).len_alloc, (*cbuftptr).len_used)
+		if 0 < (*cbuftptr).len_used {
+			strval := C.GoStringN((*cbuftptr).buf_addr, C.int((*cbuftptr).len_used))
+			fmt.Fprintf(w, ", value: %s", strval)
+		}
+	}
+	fmt.Fprintf(w, "\n")
 }
 
 // Free is a method to release both the buffer and ydb_buffer_t block associate with the BufferT block.
 func (buft *BufferT) Free() {
 	printEntry("BufferT.Free()")
-	if nil != buft {        // Ignore if buft is null already
+	if nil != buft { // Ignore if buft is null already
 		cbuftptr := (*buft).cbuft
 		if nil != cbuftptr {
 			// ydb_buffer_t block exists - free its buffer first if it exists
@@ -204,7 +204,7 @@ func (buft *BufferT) ValStr(tptoken uint64) (*string, error) {
 	lenalloc := (*cbuftptr).len_alloc
 	lenused := (*cbuftptr).len_used
 	cbufptr := (*cbuftptr).buf_addr
-	if lenused > lenalloc {         // INVSTRLEN from last operation - return what we can and give error
+	if lenused > lenalloc { // INVSTRLEN from last operation - return what we can and give error
 		str = C.GoStringN(cbufptr, C.int(lenalloc)) // Return what we can (alloc size)
 		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_INVSTRLEN))
 		if nil != err {
