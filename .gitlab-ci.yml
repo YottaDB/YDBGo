@@ -12,8 +12,9 @@ before_script:
   - apt-get update && apt-get install -y --no-install-recommends wget ca-certificates git g++ gcc libc6-dev make pkg-config && rm -rf /var/lib/apt/lists/*
   - export GOPATH=/go
   - mkdir -p ${GOPATH}/src ${GOPATH}/bin && chmod -R 777 ${GOPATH}
-  - mkdir -p ${GOPATH}/src/lang.yottadb.com/go/yottadb ${GOPATH}/src/_/builds
+  - mkdir -p ${GOPATH}/src/lang.yottadb.com/go/yottadb/.git ${GOPATH}/src/_/builds
   - cp -r $CI_PROJECT_DIR/* ${GOPATH}/src/lang.yottadb.com/go/yottadb
+  - cp -r $CI_PROJECT_DIR/.git/* ${GOPATH}/src/lang.yottadb.com/go/yottadb/.git
   - ln -s ${GOPATH}/src/lang.yottadb.com/go/yottadb ${GOPATH}/src/_/builds/yottadb
   - export PATH=$GOPATH/bin:/usr/local/go/bin:$PATH
   - wget -O go.tgz https://golang.org/dl/go${GOLANG_VERSION}.linux-amd64.tar.gz
@@ -26,8 +27,6 @@ before_script:
   - export ydb_routines=/opt/yottadb/current/libyottadbutil.so
   - echo exit | /opt/yottadb/current/mumps -run ^GDE
   - /opt/yottadb/current/mupip create
-  - ls /usr/share/pkgconfig
-  - cat /usr/share/pkgconfig/yottadb.pc
 
 unit_tests:
   stage: test
@@ -64,6 +63,12 @@ lint_code:
   script:
     - golint -set_exit_status $(go list ./... | grep -v /vendor/ | grep -v /internal/)
 
+error_codes:
+  stage: test
+  script:
+    - go generate
+    - git diff --exit-code error_codes.go
+
 build:
   stage: build
   script:
@@ -80,3 +85,5 @@ pages:
     paths:
       - public
     expire_in: 30 days
+  only:
+    - master

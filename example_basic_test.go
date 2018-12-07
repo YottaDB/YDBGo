@@ -42,7 +42,7 @@ func Example_easyAPI() {
 		cur_sub, err = yottadb.SubNextE(yottadb.NOTTP, "^hello", []string{cur_sub})
 		if err != nil {
 			error_code := yottadb.ErrorCode(err)
-			if error_code == -151027930 {
+			if error_code == yottadb.YDB_ERR_NODEEND {
 				break
 			} else {
 				panic(err)
