@@ -10,6 +10,7 @@
 //								//
 //////////////////////////////////////////////////////////////////
 
+
 package yottadb // import "lang.yottadb.com/go/yottadb"
 
 // The following comment block is a Golang/cgo preamble defining C related things we need in this package

@@ -224,3 +224,10 @@ func CheckErrorExpectYDB_ERR_INSUFFSUBS(errorcode int) bool {
 func GetYDB_DEL_TREE() int {
 	return int(C.YDB_DEL_TREE)
 }
+
+//export MyGoCallBack
+func MyGoCallBack(tptoken uint64, tpfnarg unsafe.Pointer) int {
+	// This violates TP transactions, but useful for demonstration
+	fmt.Printf("Hello from MyGoCallBack!\n")
+	return 0
+}

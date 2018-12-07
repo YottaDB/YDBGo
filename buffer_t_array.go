@@ -408,12 +408,16 @@ func (buftary *BufferTArray) DeleteExclST(tptoken uint64) error {
 }
 
 // TpST is a STAPI method to invoke transaction processing.
-// Parameters:
-// - tpfn     - C function pointer routine that either performs the transaction or immediately calls a Golang routine to
-//              perform the transaction. On return from that routine, the transaction is committed.
-// - tpfnparm - A single parameter that can be a pointer to a structure to provide parameters to the transaction routine.
+//
+// Parameters
+//
+// tpfn - C function pointer routine that either performs the transaction or immediately calls a Golang routine to
+// perform the transaction. On return from that routine, the transaction is committed.
+//
+// tpfnparm - A single parameter that can be a pointer to a structure to provide parameters to the transaction routine.
 //              Note these parameters MUST LIVE in C allocated memory or the call is likely to fail.
-// - transid  - See docs for ydb_tp_s() in the MLPG.
+//
+// transid  - See docs for ydb_tp_s() in the MLPG.
 func (buftary *BufferTArray) TpST(tptoken uint64, tpfn unsafe.Pointer, tpfnparm unsafe.Pointer, transid string) error {
 	printEntry("BufferTArray.TpST()")
 	if nil == buftary {

@@ -145,19 +145,18 @@ func TestBufTAryLenAlloc(t *testing.T) {
 	var value, noalloc_value yottadb.BufferTArray
 	var tp = yottadb.NOTTP
 
-	t.Skipf("Awaiting conclusion to how to handle Alloc(0)")
-
 	// Try getting length of non-alloc'd array
 	_, err := value.ElemLenAlloc(tp)
 	assert.NotNil(t, err)
 	// TODO: change this function to return 0
 	//assert.Equal(t, r, 0)
 
+	t.Skipf("This still needs to be fixed")
 	// Alloc a lenght of 0 and try to get it
 	value.Alloc(0, 64)
 	r, err := value.ElemLenAlloc(tp)
-	assert.NotNil(t, err)
-	assert.Equal(t, r, 0)
+	assert.Nil(t, err)
+	assert.Equal(t, r, uint32(0))
 
 	_, err = noalloc_value.ElemLenAlloc(tp)
 	assert.NotNil(t, err)
@@ -199,9 +198,9 @@ func TestBufTAryBAry(t *testing.T) {
 	value.Free()
 	err = value.SetValBAry(tp, 0, &v)
 	assert.NotNil(t, err)
-	// Need to talk about which return value is correct
-	//errcode := yottadb.ErrorCode(err)
-	//assert.True(t, CheckErrorExpectYDB_ERR_INSUFFSUBS(errcode))
+	errcode := yottadb.ErrorCode(err)
+	t.Skipf("We need to figure out what the expected result is")
+	assert.True(t, CheckErrorExpectYDB_ERR_INSUFFSUBS(errcode))
 }
 
 func TestBufTAryMultipleThreads(t *testing.T) {
@@ -233,14 +232,12 @@ func TestBufTAryElemLenUsed(t *testing.T) {
 	var value yottadb.BufferTArray
 	var tp = yottadb.NOTTP
 
-	t.Skipf("Return errors codes need to be updated in BufferTAry")
-
 	// Test non alloc'd structure
 	err := value.SetElemLenUsed(tp, 0, 0)
 	assert.NotNil(t, err)
 	r, err := value.ElemLenUsed(tp, 0)
 	assert.NotNil(t, err)
-	assert.Equal(t, r, 0)
+	assert.Equal(t, r, uint32(0))
 
 	// Allocate, then test with an element past the end
 	value.Alloc(10, 64)
@@ -249,7 +246,7 @@ func TestBufTAryElemLenUsed(t *testing.T) {
 	assert.NotNil(t, err)
 	r, err = value.ElemLenUsed(tp, 11)
 	assert.NotNil(t, err)
-	assert.Equal(t, r, int32(0))
+	assert.Equal(t, r, uint32(0))
 
 	// Set a valid subscript to an invalid length
 	err = value.SetElemLenUsed(tp, 0, 100)

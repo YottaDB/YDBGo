@@ -43,6 +43,13 @@ Build the package:
 go build yottadb
 ```
 
+Before running code using YottaDB or running the YottaDB tests, you need to make sure you have all the needed environment variables configured.
+The best way to do this is by sourcing ydb_env_set:
+
+```
+source $(pkg-config --variable=prefix yottadb)/ydb_env_set
+```
+
 Run the tests:
 
 ```
