@@ -1,34 +1,33 @@
-image: golang:1.10-stretch
+image: yottadb/yottadb-base:latest-master
 
 stages:
   - test
   - build
   - deploy
 
+variables:
+  GOLANG_VERSION: 1.10.5
+
 before_script:
-  - mkdir -p /go/src/lang.yottadb.com/go/yottadb /go/src/_/builds
-  - cp -r $CI_PROJECT_DIR/* /go/src/lang.yottadb.com/go/yottadb
-  - ln -s /go/src/lang.yottadb.com/go/yottadb /go/src/_/builds/yottadb
+  - apt-get update && apt-get install -y --no-install-recommends wget ca-certificates git g++ gcc libc6-dev make pkg-config && rm -rf /var/lib/apt/lists/*
   - export GOPATH=/go
-  - export PATH=${GOPATH}/bin:$PATH
+  - mkdir -p ${GOPATH}/src ${GOPATH}/bin && chmod -R 777 ${GOPATH}
+  - mkdir -p ${GOPATH}/src/lang.yottadb.com/go/yottadb ${GOPATH}/src/_/builds
+  - cp -r $CI_PROJECT_DIR/* ${GOPATH}/src/lang.yottadb.com/go/yottadb
+  - ln -s ${GOPATH}/src/lang.yottadb.com/go/yottadb ${GOPATH}/src/_/builds/yottadb
+  - export PATH=$GOPATH/bin:/usr/local/go/bin:$PATH
+  - wget -O go.tgz https://golang.org/dl/go${GOLANG_VERSION}.linux-amd64.tar.gz
+  - tar -C /usr/local -xzf go.tgz
+  - rm go.tgz
   - go get -u github.com/golang/lint/golint
-  - apt-get update -y -qq
-  - apt-get install cmake tcsh {libconfig,libelf,libgcrypt,libgpg-error,libgpgme11,libicu,libncurses,libssl,zlib1g}-dev binutils file -y -qq
-  - curl -fSsLO https://gitlab.com/YottaDB/DB/YDB/-/archive/master/YDB-master.tar.gz
-  - tar xzf YDB-master.tar.gz
-  - cd YDB-master
-  - mkdir build && cd build
-  - cmake -D CMAKE_INSTALL_PREFIX:PATH=$PWD ../
-  - make -j `grep -c ^processor /proc/cpuinfo`
-  - make install
-  - cd yottadb_r*
-  - ./ydbinstall --force-install
-  - cd /go/src/lang.yottadb.com/go/yottadb
-  - export ydb_dist=/usr/local/lib/yottadb/r123
+  - cd ${GOPATH}/src/lang.yottadb.com/go/yottadb
+  - export ydb_dist=/opt/yottadb/current
   - export ydb_gbldir=mumps.gld
-  - export ydb_routines=/usr/local/lib/yottadb/r123/libyottadbutil.so
-  - echo exit | /usr/local/lib/yottadb/r123/mumps -run ^GDE
-  - /usr/local/lib/yottadb/r123/mupip create
+  - export ydb_routines=/opt/yottadb/current/libyottadbutil.so
+  - echo exit | /opt/yottadb/current/mumps -run ^GDE
+  - /opt/yottadb/current/mupip create
+  - ls /usr/share/pkgconfig
+  - cat /usr/share/pkgconfig/yottadb.pc
 
 unit_tests:
   stage: test
