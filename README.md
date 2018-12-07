@@ -53,7 +53,8 @@ source $(pkg-config --variable=prefix yottadb)/ydb_env_set
 Run the tests:
 
 ```
-go test yottadb
+go get -t lang.yottadb.com/go/yottadb
+go test lang.yottadb.com/go/yottadb
 ```
 
 ## Developer builds
