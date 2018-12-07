@@ -40,7 +40,7 @@ go get lang.yottadb.com/go/yottadb
 Build the package:
 
 ```
-go build yottadb
+go build lang.yottadb.com/go/yottadb
 ```
 
 Before running code using YottaDB or running the YottaDB tests, you need to make sure you have all the needed environment variables configured.
