@@ -374,6 +374,9 @@ func (buftary *BufferTArray) SetValBAry(tptoken uint64, idx uint32, value *[]byt
 // SetValStr is a method to set a string (value) into the buffer at the given index (idx).
 func (buftary *BufferTArray) SetValStr(tptoken uint64, idx uint32, value *string) error {
 	printEntry("BufferTArray.SetValStr()")
+	if nil == buftary {
+		panic("*BufferTArray receiver of SetValBAry() cannot be nil")
+	}
 	valuebary := []byte(*value)
 	return buftary.SetValBAry(tptoken, idx, &valuebary)
 }
@@ -381,6 +384,9 @@ func (buftary *BufferTArray) SetValStr(tptoken uint64, idx uint32, value *string
 // SetValStrLit is a method to set a string literal (value) into the buffer at the given index (idx).
 func (buftary *BufferTArray) SetValStrLit(tptoken uint64, idx uint32, value string) error {
 	printEntry("BufferTArray.SetValStrLit()")
+	if nil == buftary {
+		panic("*BufferTArray receiver of SetValBAry() cannot be nil")
+	}
 	valuebary := []byte(value)
 	return buftary.SetValBAry(tptoken, idx, &valuebary)
 }

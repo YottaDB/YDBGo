@@ -76,6 +76,10 @@ func (buft *BufferT) Dump() {
 // DumpToWriter dumps a textual representation of this buffer to the writer
 func (buft *BufferT) DumpToWriter(w io.Writer) {
 	printEntry("BufferT.Dump()")
+	if nil == buft {
+		panic("*BufferT receiver of DumpToWriter() cannot be nil")
+	}
+
 	cbuftptr := (*buft).cbuft
 	fmt.Fprintf(w, "BufferT.Dump(): cbuftptr: %p", cbuftptr)
 	if nil != cbuftptr {

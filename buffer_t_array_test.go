@@ -146,20 +146,25 @@ func TestBufTAryLenAlloc(t *testing.T) {
 	var tp = yottadb.NOTTP
 
 	// Try getting length of non-alloc'd array
-	_, err := value.ElemLenAlloc(tp)
+	r, err := value.ElemLenAlloc(tp)
 	assert.NotNil(t, err)
 	// TODO: change this function to return 0
-	//assert.Equal(t, r, 0)
-
-	t.Skipf("This still needs to be fixed")
-	// Alloc a length of 0 and try to get it
-	value.Alloc(0, 64)
-	r, err := value.ElemLenAlloc(tp)
-	assert.Nil(t, err)
 	assert.Equal(t, r, uint32(0))
 
 	_, err = noalloc_value.ElemLenAlloc(tp)
 	assert.NotNil(t, err)
+
+	value.Alloc(10, 64)
+	r, err = value.ElemLenAlloc(tp)
+	assert.Nil(t, err)
+	assert.Equal(t, r, uint32(64))
+
+	t.Skipf("This still needs to be fixed")
+	// Alloc a length of 0 and try to get it
+	value.Alloc(0, 64)
+	r, err = value.ElemLenAlloc(tp)
+	assert.Nil(t, err)
+	assert.Equal(t, r, uint32(0))
 }
 
 func TestBufTAryBAry(t *testing.T) {
@@ -312,4 +317,38 @@ func TestBufTAryElemUsed(t *testing.T) {
 
 	r = value.ElemUsed()
 	assert.Equal(t, r, uint32(5))
+}
+
+func TestBufferTAryNilRecievers(t *testing.T) {
+	var value *yottadb.BufferTArray
+	var tp = yottadb.NOTTP
+
+	var safe = func() {
+		r := recover()
+		assert.NotNil(t, r)
+	}
+
+	var test_wrapper = func(f func()) {
+		defer safe()
+		f()
+		assert.Fail(t, "panic expected, but did not occur")
+	}
+
+	test_wrapper(func() { value.Alloc(10, 10) })
+	test_wrapper(func() { value.Dump() })
+	test_wrapper(func() { value.DumpToWriter(nil) })
+	//test_wrapper(func() { value.Free() }) // Free doesn't panic as a nil rec.
+	test_wrapper(func() { value.ElemAlloc() })
+	test_wrapper(func() { value.ElemLenAlloc(0) })
+	test_wrapper(func() { value.ElemLenUsed(tp, 0) })
+	test_wrapper(func() { value.ElemUsed() })
+	test_wrapper(func() { value.ValBAry(tp, 0) })
+	test_wrapper(func() { value.ValStr(tp, 0) })
+	test_wrapper(func() { value.SetElemLenUsed(tp, 0, 10) })
+	test_wrapper(func() { value.SetElemUsed(tp, 32) })
+	test_wrapper(func() { value.SetValBAry(tp, 0, nil) })
+	test_wrapper(func() { value.SetValStr(tp, 0, nil) })
+	test_wrapper(func() { value.SetValStrLit(tp, 0, "ok") })
+	test_wrapper(func() { value.DeleteExclST(tp) })
+	test_wrapper(func() { value.TpST(tp, nil, nil, "OK") })
 }

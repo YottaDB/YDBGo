@@ -13,6 +13,8 @@
 package yottadb_test
 
 import (
+	"bytes"
+	"github.com/stretchr/testify/assert"
 	"lang.yottadb.com/go/yottadb"
 	. "lang.yottadb.com/go/yottadb/internal/test_helpers"
 	"strconv"
@@ -456,4 +458,43 @@ func TestSubNextST(t *testing.T) {
 	if -1 != i {
 		t.Error("Unexpected SubPrevST() loop count - expected -1 but got", i)
 	}
+}
+
+func TestKeyTDumpToWriter(t *testing.T) {
+	var value yottadb.KeyT
+	var buf1 bytes.Buffer
+
+	value.DumpToWriter(&buf1)
+}
+
+func TestKeyTNilRecievers(t *testing.T) {
+	var value *yottadb.KeyT
+	var tp = yottadb.NOTTP
+
+	var safe = func() {
+		r := recover()
+		assert.NotNil(t, r)
+	}
+
+	var test_wrapper = func(f func()) {
+		defer safe()
+		f()
+		assert.Fail(t, "panic expected, but did not occur")
+	}
+
+	test_wrapper(func() { value.Alloc(64, 64, 64) })
+	test_wrapper(func() { value.Dump() })
+	test_wrapper(func() { value.DumpToWriter(nil) })
+	//test_wrapper(func() { value.Free() }) // Free does not panic if rec. nil
+	test_wrapper(func() { value.DataST(tp) })
+	test_wrapper(func() { value.DeleteST(tp, 0) })
+	test_wrapper(func() { value.ValST(tp, nil) })
+	test_wrapper(func() { value.IncrST(tp, nil, nil) })
+	test_wrapper(func() { value.LockDecrST(tp) })
+	test_wrapper(func() { value.LockIncrST(tp, 0) })
+	test_wrapper(func() { value.NodeNextST(tp, nil) })
+	test_wrapper(func() { value.NodePrevST(tp, nil) })
+	test_wrapper(func() { value.SetValST(tp, nil) })
+	test_wrapper(func() { value.SubNextST(tp, nil) })
+	test_wrapper(func() { value.SubPrevST(tp, nil) })
 }

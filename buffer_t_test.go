@@ -259,3 +259,34 @@ func TestDump(t *testing.T) {
 	assert.Contains(t, buf1.String(), "Hello")
 	assert.Contains(t, buf1.String(), "64")
 }
+
+func TestBufferTNilRecievers(t *testing.T) {
+	var value *yottadb.BufferT
+	var tp = yottadb.NOTTP
+
+	var safe = func() {
+		r := recover()
+		assert.NotNil(t, r)
+	}
+
+	var test_wrapper = func(f func()) {
+		defer safe()
+		f()
+		assert.Fail(t, "panic expected, but did not occur")
+	}
+
+	test_wrapper(func() { value.Alloc(60) })
+	test_wrapper(func() { value.Dump() })
+	test_wrapper(func() { value.DumpToWriter(nil) })
+	//test_wrapper(func() { value.Free() }) // Free won't panic, it'll just chill
+	test_wrapper(func() { value.LenAlloc(tp) })
+	test_wrapper(func() { value.LenUsed(tp) })
+	test_wrapper(func() { value.ValBAry(tp) })
+	test_wrapper(func() { value.ValStr(tp) })
+	test_wrapper(func() { value.SetLenUsed(tp, 1000) })
+	test_wrapper(func() { value.SetValBAry(tp, nil) })
+	test_wrapper(func() { value.SetValStr(tp, nil) })
+	test_wrapper(func() { value.SetValStrLit(tp, "ok") })
+	test_wrapper(func() { value.Str2ZwrST(tp, nil) })
+	test_wrapper(func() { value.Zwr2StrST(tp, nil) })
+}

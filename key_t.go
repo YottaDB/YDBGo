@@ -14,6 +14,8 @@ package yottadb
 
 import (
 	"fmt"
+	"io"
+	"os"
 	"unsafe"
 )
 
@@ -53,8 +55,17 @@ func (key *KeyT) Dump() {
 	if nil == key {
 		panic("*KeyT receiver of Dump() cannot be nil")
 	}
-	(&((*key).Varnm)).Dump()
-	(&((*key).Subary)).Dump()
+	key.DumpToWriter(os.Stdout)
+}
+
+// DumpToWriter dumps a textual representation of this key to the writer
+func (key *KeyT) DumpToWriter(writer io.Writer) {
+	if nil == key {
+		panic("*KeyT receiver of DumpWriter() cannot be nil")
+	}
+	(&((*key).Varnm)).DumpToWriter(writer)
+	(&((*key).Subary)).DumpToWriter(writer)
+
 }
 
 // Free is a STAPI method to free both pieces of the KeyT structure.
@@ -161,6 +172,9 @@ func (key *KeyT) IncrST(tptoken uint64, incr, retval *BufferT) error {
 // LockDecrST is a STAPI method to decrement the lock-count of a given lock node.
 func (key *KeyT) LockDecrST(tptoken uint64) error {
 	printEntry("KeyT.LockDecrST()")
+	if nil == key {
+		panic("*KeyT receiver of LockDecrST() cannot be nil")
+	}
 	vargobuft := (&((*key).Varnm)).cbuft
 	subgobuftary := &((*key).Subary)
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer((*subgobuftary).cbuftary))

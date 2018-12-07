@@ -128,11 +128,9 @@ func Example_simpleAPI() {
 		if err != nil {
 			panic(err)
 		}
-		fmt.Printf("Current subscript: %s\n", (*val1))
+		fmt.Printf("%s ", (*val1))
 		// Move to that key by setting the next node in the key
 		key1.Subary.SetValStr(tptoken, 0, val1)
 	}
-	/* Output: Current subscript: Winterfell
-Current subscript: shire
-Current subscript: world*/
+	/* Output: Winterfell shire world */
 }

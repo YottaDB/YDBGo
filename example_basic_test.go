@@ -48,9 +48,7 @@ func Example_easyAPI() {
 				panic(err)
 			}
 		}
-		fmt.Printf("Current subscript: %s\n", cur_sub)
+		fmt.Printf("%s ", cur_sub)
 	}
-	/* Output: Current subscript: Winterfell
-Current subscript: shire
-Current subscript: world*/
+	/* Output: Winterfell shire world*/
 }
