@@ -33,7 +33,7 @@ func MessageT(tptoken uint64, status int) (string, error) {
 	printEntry("MessageT()")
 	defer msgval.Free()
 	msgval.Alloc(uint32(C.YDB_MAX_ERRORMSG))
-	rc := C.ydb_message(C.int(status), msgval.cbuft)
+	rc := C.ydb_message_t(C.uint64_t(tptoken), C.int(status), msgval.cbuft)
 	if C.YDB_OK != rc {
 		err := NewError(int(rc))
 		return "", err
