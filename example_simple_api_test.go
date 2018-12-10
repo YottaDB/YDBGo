@@ -10,7 +10,7 @@ import (
 // and deleting a value.
 //
 // The SimpleAPI is somewhat more difficult to use than the EasyAPI, but is more
-// more performant. It is recommended to use the SimpleAPI if you are building a
+// performant. It is recommended to use the SimpleAPI if you are building a
 // performance critical application.
 func Example_simpleAPI() {
 	// Allocate a key to set our value equal too
@@ -27,7 +27,7 @@ func Example_simpleAPI() {
 	// Set global node ["^hello", "world"] to "Go World"
 
 	// When using the simple API, you MUST always defer the Free of each structure,
-	//  as is allocates C memory which Go doesn't know to free!
+	//  as it allocates C memory which Go doesn't know to free!
 	defer key1.Free()
 	key1.Alloc(64, 10, 64)
 	err = key1.Varnm.SetValStrLit(tptoken, "^hello")
@@ -43,7 +43,7 @@ func Example_simpleAPI() {
 		panic(err)
 	}
 
-	// Create a bufer which is used to specify the value we will be setting the global to
+	// Create a buffer which is used to specify the value we will be setting the global to
 	// Reminder, you MUST always defer Free of each structure you allocate
 	defer buff1.Free()
 	buff1.Alloc(64)

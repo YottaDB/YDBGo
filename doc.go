@@ -11,7 +11,7 @@
 //////////////////////////////////////////////////////////////////
 
 /*
-Package yottadb provides a Go wrapper for YottaDB, a mature, high performance, transactional, NoSQL engine with proven speed and stability.
+Package yottadb provides a Go wrapper for YottaDB - a mature, high performance, transactional NoSQL engine with proven speed and stability.
 
 YottaDB Quick Start
 
@@ -31,7 +31,7 @@ After installing YottaDB, install the Go wrapper:
 
 Easy API
 
-The easy API provides a set of functions which are very easy to use at the expense of
+The Easy API provides a set of functions that are very easy to use at the expense of
 some additional copies for each operation. These functions all end with the letter 'E',
 and are available in the yottadb package. They include:
 
@@ -57,11 +57,11 @@ Simple API
 The simple API provides a better one-to-one mapping to the underlying C API, and
 provides better performance at the cost of convenience. These functions are mostly
 encapsulated in the BufferT, BufferTArray, and KeyT data structures, with the only function
-beloning to this API existing outside of these data types being LockST.
+belonging to this API, existing outside of these data types, being LockST.
 
 When using any of the structures from the Simple API, it is very important to ensure that
 myvar.Free() gets called on each of the allocated structures. The structures allocate underlying
-C structures which Go does not know how to free, and if Free() is not called that memory will
+C structures which Go does not know how to free. If Free() is not called, the allocated memory will
 leak.
 
 Please see the Simple API example below for usage.
@@ -79,12 +79,12 @@ Go Error Interface
 YottaDB has a comprehensive set of error return codes. Each has a unique
 number and a mnemonic. Thus, for example, to return an error that a
 buffer allocated for a return value is not large enough, YottaDB uses
-the INVSTRLEN error code, which has the numeric value
-``C.YDB_ERR_INVSTRLEN``. YottaDB attempts to maintain
-stability of the numeric values and mnemonics from release to release,
+the INVSTRLEN error code, which has the value
+C.YDB_ERR_INVSTRLEN. YottaDB attempts to maintain
+the stability of the numeric values and mnemonics from release to release,
 to ensure applications remain compatible when the underlying YottaDB
-releases are upgraded. Go ``error`` interface
+releases are upgraded. The Go "error" interface
 provides for a call to return an error as a string (with
-``nil`` for a successful return).
+"nil" for a successful return).
 */
 package yottadb
