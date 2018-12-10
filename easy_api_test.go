@@ -403,3 +403,32 @@ func TestTpE(t *testing.T) {
 	}
 
 }
+
+func TestTpE2(t *testing.T) {
+	var tptoken uint64 = yottadb.NOTTP
+	var err error
+	var errors int
+	var val1, val2 string
+
+	// Start with a clean slate
+	Dbdeleteall(tptoken, &errors, t)
+	// Invoke TP transaction
+	err = yottadb.TpE2(tptoken, func(tptoken uint64) int {
+		return TestTpRtn(tptoken, nil)
+	}, "BATCH", []string{"*"})
+	Assertnoerr(err, t)
+	// Fetch the two nodes to make sure they are there and have correct values
+	val1, err = yottadb.ValE(tptoken, "^Variable1A", []string{"Index0", "Index1", "Index2"})
+	Assertnoerr(err, t)
+	if "The value of Variable1A" != val1 {
+		t.Errorf("The fetched value of ^Variable1A(\"Index0\",\"Index1\",\"Index2\") was not correct\n")
+		t.Logf("       Expected: 'The value of Variable1A', Received: '%s'\n", val1)
+	}
+	val2, err = yottadb.ValE(tptoken, "^Variable2B", []string{"Idx0", "Idx1"})
+	Assertnoerr(err, t)
+	if "The value of Variable2B" != val2 {
+		t.Error("The fetched value of ^Variable2B(\"Idx0\",\"Idx1\") was not correct\n")
+		t.Logf("       Expected: 'The value of Variable2B', Received: '%s'\n", val2)
+	}
+
+}

@@ -352,3 +352,35 @@ func TestBufferTAryNilRecievers(t *testing.T) {
 	test_wrapper(func() { value.DeleteExclST(tp) })
 	test_wrapper(func() { value.TpST(tp, nil, nil, "OK") })
 }
+
+func TestBufTAryTpSt2(t *testing.T) {
+	var novars yottadb.BufferTArray
+	var namelst yottadb.BufferTArray
+	var tptoken uint64 = yottadb.NOTTP
+	var err error
+	var errors int
+
+	namelst.Alloc(2, 10) // Need an array of two names not more than 10 bytes
+	// Start with clean slate then drive TP transaction
+	Dbdeleteall(tptoken, &errors, t)
+	//err = novars.TpST(tptoken, TpRtn_cgo(), nil, "BATCH")
+	err = novars.TpST2(tptoken, func(tp uint64) int {
+		return TestTpRtn(tp, nil)
+	}, "BATCH")
+	Assertnoerr(err, t)
+	// Fetch the two nodes to make sure they are there and have correct values
+	val1, err := yottadb.ValE(tptoken, "^Variable1A", []string{"Index0", "Index1", "Index2"})
+	Assertnoerr(err, t)
+	if "The value of Variable1A" != val1 {
+		t.Logf("FAIL - The fetched value of ^Variable1A(\"Index0\",\"Index1\",\"Index2\") was not correct\n")
+		t.Logf("       Expected: 'The value of Variable1A', Received: '%s'\n", val1)
+		t.Fail()
+	}
+	val2, err := yottadb.ValE(tptoken, "^Variable2B", []string{"Idx0", "Idx1"})
+	Assertnoerr(err, t)
+	if "The value of Variable2B" != val2 {
+		t.Logf("FAIL - The fetched value of ^Variable2B(\"Idx0\",\"Idx1\") was not correct\n")
+		t.Logf("       Expected: 'The value of Variable2B', Received: '%s'\n", val2)
+		t.Fail()
+	}
+}

@@ -507,6 +507,20 @@ func SubPrevE(tptoken uint64, varname string, subary []string) (string, error) {
 }
 
 // TpE is a STAPI function to initiate a TP transaction.
+//
+// Parameters
+//
+// tpfn - C function pointer routine that either performs the transaction or immediately calls a Golang routine to
+// perform the transaction. On return from that routine, the transaction is committed.
+//
+// tpfnparm - A single parameter that can be a pointer to a structure to provide parameters to the transaction routine.
+//              Note these parameters MUST LIVE in C allocated memory or the call is likely to fail.
+//
+// transid  - See docs for ydb_tp_s() in the MLPG.
+//
+// varnames - a list of local YottaDB variables to reset should the transaction
+//  be restarted; if this is an array of 1 string with a value of "*" all YDB
+//  local variables get reset after a TP_RESTART
 func TpE(tptoken uint64, tpfn unsafe.Pointer, tpfnparm unsafe.Pointer, transid string, varnames []string) error {
 	var vnames BufferTArray
 	var maxvarnmlen, varnmcnt, varnmlen uint32
@@ -534,4 +548,52 @@ func TpE(tptoken uint64, tpfn unsafe.Pointer, tpfnparm unsafe.Pointer, transid s
 	}
 	// Drive simpleAPI wrapper and return its return code
 	return vnames.TpST(tptoken, tpfn, tpfnparm, transid)
+}
+
+// TpE2 is a Easy API function to drive transactions.
+//
+// Parameters
+//
+// tptoken - the token used to identify nested transaction; start with yottadb.NOTTP
+//
+// tpfn - the closure which will be run during the transaction. This closure may get
+//  invoked multiple times if a transaction fails for some reason (concurrent changes,
+//  for example), so should not change any data outside of the database
+//
+// transid  - See docs for ydb_tp_s() in the MLPG.
+//
+// varnames - a list of local YottaDB variables to reset should the transaction
+//  be restarted; if this is an array of 1 string with a value of "*" all YDB
+//  local variables get reset after a TP_RESTART
+func TpE2(tptoken uint64,
+	tpfn func(uint64) int,
+	transid string,
+	varnames []string) error {
+
+	var vnames BufferTArray
+	var maxvarnmlen, varnmcnt, varnmlen uint32
+	var i int
+	var err error
+	var varname string
+
+	printEntry("TpE2()")
+	defer vnames.Free()
+	varnmcnt = uint32(len(varnames))
+	// Find maximum length of varname so know how much to allocate
+	maxvarnmlen = 0
+	for _, varname = range varnames {
+		varnmlen = uint32(len(varname))
+		if varnmlen > maxvarnmlen {
+			maxvarnmlen = varnmlen
+		}
+	}
+	vnames.Alloc(varnmcnt, maxvarnmlen)
+	for i, varname = range varnames {
+		err = vnames.SetValStr(tptoken, uint32(i), &varname)
+		if nil != err {
+			panic(fmt.Sprintf("YDB: Unexpected error with SetValStr(): %s", err))
+		}
+	}
+	// Drive simpleAPI wrapper and return its return code
+	return vnames.TpST2(tptoken, tpfn, transid)
 }

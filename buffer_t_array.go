@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sync"
 	"unsafe"
 )
 
@@ -23,6 +24,7 @@ import (
 // #include <string.h>
 // #include "libyottadb.h"
 // #include "libydberrors.h"
+// int ydb_tp_st_wrapper_cgo(uint64_t tptoken, void *tpfnparm);
 import "C"
 
 // BufferTArray is an array of ydb_buffer_t structures. The reason this is not an array of BufferT structures is because
@@ -439,4 +441,62 @@ func (buftary *BufferTArray) TpST(tptoken uint64, tpfn unsafe.Pointer, tpfnparm 
 		return err
 	}
 	return nil
+}
+
+// Variables used by TpST2 to wrap passing in func
+//  so the callback can retrieve it without passing pointers to C
+//  land
+var tpMutex sync.Mutex
+var tpIndex uint64
+var tpMap map[uint64]func(uint64) int
+
+// TpST2 is a STAPI method to invoke transaction processing.
+//
+// Parameters
+//
+// tptoken - the token used to identify nested transaction; start with yottadb.NOTTP
+//
+// tpfn - the closure which will be run during the transaction. This closure may get
+//  invoked multiple times if a transaction fails for some reason (concurrent changes,
+//  for example), so should not change any data outside of the database
+//
+// transid  - See docs for ydb_tp_s() in the MLPG.
+func (buftary *BufferTArray) TpST2(
+	tptoken uint64,
+	tpfn func(uint64) int,
+	transid string) error {
+
+	tid := C.CString(transid)
+	tpMutex.Lock()
+	tpfnparm := tpIndex
+	tpIndex++
+	if tpMap == nil {
+		tpMap = make(map[uint64]func(uint64) int)
+	}
+	tpMap[tpfnparm] = tpfn
+	tpMutex.Unlock()
+	defer C.free(unsafe.Pointer(tid))
+	cbuftary := (*C.ydb_buffer_t)(unsafe.Pointer((*buftary).cbuftary))
+	rc := C.ydb_tp_st(C.uint64_t(tptoken), (C.ydb_tpfnptr_t)(C.ydb_tp_st_wrapper_cgo),
+		unsafe.Pointer(&tpfnparm), tid, C.int((*buftary).elemsUsed), cbuftary)
+	delete(tpMap, tpfnparm)
+	if C.YDB_OK != rc {
+		err := NewError(int(rc))
+		return err
+	}
+	return nil
+}
+
+// YdbTpStWrapper is a private callback to wrap calls to the Go closure
+//  required for TpST2
+//export ydbTpStWrapper
+func ydbTpStWrapper(tptoken uint64, tpfnparm unsafe.Pointer) int {
+	index := *((*uint64)(tpfnparm))
+	tpMutex.Lock()
+	v, ok := tpMap[index]
+	tpMutex.Unlock()
+	if !ok {
+		panic("Couldn't find callback routine")
+	}
+	return (v)(tptoken)
 }
