@@ -6,7 +6,7 @@ stages:
   - deploy
 
 variables:
-  GOLANG_VERSION: 1.10.5
+  GOLANG_VERSION: 1.11.2
 
 before_script:
   - apt-get update && apt-get install -y --no-install-recommends wget ca-certificates git g++ gcc libc6-dev make pkg-config && rm -rf /var/lib/apt/lists/*
@@ -17,10 +17,10 @@ before_script:
   - cp -r $CI_PROJECT_DIR/.git/* ${GOPATH}/src/lang.yottadb.com/go/yottadb/.git
   - ln -s ${GOPATH}/src/lang.yottadb.com/go/yottadb ${GOPATH}/src/_/builds/yottadb
   - export PATH=$GOPATH/bin:/usr/local/go/bin:$PATH
-  - wget -O go.tgz https://golang.org/dl/go${GOLANG_VERSION}.linux-amd64.tar.gz
+  - wget -O go.tgz -q https://golang.org/dl/go${GOLANG_VERSION}.linux-amd64.tar.gz
   - tar -C /usr/local -xzf go.tgz
   - rm go.tgz
-  - go get -u github.com/golang/lint/golint
+  - go version
   - cd ${GOPATH}/src/lang.yottadb.com/go/yottadb
   - export ydb_dist=/opt/yottadb/current
   - export ydb_gbldir=mumps.gld
@@ -28,11 +28,176 @@ before_script:
   - echo exit | /opt/yottadb/current/mumps -run ^GDE
   - /opt/yottadb/current/mupip create
 
-unit_tests:
+.unit_tests:
   stage: test
   script:
     - go get -t
     - go test -short $(go list ./... | grep -v /vendor/)
+
+unit_tests1.6.2:
+  extends: .unit_tests
+  variables:
+    GOLANG_VERSION: 1.6.2
+
+unit_tests1.6.3:
+  extends: .unit_tests
+  variables:
+    GOLANG_VERSION: 1.6.3
+
+unit_tests1.6.4:
+  extends: .unit_tests
+  variables:
+    GOLANG_VERSION: 1.6.4
+
+unit_tests1.7:
+  extends: .unit_tests
+  variables:
+    GOLANG_VERSION: "1.7"
+
+unit_tests1.7.3:
+  extends: .unit_tests
+  variables:
+    GOLANG_VERSION: 1.7.3
+
+unit_tests1.7.4:
+  extends: .unit_tests
+  variables:
+    GOLANG_VERSION: 1.7.4
+
+unit_tests1.7.5:
+  extends: .unit_tests
+  variables:
+    GOLANG_VERSION: 1.7.5
+
+unit_tests1.7.6:
+  extends: .unit_tests
+  variables:
+    GOLANG_VERSION: 1.7.6
+
+unit_tests1.8:
+  extends: .unit_tests
+  variables:
+    GOLANG_VERSION: "1.8"
+
+unit_tests1.8.1:
+  extends: .unit_tests
+  variables:
+    GOLANG_VERSION: 1.8.1
+
+unit_tests1.8.2:
+  extends: .unit_tests
+  variables:
+    GOLANG_VERSION: 1.8.2
+
+unit_tests1.8.3:
+  extends: .unit_tests
+  variables:
+    GOLANG_VERSION: 1.8.3
+
+unit_tests1.8.4:
+  extends: .unit_tests
+  variables:
+    GOLANG_VERSION: 1.8.4
+
+unit_tests1.8.5:
+  extends: .unit_tests
+  variables:
+    GOLANG_VERSION: 1.8.5
+
+unit_tests1.8.6:
+  extends: .unit_tests
+  variables:
+    GOLANG_VERSION: 1.8.6
+
+unit_tests1.8.7:
+  extends: .unit_tests
+  variables:
+    GOLANG_VERSION: 1.8.7
+
+unit_tests1.9:
+  extends: .unit_tests
+  variables:
+    GOLANG_VERSION: "1.9"
+
+unit_tests1.9.1:
+  extends: .unit_tests
+  variables:
+    GOLANG_VERSION: 1.9.1
+
+unit_tests1.9.2:
+  extends: .unit_tests
+  variables:
+    GOLANG_VERSION: 1.9.2
+
+unit_tests1.9.3:
+  extends: .unit_tests
+  variables:
+    GOLANG_VERSION: 1.9.3
+
+unit_tests1.9.4:
+  extends: .unit_tests
+  variables:
+    GOLANG_VERSION: 1.9.4
+
+unit_tests1.9.5:
+  extends: .unit_tests
+  variables:
+    GOLANG_VERSION: 1.9.5
+
+unit_tests1.9.6:
+  extends: .unit_tests
+  variables:
+    GOLANG_VERSION: 1.9.6
+
+unit_tests1.9.7:
+  extends: .unit_tests
+  variables:
+    GOLANG_VERSION: 1.9.7
+
+unit_tests1.10:
+  extends: .unit_tests
+  variables:
+    GOLANG_VERSION: "1.10"
+
+unit_tests1.10.1:
+  extends: .unit_tests
+  variables:
+    GOLANG_VERSION: 1.10.1
+
+unit_tests1.10.2:
+  extends: .unit_tests
+  variables:
+    GOLANG_VERSION: 1.10.2
+
+unit_tests1.10.3:
+  extends: .unit_tests
+  variables:
+    GOLANG_VERSION: 1.10.3
+
+unit_tests1.10.4:
+  extends: .unit_tests
+  variables:
+    GOLANG_VERSION: 1.10.4
+
+unit_tests1.10.5:
+  extends: .unit_tests
+  variables:
+    GOLANG_VERSION: 1.10.5
+
+unit_tests1.11:
+  extends: .unit_tests
+  variables:
+    GOLANG_VERSION: "1.11"
+
+unit_tests1.11.1:
+  extends: .unit_tests
+  variables:
+    GOLANG_VERSION: 1.11.1
+
+unit_tests1.11.2:
+  extends: .unit_tests
+  variables:
+    GOLANG_VERSION: 1.11.2
 
 race_detector:
   stage: test
@@ -61,6 +226,7 @@ coverage:
 lint_code:
   stage: test
   script:
+    - go get -u github.com/golang/lint/golint
     - golint -set_exit_status $(go list ./... | grep -v /vendor/ | grep -v /internal/)
 
 error_codes:
