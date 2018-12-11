@@ -5,7 +5,7 @@ import (
 	"lang.yottadb.com/go/yottadb"
 )
 
-// Example_basic demonstrates the most basic features of YottaDB;
+// Example_basic demonstrates the most basic features of YottaDB:
 // setting a value, getting a value, iterating through values,
 // and deleting a value.
 //

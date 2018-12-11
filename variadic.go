@@ -40,7 +40,7 @@ type variadicPlist struct { // Variadic plist support (not exported) needed by L
 	cvplist *C.gparam_list
 }
 
-// alloc is a variadicPlist method to allocate the variable plist C structure anchored in variadicPlist
+// alloc is a variadicPlist method to allocate the variable plist C structure anchored in variadicPlist.
 func (vplist *variadicPlist) alloc() {
 	printEntry("variadicPlist.alloc()")
 	if nil == vplist {
@@ -74,7 +74,7 @@ func (vplist *variadicPlist) free() {
 	}
 }
 
-// dump is a variadicPlist method to dump a variadic plist block for debugging purposes
+// dump is a variadicPlist method to dump a variadic plist block for debugging purposes.
 func (vplist *variadicPlist) dump(tptoken uint64) {
 	printEntry("variadicPlist.dump()")
 	if nil == vplist {
@@ -106,7 +106,7 @@ func (vplist *variadicPlist) dump(tptoken uint64) {
 	}
 }
 
-// setUsed is a variadicPlist method to set the number of used elements in the variadic plist array
+// setUsed is a variadicPlist method to set the number of used elements in the variadic plist array.
 func (vplist *variadicPlist) setUsed(tptoken uint64, newUsed uint32) error {
 	printEntry("variadicPlist.setUsed")
 	if nil == vplist {

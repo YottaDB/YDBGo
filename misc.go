@@ -36,7 +36,7 @@ func max(x int, y int) int {
 	return y
 }
 
-// printEntry is a function to print entry point of function when entered if debug flag is enabled.
+// printEntry is a function to print the entry point of the function, when entered, if the debug flag is enabled.
 func printEntry(funcName string) {
 	if debugFlag {
 		_, file, line, ok := runtime.Caller(2)
@@ -96,7 +96,7 @@ func Exit() {
 	C.ydb_exit()
 }
 
-// Assertnoerror function checks provided error code and give panic along with location if is an error.
+// Assertnoerror function checks provided error code and gives a panic along with location if is an error.
 // Useful for test code especially - not particularly useful or proper for production code.
 func Assertnoerror(err error) {
 	if nil != err {

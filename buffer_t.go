@@ -128,7 +128,7 @@ func (buft *BufferT) LenAlloc(tptoken uint64) (uint32, error) {
 }
 
 // LenUsed is a method to fetch the ydb_buffer_t.len_used field containing the used length of the buffer. Note
-// that if len_used > than len_alloc thus indicating a previous issue, an INVSTRLEN error is raised.
+// that if len_used > len_alloc, thus indicating a previous issue, an INVSTRLEN error is raised.
 func (buft *BufferT) LenUsed(tptoken uint64) (uint32, error) {
 	printEntry("BufferT.LenUsed()")
 	if nil == buft {

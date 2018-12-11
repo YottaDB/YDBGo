@@ -27,7 +27,7 @@ import "C"
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// YDBError is a structure that define ours error message format which includes both the formated $ZSTATUS
+// YDBError is a structure that define our error message format which includes both the formated $ZSTATUS
 // type message plus the numeric error value.
 type YDBError struct {
 	errcode int    // The error value (e.g. C.YDB_ERR_DBFILERR, etc)
@@ -49,9 +49,9 @@ func ErrorCode(err error) int {
 	return -1
 }
 
-// NewError is a functione to create a new YDBError and return it. Note we use ydb_zstatus() instead of
-// using (for example) GetE() to fetch $ZSTATUS because ydb_zstatus does not require a tptoken so means
-// that we don't need to pass tptoken to all the data access methods (GetValStr() for example).
+// NewError is a function to create a new YDBError and return it. Note that we use ydb_zstatus() instead of
+// using (for example) GetE() to fetch $ZSTATUS because ydb_zstatus does not require a tptoken. This means
+// that we don't need to pass tptoken to all the data access methods (For example, GetValStr()).
 //
 func NewError(errnum int) error {
 	var msgptr *C.char

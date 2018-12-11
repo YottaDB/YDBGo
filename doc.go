@@ -57,7 +57,7 @@ Simple API
 The simple API provides a better one-to-one mapping to the underlying C API, and
 provides better performance at the cost of convenience. These functions are mostly
 encapsulated in the BufferT, BufferTArray, and KeyT data structures, with the only function
-belonging to this API, existing outside of these data types, being LockST.
+belonging to this API existing outside of these data types, being LockST.
 
 When using any of the structures from the Simple API, it is very important to ensure that
 myvar.Free() gets called on each of the allocated structures. The structures allocate underlying
