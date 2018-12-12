@@ -46,11 +46,11 @@ func (vplist *variadicPlist) alloc() {
 	if nil == vplist {
 		panic("*variadicPlist receiver of alloc() cannot be nil")
 	}
-	if nil != (*vplist).cvplist {
+	if nil != vplist.cvplist {
 		// Already allocated
 		return
 	}
-	(*vplist).cvplist = (*C.gparam_list)(C.malloc(C.size_t(C.sizeof_gparam_list)))
+	vplist.cvplist = (*C.gparam_list)(C.malloc(C.size_t(C.sizeof_gparam_list)))
 }
 
 // callVariadicPlistFuncSt is a variadicPlist method to drive a variadic plist function with the given
@@ -62,15 +62,15 @@ func (vplist *variadicPlist) callVariadicPlistFuncST(tptoken uint64, vpfunc unsa
 		panic("*variadicPlist receiver of callVariadicPlistFuncST() cannot be nil")
 	}
 	return int(C.ydb_call_variadic_plist_func_st(C.uint64_t(tptoken), (C.ydb_vplist_func)(vpfunc),
-		(C.uintptr_t)(uintptr(unsafe.Pointer((*vplist).cvplist)))))
+		(C.uintptr_t)(uintptr(unsafe.Pointer(vplist.cvplist)))))
 }
 
 // free is a variadicPlist method to release the allocated C buffer in this structure.
 func (vplist *variadicPlist) free() {
 	printEntry("variadicPlist.free()")
-	if (nil != vplist) && (nil != (*vplist).cvplist) {
-		C.free(unsafe.Pointer((*vplist).cvplist))
-		(*vplist).cvplist = nil
+	if (nil != vplist) && (nil != vplist.cvplist) {
+		C.free(unsafe.Pointer(vplist.cvplist))
+		vplist.cvplist = nil
 	}
 }
 
@@ -80,7 +80,7 @@ func (vplist *variadicPlist) dump(tptoken uint64) {
 	if nil == vplist {
 		panic("*variadicPlist receiver of dump() cannot be nil")
 	}
-	cvplist := (*vplist).cvplist
+	cvplist := vplist.cvplist
 	if nil == cvplist {
 		// Create an error to return
 		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
@@ -112,7 +112,7 @@ func (vplist *variadicPlist) setUsed(tptoken uint64, newUsed uint32) error {
 	if nil == vplist {
 		panic("*variadicPlist receiver of setUsed() cannot be nil")
 	}
-	cvplist := (*vplist).cvplist
+	cvplist := vplist.cvplist
 	if nil == cvplist {
 		// Create an error to return
 		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
@@ -132,7 +132,7 @@ func (vplist *variadicPlist) setVPlistParam(tptoken uint64, paramindx int, param
 	if nil == vplist {
 		panic("*variadicPlist receiver of setVPlistParam() cannot be nil")
 	}
-	cvplist := (*vplist).cvplist
+	cvplist := vplist.cvplist
 	if nil == cvplist {
 		// Create an error to return
 		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_STRUCTNOTALLOCD))

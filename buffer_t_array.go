@@ -52,22 +52,29 @@ func (buftary *BufferTArray) Alloc(numBufs, bufSiz uint32) {
 	if nil == buftary {
 		panic("*BufferTArray receiver of Alloc() cannot be nil")
 	}
-	if nil != (*buftary).cbuftary {
+	if nil != buftary.cbuftary {
 		buftary.Free() // Get rid of previous allocations and re-allocate
 	}
-	// Allocate new ydb_buffer_t array and initialize
-	len := C.size_t(uint32(C.sizeof_ydb_buffer_t) * numBufs)
-	cbuftary := (*[]C.ydb_buffer_t)(C.malloc(len))
-	(*buftary).cbuftary = cbuftary
-	(*buftary).elemsAlloc = numBufs
-	(*buftary).elemsUsed = 0
-	// Allocate a buffer for each ydb_buffer_t structure of bufSiz bytes
-	for i = 0; numBufs > i; i++ {
-		elemptr := (*C.ydb_buffer_t)(unsafe.Pointer(uintptr(unsafe.Pointer(cbuftary)) +
-			uintptr(C.sizeof_ydb_buffer_t*i)))
-		(*elemptr).buf_addr = (*C.char)(C.malloc(C.size_t(bufSiz)))
-		(*elemptr).len_alloc = C.uint(bufSiz)
-		(*elemptr).len_used = 0
+	if (0 != numBufs) {
+		// Allocate new ydb_buffer_t array and initialize
+		len := C.size_t(uint32(C.sizeof_ydb_buffer_t) * numBufs)
+		cbuftary := (*[]C.ydb_buffer_t)(C.malloc(len))
+		buftary.cbuftary = cbuftary
+		buftary.elemsAlloc = numBufs
+		buftary.elemsUsed = 0
+		// Allocate a buffer for each ydb_buffer_t structure of bufSiz bytes
+		for i = 0; numBufs > i; i++ {
+			elemptr := (*C.ydb_buffer_t)(unsafe.Pointer(uintptr(unsafe.Pointer(cbuftary)) +
+				uintptr(C.sizeof_ydb_buffer_t*i)))
+			(*elemptr).buf_addr = (*C.char)(C.malloc(C.size_t(bufSiz)))
+			(*elemptr).len_alloc = C.uint(bufSiz)
+			(*elemptr).len_used = 0
+		}
+	} else {
+		// Make sure our potentially de-allocated array has a proper uninitialized state
+		buftary.elemsAlloc = 0
+		buftary.elemsUsed = 0
+		buftary.cbuftary = nil
 	}
 }
 
@@ -82,11 +89,11 @@ func (buftary *BufferTArray) DumpToWriter(w io.Writer) {
 	if nil == buftary {
 		panic("*BufferTArray receiver of Dump() cannot be nil")
 	}
-	cbuftary := (*buftary).cbuftary
+	cbuftary := buftary.cbuftary
 	if nil != cbuftary {
 		fmt.Fprintf(w, "BufferTArray.Dump(): cbuftary: %p, elemsAlloc: %d, elemsUsed: %d\n", cbuftary,
-			(*buftary).elemsAlloc, (*buftary).elemsUsed)
-		for i := 0; int((*buftary).elemsUsed) > i; i++ {
+			buftary.elemsAlloc, buftary.elemsUsed)
+		for i := 0; int(buftary.elemsUsed) > i; i++ {
 			elemptr := (*C.ydb_buffer_t)(unsafe.Pointer((uintptr(unsafe.Pointer(cbuftary)) +
 				uintptr(C.sizeof_ydb_buffer_t*i))))
 			valstr := C.GoStringN((*elemptr).buf_addr, C.int((*elemptr).len_used))
@@ -100,11 +107,11 @@ func (buftary *BufferTArray) Free() {
 	printEntry("BufferTArray.Free()")
 	if nil != buftary {
 		// Deallocate the buffers in each ydb_buffer_t
-		cbuftary := (*buftary).cbuftary
+		cbuftary := buftary.cbuftary
 		if nil == cbuftary {
 			return // Nothing to do
 		}
-		for i := 0; int((*buftary).elemsAlloc) > i; i++ {
+		for i := 0; int(buftary.elemsAlloc) > i; i++ {
 			elemptr := (*C.ydb_buffer_t)(unsafe.Pointer(uintptr(unsafe.Pointer(cbuftary)) +
 				uintptr(C.sizeof_ydb_buffer_t*i)))
 			if 0 != (*elemptr).len_alloc {
@@ -113,9 +120,9 @@ func (buftary *BufferTArray) Free() {
 		}
 		// Array buffers are freed, now free the array of ydb_buffer_t structs if it exists
 		C.free(unsafe.Pointer(cbuftary))
-		(*buftary).cbuftary = nil
-		(*buftary).elemsAlloc = 0
-		(*buftary).elemsUsed = 0
+		buftary.cbuftary = nil
+		buftary.elemsAlloc = 0
+		buftary.elemsUsed = 0
 	}
 }
 
@@ -125,27 +132,27 @@ func (buftary *BufferTArray) ElemAlloc() uint32 {
 	if nil == buftary {
 		panic("*BufferTArray receiver of ElemAlloc() cannot be nil")
 	}
-	return (*buftary).elemsAlloc
+	return buftary.elemsAlloc
 }
 
 // ElemLenAlloc is a method to retrieve the buffer allocation length associated with our BufferTArray.
 // Since all buffers are the same size in this array, just return the value from the first array entry.
-func (buftary *BufferTArray) ElemLenAlloc(tptoken uint64) (uint32, error) {
+// If nothing is allocated yet, return 0.
+func (buftary *BufferTArray) ElemLenAlloc(tptoken uint64) uint32 {
+	var retlen uint32
+
 	printEntry("BufferTArray.ElemLenAlloc()")
 	if nil == buftary {
 		panic("*BufferTArray receiver of ElemLenAlloc() cannot be nil")
 	}
-	cbuftary := (*buftary).cbuftary
-	if nil == cbuftary {
-		// Create an error to return
-		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
-		if nil != err {
-			panic(fmt.Sprintf("YDB: Error fetching STRUCTNOTALLOCD: %s", err))
-		}
-		return 0, &YDBError{(int)(C.YDB_ERR_STRUCTNOTALLOCD), errmsg}
+	cbuftary := buftary.cbuftary
+	if nil != cbuftary {
+		elemptr := (*C.ydb_buffer_t)(unsafe.Pointer(cbuftary))
+		retlen = uint32(elemptr.len_alloc)
+	} else { // Nothing is allocated yet so "allocated length" is 0
+		retlen = 0
 	}
-	elemptr := (*C.ydb_buffer_t)(unsafe.Pointer(cbuftary))
-	return uint32(elemptr.len_alloc), nil
+	return retlen
 }
 
 // ElemLenUsed is a method to retrieve the buffer used length associated with a given buffer referenced by its index.
@@ -154,17 +161,17 @@ func (buftary *BufferTArray) ElemLenUsed(tptoken uint64, idx uint32) (uint32, er
 	if nil == buftary {
 		panic("*BufferTArray receiver of ElemLenUsed() cannot be nil")
 	}
-	cbuftary := (*buftary).cbuftary
+	cbuftary := buftary.cbuftary
 	if nil == cbuftary {
-		// Create an error to return
-		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
-		if nil != err {
-			panic(fmt.Sprintf("YDB: Error fetching STRUCTNOTALLOCD: %s", err))
-		}
-		return 0, &YDBError{(int)(C.YDB_ERR_STRUCTNOTALLOCD), errmsg}
+                // Create an error to return
+                errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
+                if nil != err {
+                        panic(fmt.Sprintf("YDB: Error fetching STRUCTNOTALLOCD: %s", err))
+                }
+                return 0, &YDBError{(int)(C.YDB_ERR_STRUCTNOTALLOCD), errmsg}
 	}
-	elemcnt := (*buftary).elemsAlloc
-	if idx > (elemcnt - 1) {
+	elemcnt := buftary.elemsAlloc
+	if !(idx < elemcnt) {
 		// Create an error to return
 		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_INSUFFSUBS))
 		if nil != err {
@@ -182,7 +189,7 @@ func (buftary *BufferTArray) ElemUsed() uint32 {
 	if nil == buftary {
 		panic("*BufferTArray receiver of ElemUsed() cannot be nil")
 	}
-	return (*buftary).elemsUsed
+	return buftary.elemsUsed
 }
 
 // ValBAry is a method to fetch the buffer of the indicated array element and return it as a byte array pointer.
@@ -193,8 +200,8 @@ func (buftary *BufferTArray) ValBAry(tptoken uint64, idx uint32) (*[]byte, error
 	if nil == buftary {
 		panic("*BufferTArray receiver of ValBAry() cannot be nil")
 	}
-	elemcnt := (*buftary).elemsAlloc
-	if idx > (elemcnt - 1) {
+	elemcnt := buftary.elemsAlloc
+	if !(idx < elemcnt) {
 		// Create an error to return
 		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_INSUFFSUBS))
 		if nil != err {
@@ -202,7 +209,7 @@ func (buftary *BufferTArray) ValBAry(tptoken uint64, idx uint32) (*[]byte, error
 		}
 		return nil, &YDBError{(int)(C.YDB_ERR_INSUFFSUBS), errmsg}
 	}
-	cbuftary := (*buftary).cbuftary
+	cbuftary := buftary.cbuftary
 	if nil == cbuftary {
 		// Create an error to return
 		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
@@ -236,8 +243,8 @@ func (buftary *BufferTArray) ValStr(tptoken uint64, idx uint32) (*string, error)
 	if nil == buftary {
 		panic("*BufferTArray receiver of ValStr() cannot be nil")
 	}
-	elemcnt := (*buftary).elemsAlloc
-	if idx > (elemcnt - 1) {
+	elemcnt := buftary.elemsAlloc
+	if !(idx < elemcnt) {
 		// Create an error to return
 		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_INSUFFSUBS))
 		if nil != err {
@@ -245,7 +252,7 @@ func (buftary *BufferTArray) ValStr(tptoken uint64, idx uint32) (*string, error)
 		}
 		return nil, &YDBError{(int)(C.YDB_ERR_INSUFFSUBS), errmsg}
 	}
-	cbuftary := (*buftary).cbuftary
+	cbuftary := buftary.cbuftary
 	if nil == cbuftary {
 		// Create an error to return
 		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
@@ -277,8 +284,8 @@ func (buftary *BufferTArray) SetElemLenUsed(tptoken uint64, idx, newLen uint32) 
 	if nil == buftary {
 		panic("*BufferTArray receiver of SetElemLenUsed() cannot be nil")
 	}
-	elemcnt := (*buftary).elemsAlloc
-	if idx > (elemcnt - 1) {
+	elemcnt := buftary.elemsAlloc
+	if !(idx < elemcnt) {
 		// Create an error to return
 		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_INSUFFSUBS))
 		if nil != err {
@@ -286,7 +293,7 @@ func (buftary *BufferTArray) SetElemLenUsed(tptoken uint64, idx, newLen uint32) 
 		}
 		return &YDBError{(int)(C.YDB_ERR_INSUFFSUBS), errmsg}
 	}
-	cbuftary := (*buftary).cbuftary
+	cbuftary := buftary.cbuftary
 	if nil == cbuftary {
 		// Create an error to return
 		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
@@ -315,7 +322,7 @@ func (buftary *BufferTArray) SetElemUsed(tptoken uint64, newUsed uint32) error {
 	if nil == buftary {
 		panic("*BufferTArray receiver of SetElemUsed() cannot be nil")
 	}
-	elemcnt := (*buftary).elemsAlloc
+	elemcnt := buftary.elemsAlloc
 	if newUsed > elemcnt {
 		// Create an error to return
 		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_INSUFFSUBS))
@@ -325,7 +332,7 @@ func (buftary *BufferTArray) SetElemUsed(tptoken uint64, newUsed uint32) error {
 		return &YDBError{(int)(C.YDB_ERR_INSUFFSUBS), errmsg}
 	}
 	// Set the number of used buffers
-	(*buftary).elemsUsed = newUsed
+	buftary.elemsUsed = newUsed
 	return nil
 }
 
@@ -335,8 +342,8 @@ func (buftary *BufferTArray) SetValBAry(tptoken uint64, idx uint32, value *[]byt
 	if nil == buftary {
 		panic("*BufferTArray receiver of SetValBAry() cannot be nil")
 	}
-	elemcnt := (*buftary).elemsAlloc
-	if idx > (elemcnt - 1) {
+	elemcnt := buftary.elemsAlloc
+	if !(idx < elemcnt) {
 		// Create an error to return
 		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_INSUFFSUBS))
 		if nil != err {
@@ -344,7 +351,7 @@ func (buftary *BufferTArray) SetValBAry(tptoken uint64, idx uint32, value *[]byt
 		}
 		return &YDBError{(int)(C.YDB_ERR_INSUFFSUBS), errmsg}
 	}
-	cbuftary := (*buftary).cbuftary
+	cbuftary := buftary.cbuftary
 	if nil == cbuftary {
 		// Create an error to return
 		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
@@ -406,8 +413,8 @@ func (buftary *BufferTArray) DeleteExclST(tptoken uint64) error {
 	if nil == buftary {
 		panic("*BufferTArray receiver of DeleteExclST() cannot be nil")
 	}
-	rc := C.ydb_delete_excl_st(C.uint64_t(tptoken), C.int((*buftary).elemsUsed),
-		(*C.ydb_buffer_t)(unsafe.Pointer((*buftary).cbuftary)))
+	rc := C.ydb_delete_excl_st(C.uint64_t(tptoken), C.int(buftary.elemsUsed),
+		(*C.ydb_buffer_t)(unsafe.Pointer(buftary.cbuftary)))
 	if C.YDB_OK != rc {
 		err := NewError(int(rc))
 		return err
@@ -433,9 +440,9 @@ func (buftary *BufferTArray) TpST(tptoken uint64, tpfn unsafe.Pointer, tpfnparm 
 	}
 	tid := C.CString(transid)
 	defer C.free(unsafe.Pointer(tid)) // Should stay regular free since this was system malloc'd
-	cbuftary := (*C.ydb_buffer_t)(unsafe.Pointer((*buftary).cbuftary))
+	cbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(buftary.cbuftary))
 	rc := C.ydb_tp_st(C.uint64_t(tptoken), (C.ydb_tpfnptr_t)(tpfn), tpfnparm, tid,
-		C.int((*buftary).elemsUsed), cbuftary)
+		C.int(buftary.elemsUsed), cbuftary)
 	if C.YDB_OK != rc {
 		err := NewError(int(rc))
 		return err

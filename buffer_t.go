@@ -46,23 +46,27 @@ func (buft *BufferT) Alloc(bufSiz uint32) {
 	if nil == buft {
 		panic("*BufferT receiver of Alloc() cannot be nil")
 	}
-	if nil != (*buft).cbuft {
+	if nil != buft.cbuft {
 		// We already have a ydb_buffer_t, just get rid of current buffer for re-allocate
-		cbuftptr = (*buft).cbuft
-		cbufptr := (*cbuftptr).buf_addr
+		cbuftptr = buft.cbuft
+		cbufptr := cbuftptr.buf_addr
 		C.free(unsafe.Pointer(cbufptr))
-		(*cbuftptr).buf_addr = nil
+		cbuftptr.buf_addr = nil
 	} else {
 		// Allocate a C flavor ydb_buffer_t struct to pass to simpleAPI
-		(*buft).cbuft = (*C.ydb_buffer_t)(C.malloc(C.size_t(C.sizeof_ydb_buffer_t)))
-		cbuftptr = (*buft).cbuft
-		(*cbuftptr).len_alloc = 0 // Setting these now incase have failure or interrupt before we finish
-		(*cbuftptr).buf_addr = nil
+		buft.cbuft = (*C.ydb_buffer_t)(C.malloc(C.size_t(C.sizeof_ydb_buffer_t)))
+		cbuftptr = buft.cbuft
+		cbuftptr.len_alloc = 0 // Setting these now incase have failure or interrupt before we finish
+		cbuftptr.buf_addr = nil
 	}
-	(*cbuftptr).len_used = 0
+	cbuftptr.len_used = 0
 	// Allocate a new buffer of the given size
-	(*cbuftptr).buf_addr = (*C.char)(C.malloc(C.size_t(bufSiz)))
-	(*cbuftptr).len_alloc = C.uint(bufSiz)
+	if 0 < bufSiz {
+		cbuftptr.buf_addr = (*C.char)(C.malloc(C.size_t(bufSiz)))
+	} else {
+		cbuftptr.buf_addr = nil // Making sure a potentially de-allocated buffer is not pointed to
+	}
+	cbuftptr.len_alloc = C.uint(bufSiz)
 }
 
 // Dump is a method to dump the contents of a BufferT block for debugging purposes.
@@ -79,14 +83,13 @@ func (buft *BufferT) DumpToWriter(w io.Writer) {
 	if nil == buft {
 		panic("*BufferT receiver of DumpToWriter() cannot be nil")
 	}
-
-	cbuftptr := (*buft).cbuft
+	cbuftptr := buft.cbuft
 	fmt.Fprintf(w, "BufferT.Dump(): cbuftptr: %p", cbuftptr)
 	if nil != cbuftptr {
-		fmt.Fprintf(w, ", buf_addr: %v, len_alloc: %v, len_used: %v", (*cbuftptr).buf_addr,
-			(*cbuftptr).len_alloc, (*cbuftptr).len_used)
-		if 0 < (*cbuftptr).len_used {
-			strval := C.GoStringN((*cbuftptr).buf_addr, C.int((*cbuftptr).len_used))
+		fmt.Fprintf(w, ", buf_addr: %v, len_alloc: %v, len_used: %v", cbuftptr.buf_addr,
+			cbuftptr.len_alloc, cbuftptr.len_used)
+		if 0 < cbuftptr.len_used {
+			strval := C.GoStringN(cbuftptr.buf_addr, C.int(cbuftptr.len_used))
 			fmt.Fprintf(w, ", value: %s", strval)
 		}
 	}
@@ -97,14 +100,14 @@ func (buft *BufferT) DumpToWriter(w io.Writer) {
 func (buft *BufferT) Free() {
 	printEntry("BufferT.Free()")
 	if nil != buft { // Ignore if buft is null already
-		cbuftptr := (*buft).cbuft
+		cbuftptr := buft.cbuft
 		if nil != cbuftptr {
 			// ydb_buffer_t block exists - free its buffer first if it exists
-			if nil != (*cbuftptr).buf_addr {
-				C.free(unsafe.Pointer((*cbuftptr).buf_addr))
+			if nil != cbuftptr.buf_addr {
+				C.free(unsafe.Pointer(cbuftptr.buf_addr))
 			}
 			C.free(unsafe.Pointer(cbuftptr))
-			(*buft).cbuft = nil
+			buft.cbuft = nil
 		}
 	}
 }
@@ -115,7 +118,7 @@ func (buft *BufferT) LenAlloc(tptoken uint64) (uint32, error) {
 	if nil == buft {
 		panic("*BufferT receiver of LenAlloc() cannot be nil")
 	}
-	cbuftptr := (*buft).cbuft
+	cbuftptr := buft.cbuft
 	if nil == cbuftptr {
 		// Create an error to return
 		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
@@ -124,7 +127,7 @@ func (buft *BufferT) LenAlloc(tptoken uint64) (uint32, error) {
 		}
 		return 0, &YDBError{(int)(C.YDB_ERR_STRUCTNOTALLOCD), errmsg}
 	}
-	return (uint32)((*cbuftptr).len_alloc), nil
+	return (uint32)(cbuftptr.len_alloc), nil
 }
 
 // LenUsed is a method to fetch the ydb_buffer_t.len_used field containing the used length of the buffer. Note
@@ -134,7 +137,7 @@ func (buft *BufferT) LenUsed(tptoken uint64) (uint32, error) {
 	if nil == buft {
 		panic("*BufferT receiver of LenUsed() cannot be nil")
 	}
-	cbuftptr := (*buft).cbuft
+	cbuftptr := buft.cbuft
 	if nil == cbuftptr {
 		// Create an error to return
 		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
@@ -143,8 +146,8 @@ func (buft *BufferT) LenUsed(tptoken uint64) (uint32, error) {
 		}
 		return 0, &YDBError{(int)(C.YDB_ERR_STRUCTNOTALLOCD), errmsg}
 	}
-	lenalloc := (*cbuftptr).len_alloc
-	lenused := (*cbuftptr).len_used
+	lenalloc := cbuftptr.len_alloc
+	lenused := cbuftptr.len_used
 	if lenused > lenalloc {
 		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_INVSTRLEN))
 		if nil != err {
@@ -163,7 +166,7 @@ func (buft *BufferT) ValBAry(tptoken uint64) (*[]byte, error) {
 	if nil == buft {
 		panic("*BufferT receiver of ValBAry() cannot be nil")
 	}
-	cbuftptr := (*buft).cbuft
+	cbuftptr := buft.cbuft
 	if nil == cbuftptr {
 		// Create an error to return
 		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
@@ -172,9 +175,9 @@ func (buft *BufferT) ValBAry(tptoken uint64) (*[]byte, error) {
 		}
 		return nil, &YDBError{(int)(C.YDB_ERR_STRUCTNOTALLOCD), errmsg}
 	}
-	lenalloc := (*cbuftptr).len_alloc
-	lenused := (*cbuftptr).len_used
-	cbufptr := (*cbuftptr).buf_addr
+	lenalloc := cbuftptr.len_alloc
+	lenused := cbuftptr.len_used
+	cbufptr := cbuftptr.buf_addr
 	if lenused > lenalloc { // INVSTRLEN from last operation - return what we can and give error
 		bary = C.GoBytes(unsafe.Pointer(cbufptr), C.int(lenalloc)) // Return what we can (alloc size)
 		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_INVSTRLEN))
@@ -196,7 +199,7 @@ func (buft *BufferT) ValStr(tptoken uint64) (*string, error) {
 	if nil == buft {
 		panic("*BufferT receiver of ValStr() cannot be nil")
 	}
-	cbuftptr := (*buft).cbuft
+	cbuftptr := buft.cbuft
 	if nil == cbuftptr {
 		// Create an error to return
 		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
@@ -205,9 +208,9 @@ func (buft *BufferT) ValStr(tptoken uint64) (*string, error) {
 		}
 		return nil, &YDBError{(int)(C.YDB_ERR_STRUCTNOTALLOCD), errmsg}
 	}
-	lenalloc := (*cbuftptr).len_alloc
-	lenused := (*cbuftptr).len_used
-	cbufptr := (*cbuftptr).buf_addr
+	lenalloc := cbuftptr.len_alloc
+	lenused := cbuftptr.len_used
+	cbufptr := cbuftptr.buf_addr
 	if lenused > lenalloc { // INVSTRLEN from last operation - return what we can and give error
 		str = C.GoStringN(cbufptr, C.int(lenalloc)) // Return what we can (alloc size)
 		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_INVSTRLEN))
@@ -227,7 +230,7 @@ func (buft *BufferT) SetLenUsed(tptoken uint64, newLen uint32) error {
 	if nil == buft {
 		panic("*BufferT receiver of SetLenUsed() cannot be nil")
 	}
-	cbuftptr := (*buft).cbuft
+	cbuftptr := buft.cbuft
 	if nil == cbuftptr {
 		// Create an error to return
 		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
@@ -236,7 +239,7 @@ func (buft *BufferT) SetLenUsed(tptoken uint64, newLen uint32) error {
 		}
 		return &YDBError{(int)(C.YDB_ERR_STRUCTNOTALLOCD), errmsg}
 	}
-	lenalloc := (*cbuftptr).len_alloc
+	lenalloc := cbuftptr.len_alloc
 	if newLen > uint32(lenalloc) {
 		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_INVSTRLEN))
 		if nil != err {
@@ -244,7 +247,7 @@ func (buft *BufferT) SetLenUsed(tptoken uint64, newLen uint32) error {
 		}
 		return &YDBError{(int)(C.YDB_ERR_INVSTRLEN), errmsg}
 	}
-	(*cbuftptr).len_used = C.uint(newLen)
+	cbuftptr.len_used = C.uint(newLen)
 	return nil
 }
 
@@ -254,7 +257,7 @@ func (buft *BufferT) SetValBAry(tptoken uint64, value *[]byte) error {
 	if nil == buft {
 		panic("*BufferT receiver of SetValBAry() cannot be nil")
 	}
-	cbuftptr := (*buft).cbuft
+	cbuftptr := buft.cbuft
 	if nil == cbuftptr {
 		// Create an error to return
 		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
@@ -264,21 +267,21 @@ func (buft *BufferT) SetValBAry(tptoken uint64, value *[]byte) error {
 		return &YDBError{(int)(C.YDB_ERR_STRUCTNOTALLOCD), errmsg}
 	}
 	vallen := C.uint(len(*value))
-	if vallen > (*cbuftptr).len_alloc {
+	if vallen > cbuftptr.len_alloc {
 		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_INVSTRLEN))
 		if nil != err {
 			panic(fmt.Sprintf("YDB: Error fetching INVSTRLEN: %s", err))
 		}
-		(*cbuftptr).len_used = vallen // Set so caller knows what alloc length SHOULD have been (minimum)
+		cbuftptr.len_used = vallen // Set so caller knows what alloc length SHOULD have been (minimum)
 		return &YDBError{(int)(C.YDB_ERR_INVSTRLEN), errmsg}
 	}
 	// Copy the Golang buffer to the C buffer
 	if 0 < vallen {
-		C.memcpy(unsafe.Pointer((*cbuftptr).buf_addr),
+		C.memcpy(unsafe.Pointer(cbuftptr.buf_addr),
 			unsafe.Pointer(&((*value)[0])),
 			C.size_t(vallen))
 	}
-	(*cbuftptr).len_used = vallen
+	cbuftptr.len_used = vallen
 	return nil
 }
 
@@ -317,7 +320,15 @@ func (buft *BufferT) Str2ZwrST(tptoken uint64, zwr *BufferT) error {
 	if nil == zwr {
 		panic("*BufferT 'zwr' parameter to Str2ZwrST() cannot be nil")
 	}
-	rc := C.ydb_str2zwr_st(C.uint64_t(tptoken), (*buft).cbuft, (*zwr).cbuft)
+	if nil == buft.cbuft || nil == zwr.cbuft {
+		// Create an error to return
+		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
+		if nil != err {
+			panic(fmt.Sprintf("YDB: Error fetching STRUCTNOTALLOCD: %s", err))
+		}
+		return &YDBError{(int)(C.YDB_ERR_STRUCTNOTALLOCD), errmsg}
+	}
+	rc := C.ydb_str2zwr_st(C.uint64_t(tptoken), buft.cbuft, zwr.cbuft)
 	if C.YDB_OK != rc {
 		err := NewError(int(rc))
 		return err
@@ -335,7 +346,15 @@ func (buft *BufferT) Zwr2StrST(tptoken uint64, str *BufferT) error {
 	if nil == str {
 		panic("*BufferT 'str' parameter to Zwr2StrST() cannot be nil")
 	}
-	rc := C.ydb_zwr2str_st(C.uint64_t(tptoken), (*buft).cbuft, (*str).cbuft)
+	if nil == buft.cbuft || nil == str.cbuft {
+		// Create an error to return
+		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
+		if nil != err {
+			panic(fmt.Sprintf("YDB: Error fetching STRUCTNOTALLOCD: %s", err))
+		}
+		return &YDBError{(int)(C.YDB_ERR_STRUCTNOTALLOCD), errmsg}
+	}
+	rc := C.ydb_zwr2str_st(C.uint64_t(tptoken), buft.cbuft, str.cbuft)
 	if C.YDB_OK != rc {
 		err := NewError(int(rc))
 		return err

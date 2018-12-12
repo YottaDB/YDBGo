@@ -61,8 +61,8 @@ func TestStr2ZwrSTAndZwr2StrST(t *testing.T) {
 
 	// TODO: reenable this test after code is fixed
 	// Try calling on a non-allocated value
-	//err = noalloc_value.Zwr2StrST(tptoken, &cvalue)
-	//assert.NotNil(t, err)
+	err = noalloc_value.Zwr2StrST(tptoken, &cvalue)
+	assert.NotNil(t, err)
 
 	// Test Str2ZwrST with an allocated value in the second param
 	err = ovalue.Str2ZwrST(tptoken, &noalloc_value)
@@ -71,12 +71,22 @@ func TestStr2ZwrSTAndZwr2StrST(t *testing.T) {
 	err = ovalue.Zwr2StrST(tptoken, &noalloc_value)
 	assert.NotNil(t, err)
 
-	t.Skipf("Str2ZwrST needs to check second parameter for nil; currently crashes")
 	// Test with nil as the second argument
-	err = ovalue.Str2ZwrST(tptoken, nil)
+	(func() {
+		defer (func() {
+			recover()
+			t.Log("Saw panic -", err)
+		})()
+		err = ovalue.Str2ZwrST(tptoken, nil)
+	})()
 	assert.NotNil(t, err)
 
-	err = ovalue.Zwr2StrST(tptoken, nil)
+	(func() {
+		defer (func() {
+			recover()
+		})()
+		err = ovalue.Zwr2StrST(tptoken, nil)
+	})()
 	assert.NotNil(t, err)
 }
 

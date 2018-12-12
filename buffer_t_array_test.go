@@ -146,24 +146,19 @@ func TestBufTAryLenAlloc(t *testing.T) {
 	var tp = yottadb.NOTTP
 
 	// Try getting length of non-alloc'd array
-	r, err := value.ElemLenAlloc(tp)
-	assert.NotNil(t, err)
-	// TODO: change this function to return 0
+	r := value.ElemLenAlloc(tp)
 	assert.Equal(t, r, uint32(0))
 
-	_, err = noalloc_value.ElemLenAlloc(tp)
-	assert.NotNil(t, err)
+	r = noalloc_value.ElemLenAlloc(tp)
+	assert.Equal(t, r, uint32(0))
 
 	value.Alloc(10, 64)
-	r, err = value.ElemLenAlloc(tp)
-	assert.Nil(t, err)
+	r = value.ElemLenAlloc(tp)
 	assert.Equal(t, r, uint32(64))
 
-	t.Skipf("This still needs to be fixed")
 	// Alloc a length of 0 and try to get it
 	value.Alloc(0, 64)
-	r, err = value.ElemLenAlloc(tp)
-	assert.Nil(t, err)
+	r = value.ElemLenAlloc(tp)
 	assert.Equal(t, r, uint32(0))
 }
 
@@ -204,33 +199,8 @@ func TestBufTAryBAry(t *testing.T) {
 	err = value.SetValBAry(tp, 0, &v)
 	assert.NotNil(t, err)
 	errcode := yottadb.ErrorCode(err)
-	t.Skipf("We need to figure out what the expected result is")
+	//t.Skipf("We need to figure out what the expected result is")
 	assert.True(t, CheckErrorExpectYDB_ERR_INSUFFSUBS(errcode))
-}
-
-func TestBufTAryMultipleThreads(t *testing.T) {
-	var value yottadb.BufferTArray
-	var tp = yottadb.NOTTP
-
-	t.Skipf("Currently causes a great many problems; skip for now")
-
-	// Spawn off 100 threads which allocate the buffer
-	for i := 0; i < 100; i++ {
-		go (func() {
-			for j := 0; j < 1000; j++ {
-				value.Alloc(10, 64)
-			}
-		})()
-	}
-
-	// Spawn off 100 threads try to set things
-	for i := 0; i < 100; i++ {
-		go (func() {
-			for j := 0; j < 1000; j++ {
-				value.SetValStrLit(tp, 0, "Hello")
-			}
-		})()
-	}
 }
 
 func TestBufTAryElemLenUsed(t *testing.T) {
