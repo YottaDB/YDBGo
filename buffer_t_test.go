@@ -75,7 +75,6 @@ func TestStr2ZwrSTAndZwr2StrST(t *testing.T) {
 	(func() {
 		defer (func() {
 			recover()
-			t.Log("Saw panic -", err)
 		})()
 		err = ovalue.Str2ZwrST(tptoken, nil)
 	})()
