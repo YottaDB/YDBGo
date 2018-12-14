@@ -22,12 +22,15 @@ import (
 	"testing"
 	"time"
 	"unsafe"
+	"sync"
+	"strconv"
 )
 
 // #cgo pkg-config: yottadb
 // #include "libyottadb.h"
 // #include "libydberrors.h"
 // int TestTpRtn_cgo(uint64_t tptoken, uintptr_t in); // Forward declaration
+// void ydb_ci_t_wrapper(unsigned long tptoken, char *name, ydb_string_t *arg);
 import "C"
 
 const VarSiz uint32 = 15                        // Max size of varname including '^'
@@ -230,4 +233,54 @@ func MyGoCallBack(tptoken uint64, tpfnarg unsafe.Pointer) int {
 	// This violates TP transactions, but useful for demonstration
 	fmt.Printf("Hello from MyGoCallBack!\n")
 	return 0
+}
+
+// Only one thing can do call-ins at a time, as we don't want to overwrite vars
+var ydb_ci_mutex sync.Mutex
+
+// YDBCi calls a M routine and returns the result (if any; else, returns an empty string)
+func YDBCi(tptoken uint64,
+	expect_return bool,
+	funcname string,
+	args ...string) string {
+
+	ydb_ci_mutex.Lock()
+	defer ydb_ci_mutex.Unlock()
+	localname := "^YDBTestYDBCiTemporaryVariable"
+	err := yottadb.DeleteE(tptoken, C.YDB_DEL_TREE, localname, nil)
+	yottadb.Assertnoerror(err)
+	err = yottadb.SetValE(tptoken, funcname, localname, []string{"rtn"})
+	yottadb.Assertnoerror(err)
+	expect := "0"
+	if expect_return {
+		expect = "1"
+	}
+	err = yottadb.SetValE(tptoken, expect, localname, []string{"return"})
+	if args != nil {
+		for i := 0; i < len(args); i++ {
+			err = yottadb.SetValE(tptoken, args[i], localname, []string{"args",
+				strconv.Itoa(i)})
+		}
+	}
+	callname := (*C.ydb_string_t)(C.malloc(C.size_t(C.sizeof_ydb_string_t)))
+	callname.length = C.ulong(len(localname))
+	callname.address = C.CString(localname)
+	C.ydb_ci_t_wrapper(C.ulong(tptoken), C.CString("ydbmcallback"), callname)
+	//C.ydb_ci_t(tptoken, C.CString("ydbmcallback", callname))
+	C.free(unsafe.Pointer(callname.address))
+	C.free(unsafe.Pointer(callname))
+	if expect_return {
+		r, err := yottadb.ValE(tptoken, localname, []string{"retval"})
+		yottadb.Assertnoerror(err)
+		return r
+	}
+	return ""
+		
+}
+
+func Available(name string) bool {
+	if name == "ydb_ci" {
+		return os.Getenv("ydb_ci") != ""
+	}
+	return false
 }

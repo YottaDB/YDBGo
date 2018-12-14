@@ -1,0 +1,1 @@
+ydbmcallback :void run^ydbcallback(I:ydb_string_t*)

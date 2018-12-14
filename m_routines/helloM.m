@@ -1,0 +1,2 @@
+hello(thing)
+    QUIT thing

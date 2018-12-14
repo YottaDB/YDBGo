@@ -31,6 +31,8 @@ before_script:
 .unit_tests:
   stage: test
   script:
+    - export ydb_routines=". m_routines/ $ydb_routines"
+    - export ydb_ci="calltab.ci"
     - go get -t
     - go test -short $(go list ./... | grep -v /vendor/)
 
