@@ -354,3 +354,21 @@ func TestBufTAryTpSt2(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func TestBufTAryTpNest(t *testing.T) {
+	var tproutine func(uint64) int
+	nest := 0
+	tproutine = func(tptoken uint64) int {
+		if nest < 130 {
+			nest++
+			e := yottadb.TpE2(tptoken, tproutine, "BATCH", []string{})
+			if e == nil {
+				return 0
+			}
+			return yottadb.ErrorCode(e)
+		}
+		return 0
+	}
+	e := tproutine(yottadb.NOTTP)
+	assert.Equal(t, yottadb.YDB_ERR_TPTOODEEP, e)
+}
