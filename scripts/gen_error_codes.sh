@@ -11,6 +11,8 @@ package yottadb
 const (
 EOF
 grep "#define YDB_ERR_" $ydb_dist/libydberrors*.h | awk '{print $2,"=",$3}' >> error_codes.go
+echo "" >> error_codes.go
+gcc -E $ydb_dist/libyottadb.h | grep YDB | tr ',' ' ' >> error_codes.go
 cat <<EOF >> error_codes.go
 )
 
