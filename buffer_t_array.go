@@ -486,7 +486,9 @@ func (buftary *BufferTArray) TpST2(
 	cbuftary := (*C.ydb_buffer_t)(unsafe.Pointer((*buftary).cbuftary))
 	rc := C.ydb_tp_st(C.uint64_t(tptoken), (C.ydb_tpfnptr_t)(C.ydb_tp_st_wrapper_cgo),
 		unsafe.Pointer(&tpfnparm), tid, C.int((*buftary).elemsUsed), cbuftary)
+	tpMutex.Lock()
 	delete(tpMap, tpfnparm)
+	tpMutex.Unlock()
 	if C.YDB_OK != rc {
 		err := NewError(int(rc))
 		return err
