@@ -27,6 +27,7 @@ before_script:
   - export ydb_routines=/opt/yottadb/current/libyottadbutil.so
   - echo exit | /opt/yottadb/current/mumps -run ^GDE
   - /opt/yottadb/current/mupip create
+  - mkdir -p $CI_PROJECT_DIR/artifacts
 
 .unit_tests:
   stage: test
@@ -35,6 +36,11 @@ before_script:
     - export ydb_ci="calltab.ci"
     - go get -t
     - go test -short $(go list ./... | grep -v /vendor/)
+    - cp -r . $CI_PROJECT_DIR/artifacts
+  artifacts:
+    paths:
+      - artifacts
+    expire_in: 7 days
 
 unit_tests1.6.2:
   extends: .unit_tests
@@ -200,6 +206,16 @@ unit_tests1.11.2:
   extends: .unit_tests
   variables:
     GOLANG_VERSION: 1.11.2
+
+unit_tests1.11.3:
+  extends: .unit_tests
+  variables:
+    GOLANG_VERSION: 1.11.3
+
+unit_tests1.11.4:
+  extends: .unit_tests
+  variables:
+    GOLANG_VERSION: 1.11.4
 
 race_detector:
   stage: test
