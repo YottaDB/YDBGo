@@ -251,7 +251,7 @@ error_codes:
   stage: test
   script:
     - go generate
-    - git diff --exit-code error_codes.go
+    - git diff --exit-code error_codes.go || (echo "There is a difference between the latest YottaDB master and the currently committed error_codes.go, please run 'go generate' and commit error_codes.go" && exit 1)
 
 build:
   stage: build
