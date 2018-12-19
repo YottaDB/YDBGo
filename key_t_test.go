@@ -498,3 +498,102 @@ func TestKeyTNilRecievers(t *testing.T) {
 	test_wrapper(func() { value.SubNextST(tp, nil) })
 	test_wrapper(func() { value.SubPrevST(tp, nil) })
 }
+
+func TestKeyTGetValueThatWontFitInBuffer(t *testing.T) {
+	// Get a value that doesn't fit in the provided buffer
+	var key yottadb.KeyT
+	var buff yottadb.BufferT
+	var tptoken = yottadb.NOTTP
+	var err error
+
+	defer key.Free()
+	key.Alloc(10, 1, 10)
+
+	defer buff.Free()
+	buff.Alloc(10)
+
+	key.Varnm.SetValStrLit(tptoken, "^MyVal")
+	key.Subary.SetValStrLit(tptoken, 0, "A")
+	key.Subary.SetElemUsed(tptoken, 1)
+
+	err = yottadb.SetValE(tptoken, "1234567890A", "^MyVal", []string{"A"})
+	assert.Nil(t, err)
+	err = yottadb.SetValE(tptoken, "1234567890A", "^MyVal", []string{"V1234567890A"})
+	assert.Nil(t, err)
+
+	// Get the value
+	err = key.ValST(tptoken, &buff)
+	assert.NotNil(t, err)
+	errcode := yottadb.ErrorCode(err)
+	assert.Equal(t, yottadb.YDB_ERR_INVSTRLEN, errcode)
+
+	// Verify that getting len on the buffer results in error
+	_, err = buff.LenUsed(tptoken)
+	assert.NotNil(t, err)
+	errcode = yottadb.ErrorCode(err)
+	assert.Equal(t, yottadb.YDB_ERR_INVSTRLEN, errcode)
+
+	// Verify that getting val on the buffer results in error
+	_, err = buff.ValBAry(tptoken)
+	assert.NotNil(t, err)
+	errcode = yottadb.ErrorCode(err)
+	assert.Equal(t, yottadb.YDB_ERR_INVSTRLEN, errcode)
+
+	// Verify that getting len on the buffer results in error
+	_, err = buff.ValStr(tptoken)
+	assert.NotNil(t, err)
+	errcode = yottadb.ErrorCode(err)
+	assert.Equal(t, yottadb.YDB_ERR_INVSTRLEN, errcode)
+}
+
+
+func TestKeyTNodeNextWithSmallBufAry(t *testing.T) {
+	// Get a value that doesn't fit in the provided buffer
+	var key yottadb.KeyT
+	var buftary yottadb.BufferTArray
+	var tptoken = yottadb.NOTTP
+	var err error
+	var errcode int
+
+	defer key.Free()
+	key.Alloc(10, 1, 10)
+ 
+	key.Varnm.SetValStrLit(tptoken, "^MyVal")
+	key.Subary.SetValStrLit(tptoken, 0, "A")
+	key.Subary.SetElemUsed(tptoken, 1)
+
+	err = yottadb.SetValE(tptoken, "1234567890A", "^MyVal", []string{"A"})
+	assert.Nil(t, err)
+	err = yottadb.SetValE(tptoken, "1234567890A", "^MyVal", []string{"V1234567890A"})
+	assert.Nil(t, err)
+
+	// Try the same thing BufferTArray
+	defer buftary.Free()
+	buftary.Alloc(1, 5)
+	// TODO: this shouldn't be needed
+	buftary.SetElemUsed(tptoken, 1)
+	err = key.NodeNextST(tptoken, &buftary)
+
+	_, err = buftary.ValStr(tptoken, 0)
+	assert.NotNil(t, err)
+	errcode = yottadb.ErrorCode(err)
+	assert.Equal(t, yottadb.YDB_ERR_INVSTRLEN, errcode)
+	buftary.SetElemUsed(tptoken, 1)
+	//buftary.Dump()
+	
+	_, err = buftary.ValBAry(tptoken, 0)
+	assert.NotNil(t, err)
+	errcode = yottadb.ErrorCode(err)
+	assert.Equal(t, yottadb.YDB_ERR_INVSTRLEN, errcode)
+	buftary.SetElemUsed(tptoken, 1)
+
+	
+	err = buftary.SetValStrLit(tptoken, 0, "Hello world")
+	assert.NotNil(t, err)
+	errcode = yottadb.ErrorCode(err)
+	assert.Equal(t, yottadb.YDB_ERR_INVSTRLEN, errcode)
+	buftary.SetElemUsed(tptoken, 1)
+
+
+}
+
