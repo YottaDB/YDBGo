@@ -17,6 +17,8 @@ import (
 	"lang.yottadb.com/go/yottadb"
 	. "lang.yottadb.com/go/yottadb/internal/test_helpers"
 	"testing"
+	"sync"
+	"fmt"
 )
 
 func TestSimpleAPILockST(t *testing.T) {
@@ -59,4 +61,39 @@ func TestSimpleAPILockManyParms(t *testing.T) {
 	errmsg = err.Error()
 	expectederrmsg := "%YDB-E-NAMECOUNT2HI, Number of varnames (namecount parameter in a LockST() call) exceeds maximum (11)"
 	assert.Equal(t, errmsg, expectederrmsg)
+}
+
+func TestSimpleAPITpFullNesting(t *testing.T) {
+	var wg sync.WaitGroup
+	hit_tp_too_deep := 0
+	var fn func(string, uint64) error
+	fn = func(myId string, tptoken uint64) error {
+		return yottadb.TpE2(tptoken, func(tptoken uint64) int {
+			curTpLevel, err := yottadb.ValE(tptoken, "$TLEVEL", []string{})
+			yottadb.Assertnoerror(err)
+			err = yottadb.SetValE(tptoken, "", "^x", []string{myId, curTpLevel})
+			yottadb.Assertnoerror(err)
+			err = fn(myId, tptoken)
+			if nil != err {
+				errcode := yottadb.ErrorCode(err)
+				if errcode == yottadb.YDB_ERR_TPTOODEEP {
+					hit_tp_too_deep++
+				} else {
+					assert.Fail(t, "Error other than TPTOODEEP")
+				}
+				return errcode
+			}
+			return 0
+		}, "BATCH", []string{})
+	}
+
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			fn(fmt.Sprintf("%d", i), yottadb.NOTTP)
+		}(i)
+	}
+	wg.Wait()
+	assert.Equal(t, 100 * 126, hit_tp_too_deep)
 }
