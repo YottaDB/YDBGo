@@ -118,7 +118,7 @@ func Example_simpleAPI() {
 		err = key1.SubNextST(tptoken, &cur_sub)
 		if err != nil {
 			error_code := yottadb.ErrorCode(err)
-			if error_code == -151027930 {
+			if error_code == yottadb.YDB_ERR_NODEEND {
 				break
 			} else {
 				panic(err)

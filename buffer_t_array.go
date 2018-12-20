@@ -468,11 +468,7 @@ var tpMap map[uint64]func(uint64) int
 //  for example), so should not change any data outside of the database
 //
 // transid  - See docs for ydb_tp_s() in the MLPG.
-func (buftary *BufferTArray) TpST2(
-	tptoken uint64,
-	tpfn func(uint64) int,
-	transid string) error {
-
+func (buftary *BufferTArray) TpST2(tptoken uint64, tpfn func(uint64) int, transid string) error {
 	tid := C.CString(transid)
 	tpMutex.Lock()
 	tpfnparm := tpIndex

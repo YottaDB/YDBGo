@@ -41,6 +41,8 @@ func TestSimpleAPILockST(t *testing.T) {
 }
 
 func TestSimpleAPILockManyParms(t *testing.T) {
+	var errmsg string
+
 	maxvparms := 36 // Currently hard coded in simple_api.go as a C decl.
 	var locks [](*yottadb.KeyT)
 
@@ -54,4 +56,7 @@ func TestSimpleAPILockManyParms(t *testing.T) {
 
 	err := yottadb.LockST(yottadb.NOTTP, 0, locks...)
 	assert.NotNil(t, err)
+	errmsg = err.Error()
+	expectederrmsg := "%YDB-E-NAMECOUNT2HI, Number of varnames (namecount parameter in a LockST() call) exceeds maximum (11)"
+	assert.Equal(t, errmsg, expectederrmsg)
 }

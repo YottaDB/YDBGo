@@ -565,11 +565,7 @@ func TpE(tptoken uint64, tpfn unsafe.Pointer, tpfnparm unsafe.Pointer, transid s
 // varnames - a list of local YottaDB variables to reset should the transaction
 //  be restarted; if this is an array of 1 string with a value of "*" all YDB
 //  local variables get reset after a TP_RESTART
-func TpE2(tptoken uint64,
-	tpfn func(uint64) int,
-	transid string,
-	varnames []string) error {
-
+func TpE2(tptoken uint64, tpfn func(uint64) int, transid string, varnames []string) error {
 	var vnames BufferTArray
 	var maxvarnmlen, varnmcnt, varnmlen uint32
 	var i int

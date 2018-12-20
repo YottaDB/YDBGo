@@ -14,6 +14,7 @@ package yottadb
 
 import (
 	"fmt"
+	"strings"
 	"strconv"
 	"unsafe"
 )
@@ -74,17 +75,21 @@ func LockST(tptoken uint64, timeoutNsec uint64, lockname ...*KeyT) error {
 	vplist.setVPlistParam(tptoken, parmindx, uintptr(namecnt))
 	parmindx++
 	if 0 != lockcnt {
-		parmsleft := C.MAXVPARMS - 2 // We've already used two parms (timeout and namecount)
+		parmsleft := C.MAXVPARMS - parmindx // We've already used two parms (timeout and namecount)
+		parmsleftorig := parmsleft // Save for error below just-in-case
 		lockindx := 0                // The next lockname index to be read
 		// Load the lockname parameters into the plist
 		for 0 < lockcnt {
 			// Make sure enough room for another set of 3 parms
 			if 3 > parmsleft {
-				errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_PARMOFLOW))
+				errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_NAMECOUNT2HI))
 				if nil != err {
-					panic(fmt.Sprintf("YDB: Error fetching PARMOFLOW: %s", err))
+					panic(fmt.Sprintf("YDB: Error fetching NAMECOUNT2HI: %s", err))
 				}
-				return &YDBError{(int)(C.YDB_ERR_PARMOFLOW), errmsg}
+				// Do some error message substitution
+				errmsg = strings.Replace(errmsg, "!AD", "LockST()", 1)
+				errmsg = strings.Replace(errmsg, "!UL", fmt.Sprintf("%d", parmsleftorig / 3), 1)
+				return &YDBError{(int)(C.YDB_ERR_NAMECOUNT2HI), errmsg}
 			}
 			// Set the 3 parameters for this lockname
 			vplist.setVPlistParam(tptoken, parmindx, uintptr(unsafe.Pointer((*lockname[lockindx]).Varnm.cbuft)))

@@ -13,7 +13,6 @@
 package yottadb
 
 import (
-	"fmt"
 	"io"
 	"os"
 	"unsafe"
@@ -240,15 +239,6 @@ func (key *KeyT) NodeNextST(tptoken uint64, next *BufferTArray) error {
 		err := NewError(int(rc))
 		return err
 	}
-	if C.YDB_NODE_END == next.elemsUsed {
-		// We reached the end of the list - return NODEEND error
-		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_NODEEND))
-		if nil != err {
-			panic(fmt.Sprintf("YDB: Error fetching NODEEND: %s", err))
-		}
-		return &YDBError{(int)(C.YDB_ERR_NODEEND), errmsg}
-	}
-	// Returned node should be snug in the 'next' buffer array
 	return nil
 }
 
@@ -271,15 +261,6 @@ func (key *KeyT) NodePrevST(tptoken uint64, prev *BufferTArray) error {
 		err := NewError(int(rc))
 		return err
 	}
-	if C.YDB_NODE_END == prev.elemsUsed {
-		// We reached the end of the list - return NODEEND error
-		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_NODEEND))
-		if nil != err {
-			panic(fmt.Sprintf("YDB: Error fetching NODEEND: %s", err))
-		}
-		return &YDBError{(int)(C.YDB_ERR_NODEEND), errmsg}
-	}
-	// Returned node should be snug in the 'prev' buffer array
 	return nil
 }
 
@@ -321,15 +302,6 @@ func (key *KeyT) SubNextST(tptoken uint64, retval *BufferT) error {
 		err := NewError(int(rc))
 		return err
 	}
-	if 0 == (retval.cbuft).len_used {
-		// We reached the end of the list - return NODEEND error
-		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_NODEEND))
-		if nil != err {
-			panic(fmt.Sprintf("YDB: Error fetching NODEEND: %s", err))
-		}
-		return &YDBError{(int)(C.YDB_ERR_NODEEND), errmsg}
-	}
-	// Returned string should be snug in the retval buffer
 	return nil
 }
 
@@ -351,14 +323,5 @@ func (key *KeyT) SubPrevST(tptoken uint64, retval *BufferT) error {
 		err := NewError(int(rc))
 		return err
 	}
-	if 0 == (retval.cbuft).len_used {
-		// We reached the end of the list - return NODEEND error
-		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_NODEEND))
-		if nil != err {
-			panic(fmt.Sprintf("YDB: Error fetching NODEEND: %s", err))
-		}
-		return &YDBError{(int)(C.YDB_ERR_NODEEND), errmsg}
-	}
-	// Returned string should be snug in the retval buffer
 	return nil
 }
