@@ -44,8 +44,8 @@ type BufferTArray struct {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Alloc is a method to allocate an array of 'numBufs' ydb_buffer_t structures anchored in this BufferTArray and also
-// for each of those buffers, allocate 'bufSiz' byte buffers anchoring them in the ydb_buffer_t structure.
-func (buftary *BufferTArray) Alloc(numBufs, bufSiz uint32) {
+// for each of those buffers, allocate 'nBytes' byte buffers anchoring them in the ydb_buffer_t structure.
+func (buftary *BufferTArray) Alloc(numBufs, nBytes uint32) {
 	var i uint32
 
 	printEntry("BufferTArray.Alloc()")
@@ -62,12 +62,12 @@ func (buftary *BufferTArray) Alloc(numBufs, bufSiz uint32) {
 		buftary.cbuftary = cbuftary
 		buftary.elemsAlloc = numBufs
 		buftary.elemsUsed = 0
-		// Allocate a buffer for each ydb_buffer_t structure of bufSiz bytes
+		// Allocate a buffer for each ydb_buffer_t structure of nBytes bytes
 		for i = 0; numBufs > i; i++ {
 			elemptr := (*C.ydb_buffer_t)(unsafe.Pointer(uintptr(unsafe.Pointer(cbuftary)) +
 				uintptr(C.sizeof_ydb_buffer_t*i)))
-			(*elemptr).buf_addr = (*C.char)(C.malloc(C.size_t(bufSiz)))
-			(*elemptr).len_alloc = C.uint(bufSiz)
+			(*elemptr).buf_addr = (*C.char)(C.malloc(C.size_t(nBytes)))
+			(*elemptr).len_alloc = C.uint(nBytes)
 			(*elemptr).len_used = 0
 		}
 	} else {
@@ -84,20 +84,20 @@ func (buftary *BufferTArray) Dump() {
 }
 
 //DumpToWriter is a writer that allows the tests or user code to dump to other than stdout
-func (buftary *BufferTArray) DumpToWriter(w io.Writer) {
+func (buftary *BufferTArray) DumpToWriter(writer io.Writer) {
 	printEntry("BufferTArray.Dump()")
 	if nil == buftary {
 		panic("*BufferTArray receiver of Dump() cannot be nil")
 	}
 	cbuftary := buftary.cbuftary
 	if nil != cbuftary {
-		fmt.Fprintf(w, "BufferTArray.Dump(): cbuftary: %p, elemsAlloc: %d, elemsUsed: %d\n", cbuftary,
+		fmt.Fprintf(writer, "BufferTArray.Dump(): cbuftary: %p, elemsAlloc: %d, elemsUsed: %d\n", cbuftary,
 			buftary.elemsAlloc, buftary.elemsUsed)
 		for i := 0; int(buftary.elemsUsed) > i; i++ {
 			elemptr := (*C.ydb_buffer_t)(unsafe.Pointer((uintptr(unsafe.Pointer(cbuftary)) +
 				uintptr(C.sizeof_ydb_buffer_t*i))))
 			valstr := C.GoStringN((*elemptr).buf_addr, C.int((*elemptr).len_used))
-			fmt.Fprintf(w, "  %d: %s\n", i, valstr)
+			fmt.Fprintf(writer, "  %d: %s\n", i, valstr)
 		}
 	}
 }
@@ -455,7 +455,7 @@ func (buftary *BufferTArray) TpST(tptoken uint64, tpfn unsafe.Pointer, tpfnparm 
 //  land
 var tpMutex sync.Mutex
 var tpIndex uint64
-var tpMap map[uint64]func(uint64) int
+var tpMap map[uint64]func(uint64) int32
 
 // TpST2 is a STAPI method to invoke transaction processing.
 //
@@ -468,13 +468,13 @@ var tpMap map[uint64]func(uint64) int
 //  for example), so should not change any data outside of the database
 //
 // transid  - See docs for ydb_tp_s() in the MLPG.
-func (buftary *BufferTArray) TpST2(tptoken uint64, tpfn func(uint64) int, transid string) error {
+func (buftary *BufferTArray) TpST2(tptoken uint64, tpfn func(uint64) int32, transid string) error {
 	tid := C.CString(transid)
 	tpMutex.Lock()
 	tpfnparm := tpIndex
 	tpIndex++
 	if tpMap == nil {
-		tpMap = make(map[uint64]func(uint64) int)
+		tpMap = make(map[uint64]func(uint64) int32)
 	}
 	tpMap[tpfnparm] = tpfn
 	tpMutex.Unlock()
@@ -495,7 +495,7 @@ func (buftary *BufferTArray) TpST2(tptoken uint64, tpfn func(uint64) int, transi
 // YdbTpStWrapper is a private callback to wrap calls to the Go closure
 //  required for TpST2
 //export ydbTpStWrapper
-func ydbTpStWrapper(tptoken uint64, tpfnparm unsafe.Pointer) int {
+func ydbTpStWrapper(tptoken uint64, tpfnparm unsafe.Pointer) int32 {
 	index := *((*uint64)(tpfnparm))
 	tpMutex.Lock()
 	v, ok := tpMap[index]

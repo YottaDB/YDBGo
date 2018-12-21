@@ -334,8 +334,8 @@ func TestBufTAryTpSt2(t *testing.T) {
 	// Start with clean slate then drive TP transaction
 	Dbdeleteall(tptoken, &errors, t)
 	//err = novars.TpST(tptoken, TpRtn_cgo(), nil, "BATCH")
-	err = novars.TpST2(tptoken, func(tp uint64) int {
-		return TestTpRtn(tp, nil)
+	err = novars.TpST2(tptoken, func(tp uint64) int32 {
+		return int32(TestTpRtn(tp, nil))
 	}, "BATCH")
 	Assertnoerr(err, t)
 	// Fetch the two nodes to make sure they are there and have correct values
@@ -356,19 +356,19 @@ func TestBufTAryTpSt2(t *testing.T) {
 }
 
 func TestBufTAryTpNest(t *testing.T) {
-	var tproutine func(uint64) int
+	var tproutine func(uint64) int32
 	nest := 0
-	tproutine = func(tptoken uint64) int {
+	tproutine = func(tptoken uint64) int32 {
 		if nest < 130 {
 			nest++
 			e := yottadb.TpE2(tptoken, tproutine, "BATCH", []string{})
 			if e == nil {
 				return 0
 			}
-			return yottadb.ErrorCode(e)
+			return int32(yottadb.ErrorCode(e))
 		}
 		return 0
 	}
 	e := tproutine(yottadb.NOTTP)
-	assert.Equal(t, yottadb.YDB_ERR_TPTOODEEP, e)
+	assert.Equal(t, int32(yottadb.YDB_ERR_TPTOODEEP), e)
 }

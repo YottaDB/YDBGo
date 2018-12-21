@@ -23,7 +23,7 @@ func Example_transactionProcessing2() {
 	if err != nil {
 		panic(err)
 	}
-	err = buffertary1.TpST2(tptoken, func(tptoken uint64) int {
+	err = buffertary1.TpST2(tptoken, func(tptoken uint64) int32 {
 		fmt.Printf("Hello from MyGoCallBack!\n")
 		return 0
 	}, "TEST")

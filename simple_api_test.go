@@ -68,7 +68,7 @@ func TestSimpleAPITpFullNesting(t *testing.T) {
 	hit_tp_too_deep := 0
 	var fn func(string, uint64) error
 	fn = func(myId string, tptoken uint64) error {
-		return yottadb.TpE2(tptoken, func(tptoken uint64) int {
+		return yottadb.TpE2(tptoken, func(tptoken uint64) int32 {
 			curTpLevel, err := yottadb.ValE(tptoken, "$TLEVEL", []string{})
 			yottadb.Assertnoerror(err)
 			err = yottadb.SetValE(tptoken, "", "^x", []string{myId, curTpLevel})
@@ -81,7 +81,7 @@ func TestSimpleAPITpFullNesting(t *testing.T) {
 				} else {
 					assert.Fail(t, "Error other than TPTOODEEP")
 				}
-				return errcode
+				return int32(errcode)
 			}
 			return 0
 		}, "BATCH", []string{})

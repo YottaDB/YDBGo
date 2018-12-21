@@ -39,7 +39,7 @@ type BufferT struct { // Contains a single ydb_buffer_t struct
 
 // Alloc is a method to allocate the ydb_buffer_t C storage and allocate or re-allocate the buffer pointed
 // to by that struct.
-func (buft *BufferT) Alloc(bufSiz uint32) {
+func (buft *BufferT) Alloc(nBytes uint32) {
 	var cbuftptr *C.ydb_buffer_t
 
 	printEntry("BufferT.Alloc()")
@@ -61,12 +61,12 @@ func (buft *BufferT) Alloc(bufSiz uint32) {
 	}
 	cbuftptr.len_used = 0
 	// Allocate a new buffer of the given size
-	if 0 < bufSiz {
-		cbuftptr.buf_addr = (*C.char)(C.malloc(C.size_t(bufSiz)))
+	if 0 < nBytes {
+		cbuftptr.buf_addr = (*C.char)(C.malloc(C.size_t(nBytes)))
 	} else {
 		cbuftptr.buf_addr = nil // Making sure a potentially de-allocated buffer is not pointed to
 	}
-	cbuftptr.len_alloc = C.uint(bufSiz)
+	cbuftptr.len_alloc = C.uint(nBytes)
 }
 
 // Dump is a method to dump the contents of a BufferT block for debugging purposes.
@@ -78,22 +78,22 @@ func (buft *BufferT) Dump() {
 }
 
 // DumpToWriter dumps a textual representation of this buffer to the writer
-func (buft *BufferT) DumpToWriter(w io.Writer) {
+func (buft *BufferT) DumpToWriter(writer io.Writer) {
 	printEntry("BufferT.Dump()")
 	if nil == buft {
 		panic("*BufferT receiver of DumpToWriter() cannot be nil")
 	}
 	cbuftptr := buft.cbuft
-	fmt.Fprintf(w, "BufferT.Dump(): cbuftptr: %p", cbuftptr)
+	fmt.Fprintf(writer, "BufferT.Dump(): cbuftptr: %p", cbuftptr)
 	if nil != cbuftptr {
-		fmt.Fprintf(w, ", buf_addr: %v, len_alloc: %v, len_used: %v", cbuftptr.buf_addr,
+		fmt.Fprintf(writer, ", buf_addr: %v, len_alloc: %v, len_used: %v", cbuftptr.buf_addr,
 			cbuftptr.len_alloc, cbuftptr.len_used)
 		if 0 < cbuftptr.len_used {
 			strval := C.GoStringN(cbuftptr.buf_addr, C.int(cbuftptr.len_used))
-			fmt.Fprintf(w, ", value: %s", strval)
+			fmt.Fprintf(writer, ", value: %s", strval)
 		}
 	}
-	fmt.Fprintf(w, "\n")
+	fmt.Fprintf(writer, "\n")
 }
 
 // Free is a method to release both the buffer and ydb_buffer_t block associate with the BufferT block.

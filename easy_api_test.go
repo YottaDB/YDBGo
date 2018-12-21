@@ -413,8 +413,8 @@ func TestTpE2(t *testing.T) {
 	// Start with a clean slate
 	Dbdeleteall(tptoken, &errors, t)
 	// Invoke TP transaction
-	err = yottadb.TpE2(tptoken, func(tptoken uint64) int {
-		return TestTpRtn(tptoken, nil)
+	err = yottadb.TpE2(tptoken, func(tptoken uint64) int32 {
+		return int32(TestTpRtn(tptoken, nil))
 	}, "BATCH", []string{"*"})
 	Assertnoerr(err, t)
 	// Fetch the two nodes to make sure they are there and have correct values
