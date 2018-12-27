@@ -58,8 +58,6 @@ func TestStr2ZwrSTAndZwr2StrST(t *testing.T) {
 		t.Log("  Modified string:", *outstrp)
 		t.Fail()
 	}
-
-	// TODO: reenable this test after code is fixed
 	// Try calling on a non-allocated value
 	err = noalloc_value.Zwr2StrST(tptoken, &cvalue)
 	assert.NotNil(t, err)

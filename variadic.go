@@ -19,7 +19,6 @@ import (
 
 // #include <stdlib.h>
 // #include "libyottadb.h"
-// #include "libydberrors.h"
 // /* Equivalent of gparam_list in callg.h (not available to us) */
 // #define MAXVPARMS 36
 // typedef struct {

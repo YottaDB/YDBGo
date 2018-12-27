@@ -19,7 +19,6 @@ import (
 )
 
 // #include "libyottadb.h"
-// #include "libydberrors.h"
 import "C"
 
 // KeyT defines a database key including varname and optional subscripts.
@@ -223,6 +222,10 @@ func (key *KeyT) LockIncrST(tptoken uint64, timeoutNsec uint64) error {
 // NodeNextST is a STAPI method to return the next subscripted node for the given global - the node logically following the
 // specified node (returns *BufferTArray).
 func (key *KeyT) NodeNextST(tptoken uint64, next *BufferTArray) error {
+	var nextElemsPtr *uint32
+	var dummyElemUsed uint32
+	var nextSubaryPtr *[]C.ydb_buffer_t
+
 	printEntry("KeyT.NodeNextST()")
 	if nil == key {
 		panic("*KeyT receiver of NodeNextST() cannot be nil")
@@ -231,10 +234,19 @@ func (key *KeyT) NodeNextST(tptoken uint64, next *BufferTArray) error {
 	if (nil == vargobuft) || (nil == vargobuft.buf_addr) || (0 == vargobuft.len_used) {
 		panic("KeyT varname is not allocated, is nil, or has a 0 length")
 	}
+	// The output buffer does not need to be allocated at this point though it may error in ydb_node_next_s() if not.
+	if nil != next {
+		next.elemsUsed = next.elemsAlloc // Set all elements of output array available for output
+		nextElemsPtr = &next.elemsUsed
+		nextSubaryPtr = next.cbuftary
+	} else {
+		nextElemsPtr = &dummyElemUsed
+		nextSubaryPtr = nil
+	}
 	subgobuftary := &(key.Subary)
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(subgobuftary.cbuftary))
 	rc := C.ydb_node_next_st(C.uint64_t(tptoken), vargobuft, C.int(subgobuftary.elemsUsed), subbuftary,
-		(*C.int)(unsafe.Pointer(&(next.elemsUsed))), (*C.ydb_buffer_t)(unsafe.Pointer(next.cbuftary)))
+		(*C.int)(unsafe.Pointer(nextElemsPtr)), (*C.ydb_buffer_t)(unsafe.Pointer(nextSubaryPtr)))
 	if C.YDB_OK != rc {
 		err := NewError(int(rc))
 		return err
@@ -245,6 +257,10 @@ func (key *KeyT) NodeNextST(tptoken uint64, next *BufferTArray) error {
 // NodePrevST is a STAPI method to return the previous subscripted node for the given global - the node logically previous
 // to the specified node (returns *BufferTArray).
 func (key *KeyT) NodePrevST(tptoken uint64, prev *BufferTArray) error {
+	var prevElemsPtr *uint32
+	var dummyElemUsed uint32
+	var prevSubaryPtr *[]C.ydb_buffer_t
+
 	printEntry("KeyT.NodePrevST()")
 	if nil == key {
 		panic("*KeyT receiver of NodePrevST() cannot be nil")
@@ -253,10 +269,19 @@ func (key *KeyT) NodePrevST(tptoken uint64, prev *BufferTArray) error {
 	if (nil == vargobuft) || (nil == vargobuft.buf_addr) || (0 == vargobuft.len_used) {
 		panic("KeyT varname is not allocated, is nil, or has a 0 length")
 	}
+	// The output buffer does not need to be allocated at this point though it may error in ydb_node_previous_s() if not.
+	if nil != prev {
+		prev.elemsUsed = prev.elemsAlloc // Set all elements of output array available for output
+		prevElemsPtr = &prev.elemsUsed
+		prevSubaryPtr = prev.cbuftary
+	} else {
+		prevElemsPtr = &dummyElemUsed
+		prevSubaryPtr = nil
+	}
 	subgobuftary := &(key.Subary)
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(subgobuftary.cbuftary))
 	rc := C.ydb_node_previous_st(C.uint64_t(tptoken), vargobuft, C.int(subgobuftary.elemsUsed),
-		subbuftary, (*C.int)(unsafe.Pointer(&(prev.elemsUsed))), (*C.ydb_buffer_t)(unsafe.Pointer(prev.cbuftary)))
+		subbuftary, (*C.int)(unsafe.Pointer(prevElemsPtr)), (*C.ydb_buffer_t)(unsafe.Pointer(prevSubaryPtr)))
 	if C.YDB_OK != rc {
 		err := NewError(int(rc))
 		return err

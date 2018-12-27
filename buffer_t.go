@@ -22,7 +22,6 @@ import (
 // #include <stdlib.h>
 // #include <string.h>
 // #include "libyottadb.h"
-// #include "libydberrors.h"
 import "C"
 
 // BufferT is a golang structure that serves as an anchor point for a C allocated ydb_buffer_t structure used

@@ -557,7 +557,7 @@ func TestKeyTNodeNextWithSmallBufAry(t *testing.T) {
 
 	defer key.Free()
 	key.Alloc(10, 1, 10)
- 
+
 	key.Varnm.SetValStrLit(tptoken, "^MyVal")
 	key.Subary.SetValStrLit(tptoken, 0, "A")
 	key.Subary.SetElemUsed(tptoken, 1)
@@ -569,31 +569,32 @@ func TestKeyTNodeNextWithSmallBufAry(t *testing.T) {
 
 	// Try the same thing BufferTArray
 	defer buftary.Free()
-	buftary.Alloc(1, 5)
-	// TODO: this shouldn't be needed
-	buftary.SetElemUsed(tptoken, 1)
+	buftary.Alloc(1, 12)
 	err = key.NodeNextST(tptoken, &buftary)
+	assert.Nil(t, err)
+
+	buftary.Alloc(1, 5) // Make buffer too small
+	err = key.NodeNextST(tptoken, &buftary)
+	assert.NotNil(t, err)
+	errcode = yottadb.ErrorCode(err)
+	assert.Equal(t, yottadb.YDB_ERR_INVSTRLEN, errcode)
 
 	_, err = buftary.ValStr(tptoken, 0)
 	assert.NotNil(t, err)
 	errcode = yottadb.ErrorCode(err)
 	assert.Equal(t, yottadb.YDB_ERR_INVSTRLEN, errcode)
 	buftary.SetElemUsed(tptoken, 1)
-	//buftary.Dump()
-	
+
 	_, err = buftary.ValBAry(tptoken, 0)
 	assert.NotNil(t, err)
 	errcode = yottadb.ErrorCode(err)
 	assert.Equal(t, yottadb.YDB_ERR_INVSTRLEN, errcode)
 	buftary.SetElemUsed(tptoken, 1)
 
-	
 	err = buftary.SetValStrLit(tptoken, 0, "Hello world")
 	assert.NotNil(t, err)
 	errcode = yottadb.ErrorCode(err)
 	assert.Equal(t, yottadb.YDB_ERR_INVSTRLEN, errcode)
 	buftary.SetElemUsed(tptoken, 1)
-
-
 }
 

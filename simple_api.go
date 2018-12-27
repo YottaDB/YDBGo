@@ -20,7 +20,6 @@ import (
 )
 
 // #include "libyottadb.h"
-// #include "libydberrors.h"
 // /* Equivalent of gparam_list in callg.h (not available to us) */
 // #define MAXVPARMS 36
 // /* C routine to get around the cgo issue and its lack of support for variadic plist routines */

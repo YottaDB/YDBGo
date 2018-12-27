@@ -23,7 +23,6 @@ import (
 // #include <stdlib.h>
 // #include <string.h>
 // #include "libyottadb.h"
-// #include "libydberrors.h"
 // int ydb_tp_st_wrapper_cgo(uint64_t tptoken, void *tpfnparm);
 import "C"
 
