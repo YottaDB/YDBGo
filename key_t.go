@@ -34,6 +34,9 @@ type KeyT struct {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Alloc is a STAPI method to allocate both pieces of the KeyT according to the supplied parameters.
+//
+// Invoke Varnm.Alloc(varSiz) and SubAry.Alloc(numSubs, subSiz)
+//
 // Parameters:
 //   varSiz  - Length of buffer for varname (current var max is 31).
 //   numSubs - Number of subscripts to supply (current subscript max is 31).
@@ -48,6 +51,8 @@ func (key *KeyT) Alloc(varSiz, numSubs, subSiz uint32) {
 }
 
 // Dump is a STAPI method to dump the contents of the KeyT structure.
+//
+// Invoke Varnm.Dump() and SubAry.Dump().
 func (key *KeyT) Dump() {
 	printEntry("KeyT.Dump()")
 	if nil == key {
@@ -56,7 +61,7 @@ func (key *KeyT) Dump() {
 	key.DumpToWriter(os.Stdout)
 }
 
-// DumpToWriter dumps a textual representation of this key to the writer
+// DumpToWriter dumps a textual representation of this key to the writer.
 func (key *KeyT) DumpToWriter(writer io.Writer) {
 	if nil == key {
 		panic("*KeyT receiver of DumpWriter() cannot be nil")
@@ -66,6 +71,8 @@ func (key *KeyT) DumpToWriter(writer io.Writer) {
 }
 
 // Free is a STAPI method to free both pieces of the KeyT structure.
+//
+// Invoke Varnm.Free() and SubAry.Free().
 func (key *KeyT) Free() {
 	printEntry("KeyT.Free()")
 	if nil != key { // Ignore if no struct passed
@@ -81,6 +88,9 @@ func (key *KeyT) Free() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // DataST is a STAPI method to determine the status of a given node and its successors.
+//
+// Matching DataE(), DataST() returns the result of ydb_data_st(). In the event an error is returned, the return value
+// is unspecified.
 func (key *KeyT) DataST(tptoken uint64) (uint32, error) {
 	var retval C.uint
 
@@ -103,9 +113,11 @@ func (key *KeyT) DataST(tptoken uint64) (uint32, error) {
 	return uint32(retval), nil
 }
 
-// DeleteST is a STAPI method to delete a node and perhaps its successors depending on the value of deltype. If
-// deltype is C.YDB_DEL_NODE, only the given node is deleted if it exists. If the value instead is
-// C.YDB_DEL_TREE, then the tree starting at the given node is removed.
+// DeleteST is a STAPI method to delete a node and perhaps its successors depending on the value of deltype.
+//
+// Matching DeleteE(), DeleteST() wraps ydb_delete_st() to delete a local or global variable node or (sub)tree, with a value of
+// C.YDB_DEL_NODE for deltype specifying that only the node should be deleted, leaving the (sub)tree untouched, and a value
+// of C.YDB_DEL_TREE specifying that the node as well as the (sub)tree are to be deleted.
 func (key *KeyT) DeleteST(tptoken uint64, deltype int) error {
 	printEntry("KeyT.DeleteST()")
 	if nil == key {
@@ -127,6 +139,14 @@ func (key *KeyT) DeleteST(tptoken uint64, deltype int) error {
 }
 
 // ValST is a STAPI method to fetch the given node returning its value in retval.
+//
+// Matching ValE(), ValST() wraps ydb_get_st() to return the value at the referenced global or local variable node, or
+// intrinsic special variable, in the buffer referenced by the BufferT structure referenced by retval.
+//
+// If ydb_get_st() returns an error such as GVUNDEF, INVSVN, LVUNDEF, the method makes no changes to the structures under retval
+// and returns the error. If the length of the data to be returned exceeds retval.getLenAlloc(), the method sets the len_used` of
+// the C.ydb_buffer_t referenced by retval to the required length, and returns an INVSTRLEN error. Otherwise, it copies the data
+// to the buffer referenced by the retval.buf_addr, and sets retval.lenUsed to its length.
 func (key *KeyT) ValST(tptoken uint64, retval *BufferT) error {
 	printEntry("KeyT.ValST()")
 	if nil == key {
@@ -149,6 +169,17 @@ func (key *KeyT) ValST(tptoken uint64, retval *BufferT) error {
 }
 
 // IncrST is a STAPI method to increment a given node and return the new value.
+//
+// Matching IncrE(), IncrST() wraps ydb_incr_st() to atomically increment the referenced global or local variable node
+// coerced to a number, with incr coerced to a number. It stores the result in the node and also returns it through
+// the BufferT structure referenced by retval.
+//
+// If ydb_incr_st() returns an error such as NUMOFLOW, INVSTRLEN, the method makes no changes to the structures under retval and
+// returns the error. If the length of the data to be returned exceeds retval.lenAlloc, the method sets the len_used
+// of the C.ydb_buffer_t referenced by retval to the required length, and returns an INVSTRLEN error.
+// Otherwise, it copies the data to the buffer referenced by the retval.buf_addr, sets retval.lenUsed to its length.
+//
+// With a nil value for incr, the default increment is 1. Note that the value of the empty string coerced to an integer is zero.
 func (key *KeyT) IncrST(tptoken uint64, incr, retval *BufferT) error {
 	var incrcbuft unsafe.Pointer
 
@@ -179,6 +210,9 @@ func (key *KeyT) IncrST(tptoken uint64, incr, retval *BufferT) error {
 }
 
 // LockDecrST is a STAPI method to decrement the lock-count of a given lock node.
+//
+// Matching LockDecrE(), LockDecrST() wraps ydb_lock_decr_st() to decrement the count of the lock name
+// referenced, releasing it if the count goes to zero or ignoring the invocation if the process does not hold the lock.
 func (key *KeyT) LockDecrST(tptoken uint64) error {
 	printEntry("KeyT.LockDecrST()")
 	if nil == key {
@@ -199,6 +233,14 @@ func (key *KeyT) LockDecrST(tptoken uint64) error {
 }
 
 // LockIncrST is a STAPI method to increment the lock-count of a given node lock with the given timeout in nano-seconds.
+//
+// Matching LockIncrE(), LockIncrST() wraps ydb_lock_incr_st() to attempt to acquire the referenced lock
+// resource name without releasing any locks the process already holds.
+//
+// If the process already holds the named lock resource, the method increments its count and returns.
+// If timeoutNsec exceeds C.YDB_MAX_TIME_NSEC, the method returns with an error return TIME2LONG.
+// If it is able to aquire the lock resource within timeoutNsec nanoseconds, it returns holding the lock, otherwise it returns
+// LOCK_TIMEOUT. If timeoutNsec is zero, the method makes exactly one attempt to acquire the lock.
 func (key *KeyT) LockIncrST(tptoken uint64, timeoutNsec uint64) error {
 	printEntry("KeyT.LockIncrST()")
 	if nil == key {
@@ -221,6 +263,19 @@ func (key *KeyT) LockIncrST(tptoken uint64, timeoutNsec uint64) error {
 
 // NodeNextST is a STAPI method to return the next subscripted node for the given global - the node logically following the
 // specified node (returns *BufferTArray).
+//
+// Matching NodeNextE(), NodeNextST() wraps ydb_node_next_st() to facilitate depth first traversal of a local or global variable tree.
+//
+// If there is a next node:
+//
+// If the number of subscripts of that next node exceeds next.elemsAlloc, the method sets next.elemsUsed to
+// the number of subscripts required, and returns an INSUFFSUBS error. In this case the elemsUsed is greater than elemsAlloc.
+// If one of the C.ydb_buffer_t structures referenced by next (call the first or only element n) has insufficient space for
+// the corresponding subscript, the method sets next.elemsUsed to n, and the len_alloc of that C.ydb_buffer_t structure to the actual space
+// required. The method returns an INVSTRLEN error. In this case the len_used of that structure is greater than its len_alloc.
+// Otherwise, it sets the structure next to reference the subscripts of that next node, and next.elemsUsed to the number of subscripts.
+//
+// If the node is the last in the tree, the method returns the NODEEND error, making no changes to the structures below next.
 func (key *KeyT) NodeNextST(tptoken uint64, next *BufferTArray) error {
 	var nextElemsPtr *uint32
 	var dummyElemUsed uint32
@@ -256,6 +311,19 @@ func (key *KeyT) NodeNextST(tptoken uint64, next *BufferTArray) error {
 
 // NodePrevST is a STAPI method to return the previous subscripted node for the given global - the node logically previous
 // to the specified node (returns *BufferTArray).
+//
+// Matching NodePrevE(), NodePrevST() wraps ydb_node_previous_st() to facilitate reverse depth first traversal of a local or global variable tree.
+//
+// If there is a previous node:
+//
+// If the number of subscripts of that previous node exceeds prev.elemsAlloc, the method sets prev.elemsUsed to
+// the number of subscripts required, and returns an INSUFFSUBS error. In this case the elemsUsed is greater than elemsAlloc.
+// If one of the C.ydb_buffer_t structures referenced by prev (call the first or only element n) has insufficient space for 
+// the corresponding subscript, the method sets prev.elemsUsed to n, and the len_alloc of that C.ydb_buffer_t structure to the actual space
+// required. The method returns an INVSTRLEN error. In this case the len_used of that structure is greater than its len_alloc.
+// Otherwise, it sets the structure prev to reference the subscripts of that prev node, and prev.elemsUsed to the number of subscripts.
+//
+// If the node is the first in the tree, the method returns the NODEEND error making no changes to the structures below prev.
 func (key *KeyT) NodePrevST(tptoken uint64, prev *BufferTArray) error {
 	var prevElemsPtr *uint32
 	var dummyElemUsed uint32
@@ -290,6 +358,9 @@ func (key *KeyT) NodePrevST(tptoken uint64, prev *BufferTArray) error {
 }
 
 // SetValST is a STAPI method to set the given value into the given node (glvn or SVN).
+//
+// Matching SetE(), at the referenced local or global variable node, or the intrinsic special variable, SetValST() wraps
+// ydb_set_st() to set the value specified by val.
 func (key *KeyT) SetValST(tptoken uint64, value *BufferT) error {
 	printEntry("KeyT.SetValST()")
 	if nil == key {
@@ -310,6 +381,18 @@ func (key *KeyT) SetValST(tptoken uint64, value *BufferT) error {
 }
 
 // SubNextST is a STAPI method to return the next subscript following the specified node.
+// 
+// Matching SubNextE(), SubNextST() wraps ydb_subscript_next_st() to facilitate breadth-first traversal of a
+// local or global variable sub-tree.
+//
+// At the level of the last subscript, if there is a next subscript with a node and/or a subtree:
+//
+// If the length of that next subscript exceeds sub.len_alloc, the method sets sub.len_used to the
+// actual length of that subscript, and returns an INVSTRLEN error. In this case sub.len_used is greater than
+// sub.len_alloc. Otherwise, it copies that subscript to the buffer referenced by
+// sub.buf_addr, and sets sub.len_used to its length.
+//
+// If there is no next node or subtree at that level of the subtree, the method returns the NODEEND error.
 func (key *KeyT) SubNextST(tptoken uint64, retval *BufferT) error {
 	printEntry("KeyT.SubNextST()")
 	if nil == key {
@@ -331,6 +414,16 @@ func (key *KeyT) SubNextST(tptoken uint64, retval *BufferT) error {
 }
 
 // SubPrevST is a STAPI method to return the previous subscript following the specified node.
+//
+// SubPrevST() wraps ydb_subscript_previous_st() to facilitate reverse breadth-first traversal of a local or global variable sub-tree.
+//
+// At the level of the last subscript, if there is a previous subscript with a node and/or a subtree:
+//
+// If the length of that previous subscript exceeds sub.len_alloc, the method sets sub.len_used to the
+// actual length of that subscript, and returns an INVSTRLEN error. In this case sub.len_used is greater than
+// sub.len_alloc. Otherwise, it copies that subscript to the buffer referenced by sub.buf_addr, and sets buf.len_used to its length.
+// 
+// If there is no previous node or subtree at that level of the subtree, the method returns the NODEEND error.
 func (key *KeyT) SubPrevST(tptoken uint64, retval *BufferT) error {
 	printEntry("KeyT.SubPrevST()")
 	if nil == key {

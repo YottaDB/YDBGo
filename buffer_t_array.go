@@ -77,12 +77,14 @@ func (buftary *BufferTArray) Alloc(numBufs, nBytes uint32) {
 	}
 }
 
-// Dump is a STAPI method to dump (print) the contents of this BufferTArray block
+// Dump is a STAPI method to dump (print) the contents of this BufferTArray block for debugging purposes. It dumps to stdout - cbuftary as a hexadecimal address,
+// elemsAlloc and elemsUsed as integers, and for each element of the smaller of elemsAlloc and elemsUsed elements of the ydb_buffer_t array referenced by cbuftary,
+// buf_addr as a hexadecimal address, len_alloc and len_used as integers and the smaller of len_used and len_alloc bytes at the address buf_addr in zwrite format.
 func (buftary *BufferTArray) Dump() {
 	buftary.DumpToWriter(os.Stdout)
 }
 
-//DumpToWriter is a writer that allows the tests or user code to dump to other than stdout
+//DumpToWriter is a writer that allows the tests or user code to dump to other than stdout.
 func (buftary *BufferTArray) DumpToWriter(writer io.Writer) {
 	printEntry("BufferTArray.Dump()")
 	if nil == buftary {
@@ -101,7 +103,8 @@ func (buftary *BufferTArray) DumpToWriter(writer io.Writer) {
 	}
 }
 
-// Free is a method to release all allocated C storage in a BufferTArray.
+// Free is a method to release all allocated C storage in a BufferTArray. It is the inverse of the Alloc() method: release the numSubs buffers
+// and the ydb_buffer_t array. Set cbuftary to nil, and elemsAlloc and elemsUsed to zero.
 func (buftary *BufferTArray) Free() {
 	printEntry("BufferTArray.Free()")
 	if nil != buftary {
@@ -406,7 +409,13 @@ func (buftary *BufferTArray) SetValStrLit(tptoken uint64, idx uint32, value stri
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // DeleteExclST is a method to delete all local variables EXCEPT the variables listed in the method BufferTArray.
-// If the input array is empty, then ALL local variables are deleted.
+// If the input array is empty, then ALL local variables are deleted. DeleteExclST() wraps ydb_delete_excl_st() to delete all
+// local variable trees except those of local variables whose names are specified in the BufferTArray structure. In the special case
+// where elemsUsed is zero, the method deletes all local variable trees.
+//
+// In the event that the elemsUsed exceeds C.YDB_MAX_NAMES, the error return is ERRNAMECOUNT2HI.
+//
+// As M and Go application code cannot be mixed in the same process, the warning in ydb_delete_excl_s() does not apply.
 func (buftary *BufferTArray) DeleteExclST(tptoken uint64) error {
 	printEntry("BufferTArray.DeleteExclST()")
 	if nil == buftary {
@@ -421,7 +430,40 @@ func (buftary *BufferTArray) DeleteExclST(tptoken uint64) error {
 	return nil
 }
 
-// TpST is a STAPI method to invoke transaction processing.
+// TpST() wraps ydb_tp_st() to implement transaction processing. tpfn is a pointer to a C function with two
+// parameters, the first of which is a tptoken and the second of which is tpfnparm, a pointer to an arbitrary
+// data structure in YottaDB heap space.
+//
+// Since Go does not permit a pointer to a Go function to be passed as a parameter to a C function, tpfn is required to be a pointer to
+// a C function. For a pure Go application, the C function is a glue routine that in turn calls the Go function. The shell script
+// GenYDBGlueRoutine.sh generates glue routine functions.
+//
+// Any function implementing logic for a transaction should return an error code with one of the following:
+//
+// - A normal return (nil) to indicate that per application logic, the transaction can be committed. The YottaDB database engine
+// will commit the transaction if it is able to, and if not, will call the function again.
+//
+// - TPRESTART to indicate that the transaction should restart, either because application logic has so determined or because a YottaDB
+// function called by the function has returned TPRESTART.
+//
+// - ROLLBACK to indicate that TpST() should not commit the transaction, and should return ROLLBACK to the caller.
+//
+// In order to provide the function implementing the transaction logic with a parameter or parameters, tpfnparm is passed to the glue
+// routine, in turn be passed to the Go function called by the glue routine. As tpfnparm is passed from Go to YottaDB and back to
+// Go, the memory it references should be allocated using Go Malloc() to protect it from the Go garbage collector.
+//
+// The BufferTArray receiving the TpST() method is a list of local variables whose values should be saved, and restored to their
+// original values when the transaction restarts. If the cbuftary structures have not been allocated or elemsUsed is zero, no
+// local variables are saved and restored; and if elemsUsed is 1, and that sole element references the string "*" all local variables
+// are saved and restored.
+//
+// A case-insensitive value of "BA" or "BATCH" for transid indicates to YottaDB that it need not ensure Durability for this
+// transaction (it continues to ensure Atomicity, Consistency, and Isolation)
+//
+// A special note: as the definition and implementation of Go protect against dangling pointers in pure Go code, Go application code may not
+// be designed and coded with the same level of defensiveness against dangling pointers that C applications are. In the case of
+// TpST(), owing to the need to use unsafe.Pointer parameters, please take additional care in designing and coding your
+// application to ensure the validity of the pointers passed to TpST().
 //
 // Parameters
 //
@@ -450,13 +492,16 @@ func (buftary *BufferTArray) TpST(tptoken uint64, tpfn unsafe.Pointer, tpfnparm 
 }
 
 // Variables used by TpST2 to wrap passing in func
-//  so the callback can retrieve it without passing pointers to C
-//  land
+//  so the callback can retrieve it without passing pointers to C.
 var tpMutex sync.Mutex
 var tpIndex uint64
 var tpMap map[uint64]func(uint64) int32
 
-// TpST2 is a STAPI method to invoke transaction processing.
+// Matching Go TpE2(), TpST2() wraps ydb_tp_st() to implement transaction processing. The difference between
+// TpST() and TpST2() is that the former uses C glue code to pass a parameter to the function implementing transaction logic,
+// whereas the latter is a pure Go function call (which may be a closure).
+//
+// Refer to TpST() for a more detailed discussion of transaction processing.
 //
 // Parameters
 //
@@ -491,8 +536,7 @@ func (buftary *BufferTArray) TpST2(tptoken uint64, tpfn func(uint64) int32, tran
 	return nil
 }
 
-// YdbTpStWrapper is a private callback to wrap calls to the Go closure
-//  required for TpST2
+// YdbTpStWrapper is a private callback to wrap calls to the Go closure required for TpST2.
 //export ydbTpStWrapper
 func ydbTpStWrapper(tptoken uint64, tpfnparm unsafe.Pointer) int32 {
 	index := *((*uint64)(tpfnparm))

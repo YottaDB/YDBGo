@@ -38,6 +38,10 @@ type BufferT struct { // Contains a single ydb_buffer_t struct
 
 // Alloc is a method to allocate the ydb_buffer_t C storage and allocate or re-allocate the buffer pointed
 // to by that struct.
+//
+// It allocates a buffer in YottaDB heap space of size nBytes; and a C.ydb_buffer_t structure, also in YottaDB heap space, with
+// its buf_addr referencing the buffer, its len_alloc set to nBytes and its len_used set to zero. Set cbuft in the BufferT
+// structure to reference the C.ydb_buffer_t structure.
 func (buft *BufferT) Alloc(nBytes uint32) {
 	var cbuftptr *C.ydb_buffer_t
 
@@ -69,6 +73,14 @@ func (buft *BufferT) Alloc(nBytes uint32) {
 }
 
 // Dump is a method to dump the contents of a BufferT block for debugging purposes.
+//
+// For debugging purposes, dump on stdout:
+//
+// - cbuft as a hexadecimal address;
+//
+// - for the C.ydb_buffer_t structure referenced by cbuft: buf_addr as a hexadecimal address, and len_alloc and len_used as integers; and
+//
+// - at the address buf_addr, the lower of len_used or len_alloc bytes in zwrite format.
 func (buft *BufferT) Dump() {
 	if nil == buft {
 		panic("*BufferT receiver of Dump() cannot be nil")
@@ -96,6 +108,9 @@ func (buft *BufferT) DumpToWriter(writer io.Writer) {
 }
 
 // Free is a method to release both the buffer and ydb_buffer_t block associate with the BufferT block.
+//
+// The inverse of the Alloc() method: release the buffer in YottaDB heap space referenced by the C.ydb_buffer_t structure,
+// release the C.ydb_buffer_t, and set cbuft in the BufferT structure to nil.
 func (buft *BufferT) Free() {
 	printEntry("BufferT.Free()")
 	if nil != buft { // Ignore if buft is null already
@@ -112,6 +127,10 @@ func (buft *BufferT) Free() {
 }
 
 // LenAlloc is a method to fetch the ydb_buffer_t.len_alloc field containing the allocated length of the buffer.
+//
+// If the C.ydb_buffer_t structure referenced by cbuft has not yet been allocated, return the STRUCTNOTALLOCD error.
+// Otherwise, return the len_alloc field of the C.ydb_buffer_t structure referenced by cbuft.
+
 func (buft *BufferT) LenAlloc(tptoken uint64) (uint32, error) {
 	printEntry("BufferT.LenAlloc()")
 	if nil == buft {
@@ -131,6 +150,11 @@ func (buft *BufferT) LenAlloc(tptoken uint64) (uint32, error) {
 
 // LenUsed is a method to fetch the ydb_buffer_t.len_used field containing the used length of the buffer. Note
 // that if len_used > len_alloc, thus indicating a previous issue, an INVSTRLEN error is raised.
+//
+// If the C.ydb_buffer_t structure referenced by cbuft has not yet been allocated, return the STRUCTNOTALLOCD error.
+// If the len_used field of the C.ydb_buffer_t structure is greater than its len_alloc field (owing to a
+// prior INVSTRLEN error), return an INVSTRLEN error and the len_used field of the C.ydb_buffer_t structure
+// referenced by cbuft. Otherwise, return the len_used field of the C.ydb_buffer_t structure referenced by cbuft.
 func (buft *BufferT) LenUsed(tptoken uint64) (uint32, error) {
 	printEntry("BufferT.LenUsed()")
 	if nil == buft {
@@ -158,6 +182,10 @@ func (buft *BufferT) LenUsed(tptoken uint64) (uint32, error) {
 }
 
 // ValBAry is a method to fetch the buffer contents as a byte array (returned as *[]byte to limit copies made).
+//
+// If the C.ydb_buffer_t structure referenced by cbuft has not yet been allocated, return the STRUCTNOTALLOCD error.
+// If the len_used field of the C.ydb_buffer_t structure is greater than its len_alloc field (owing to a prior
+// INVSTRLEN error), return an INVSTRLEN error. Otherwise, return len_used bytes of the buffer as a byte array.
 func (buft *BufferT) ValBAry(tptoken uint64) (*[]byte, error) {
 	var bary []byte
 
@@ -191,6 +219,10 @@ func (buft *BufferT) ValBAry(tptoken uint64) (*[]byte, error) {
 }
 
 // ValStr is a method to fetch the buffer contents as a string (returned as *string to limit copies made).
+//
+// If the C.ydb_buffer_t structure referenced by cbuft has not yet been allocated, return the STRUCTNOTALLOCD error.
+// If the len_used field of the C.ydb_buffer_t structure is greater than its len_alloc field (owing to a prior
+// INVSTRLEN error), return an INVSTRLEN error. Otherwise, return len_used bytes of the buffer as a string.
 func (buft *BufferT) ValStr(tptoken uint64) (*string, error) {
 	var str string
 
@@ -224,6 +256,16 @@ func (buft *BufferT) ValStr(tptoken uint64) (*string, error) {
 }
 
 // SetLenUsed is a method to set the used length of buffer in the ydb_buffer_t block (must be <= alloclen).
+//
+// Use this method to change the length of a used substring of the contents of the buffer referenced by the buf_addr field of the
+// referenced C.ydb_buffer_t.
+//
+// If the C.ydb_buffer_t structure referenced by cbuft has not yet been allocated, return the STRUCTNOTALLOCD error.
+// If newLen is greater than the len_alloc field of the referenced C.ydb_buffer_t, make no changes and return with
+// an error return of INVSTRLEN. Otherwise, set the len_used field of the referenced C.ydb_buffer_t to newLen.
+//
+// Note that even if newLen is not greater than the value of len_alloc, setting a len_used value greater than the
+// number of meaningful bytes in the buffer will likely lead to hard-to-debug errors.
 func (buft *BufferT) SetLenUsed(tptoken uint64, newLen uint32) error {
 	printEntry("BufferT.SetLenUsed()")
 	if nil == buft {
@@ -251,6 +293,11 @@ func (buft *BufferT) SetLenUsed(tptoken uint64, newLen uint32) error {
 }
 
 // SetValBAry is a method to set a []byte array into the given buffer.
+//
+// If the C.ydb_buffer_t structure referenced by cbuft has not yet been allocated, return the STRUCTNOTALLOCD error.
+// If the length of val is greater than the len_alloc field of the C.ydb_buffer_t structure referenced by
+// cbuft, make no changes and return INVSTRLEN. Otherwise, copy the bytes of val to the location referenced
+// by the buf_addr field of the C.ydbbuffer_t structure, set the len_used field to the length of val.
 func (buft *BufferT) SetValBAry(tptoken uint64, value *[]byte) error {
 	printEntry("BufferT.SetValBAry()")
 	if nil == buft {
@@ -285,6 +332,11 @@ func (buft *BufferT) SetValBAry(tptoken uint64, value *[]byte) error {
 }
 
 // SetValStr is a method to set a string into the given buffer.
+//
+// If the C.ydb_buffer_t structure referenced by cbuft has not yet been allocated, return the STRUCTNOTALLOCD error.
+// If the length of val is greater than the len_alloc field of the C.ydb_buffer_t structure referenced by
+// cbuft, make no changes and return INVSTRLEN. Otherwise, copy the bytes of val to the location referenced
+// by the buf_addr field of the C.ydbbuffer_t structure, set the len_used field to the length of val.
 func (buft *BufferT) SetValStr(tptoken uint64, value *string) error {
 	printEntry("BufferT.SetValStr()")
 	if nil == buft {
@@ -295,6 +347,11 @@ func (buft *BufferT) SetValStr(tptoken uint64, value *string) error {
 }
 
 // SetValStrLit is a method to set a literal string into the given buffer.
+//
+// If the C.ydb_buffer_t structure referenced by cbuft has not yet been allocated, return the STRUCTNOTALLOCD error.
+// If the length of val is greater than the len_alloc field of the C.ydb_buffer_t structure referenced by
+// cbuft, make no changes and return INVSTRLEN. Otherwise, copy the bytes of val to the location referenced
+// by the buf_addr field of the C.ydbbuffer_t structure, set the len_used field to the length of val.
 func (buft *BufferT) SetValStrLit(tptoken uint64, value string) error {
 	printEntry("BufferT.SetValStrLit()")
 	if nil == buft {
@@ -311,6 +368,11 @@ func (buft *BufferT) SetValStrLit(tptoken uint64, value string) error {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Str2ZwrST is a STAPI method to take the given string and return it in ZWRITE format.
+//
+// If the C.ydb_buffer_t structure referenced by cbuft has not yet been allocated, return the STRUCTNOTALLOCD error.
+// If len_alloc is not large enough, set len_used to the required length, and return an INVSTRLEN error. In this case,
+// len_used will be greater than len_alloc until corrected by application code. Otherwise, set the buffer referenced by buf_addr
+// to the zwrite format string, and set len_used to the length.
 func (buft *BufferT) Str2ZwrST(tptoken uint64, zwr *BufferT) error {
 	printEntry("BufferT.Str2ZwrST()")
 	if nil == buft {
@@ -337,6 +399,14 @@ func (buft *BufferT) Str2ZwrST(tptoken uint64, zwr *BufferT) error {
 }
 
 // Zwr2StrST is a STAPI method to take the given ZWRITE format string and return it as a normal ASCII string.
+//
+// If the C.ydb_buffer_t structure referenced by cbuft has not yet been allocated, return the STRUCTNOTALLOCD error.
+// If len_alloc is not large enough, set len_used to the required length, and return an INVSTRLEN error. In this case,
+// len_used will be greater than len_alloc until corrected by application code. If str has errors and is not in valid zwrite format, set
+// len_used to zero, and return the error code returned by ydb_zwr2str_s() e.g., INVZWRITECHAR. Otherwise, set the buffer referenced
+// by buf_addr to the unencoded string, set len_used to the length.
+//
+// Note that the length of a string in zwrite format is always greater than or equal to the string in its original, unencoded format.
 func (buft *BufferT) Zwr2StrST(tptoken uint64, str *BufferT) error {
 	printEntry("BufferT.Zwr2StrST()")
 	if nil == buft {

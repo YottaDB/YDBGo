@@ -26,19 +26,19 @@ import "C"
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// YDBError is a structure that define our error message format which includes both the formated $ZSTATUS
-// type message plus the numeric error value.
+// YDBError is a structure that defines the error message format which includes both the formated $ZSTATUS
+// type message and the numeric error value.
 type YDBError struct {
 	errcode int    // The error value (e.g. C.YDB_ERR_DBFILERR, etc)
 	errmsg  string // The error string - generally from $ZSTATUS when available
 }
 
-// Error is a method to return the string out of our error like is normally expected.
+// Error is a method to return the expected error message string.
 func (err *YDBError) Error() string {
 	return err.errmsg
 }
 
-// ErrorCode is a function we use to find the error return code.
+// ErrorCode is a function used to find the error return code.
 func ErrorCode(err error) int {
 	yerr, ok := err.(*YDBError)
 	if ok {

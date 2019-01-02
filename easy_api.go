@@ -28,6 +28,9 @@ import "C"
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // DataE is a STAPI function to return $DATA() value for a given variable subscripted or not.
+//
+// Matching DataST(), DataE() function wraps and returns the result of ydb_data_st(). In the event of an error, the return
+// value is unspecified.
 func DataE(tptoken uint64, varname string, subary []string) (uint32, error) {
 	var retval C.uint
 	var dbkey KeyT
@@ -46,7 +49,12 @@ func DataE(tptoken uint64, varname string, subary []string) (uint32, error) {
 	return uint32(retval), nil
 }
 
-// DeleteE is a STAPI function to delete a node or a subtree (see DeleteST) given a deletion type and a varname/subscript set
+// DeleteE is a STAPI function to delete a node or a subtree (see DeleteST) given a deletion type and a varname/subscript set.
+//
+// Matching DeleteST(), DeleteE() wraps ydb_delete_st() to
+// delete a local or global variable node or (sub)tree, with a value of
+// C.YDB_DEL_NODE for deltype specifying that only the node should be deleted, leaving the (sub)tree untouched, and a value
+// of C.YDB_DEL_TREE specifying that the node as well as the(sub)tree are to be deleted.
 func DeleteE(tptoken uint64, deltype int, varname string, subary []string) error {
 	var dbkey KeyT
 	var err error
@@ -67,6 +75,14 @@ func DeleteE(tptoken uint64, deltype int, varname string, subary []string) error
 
 // DeleteExclE is a STAPI function to do an exclusive delete by deleting all local variables except those root vars specified
 // in the variable name array. If the varname array is empty, all local variables are deleted.
+//
+// Matching DeleteExclST(), DeleteExclE() wraps ydb_delete_excl_st() to delete all local variables except those
+// specified. In the event varnames has no elements (i.e.,[]string{}), DeleteExclE() deletes all local variables.
+//
+// In the event that the number of variable names in varnames exceeds C.YDB_MAX_NAMES, the error return is
+// ERRNAMECOUNT2HI. Otherwise, if ydb_delete_excl_st() returns an error, the function returns the error.
+//
+// As M and Go application code cannot be mixed in the same process, the warning in ydb_delete_excl_s() does not apply.
 func DeleteExclE(tptoken uint64, varnames []string) error {
 	var vnames BufferTArray
 	var maxvarnmlen, varnmcnt, varnmlen uint32
@@ -101,6 +117,12 @@ func DeleteExclE(tptoken uint64, varnames []string) error {
 }
 
 // ValE is an STAPI function to return the value found for varname(subary...)
+//
+// Matching ValST(), ValE() wraps ydb_get_st() to return
+// the value at the referenced global or local variable node, or intrinsic special variable.
+//
+// If ydb_get_s() returns an error such as GVUNDEF, INVSVN, LVUNDEF,
+// the function returns the error. Otherwise, it returns the value at the node.
 func ValE(tptoken uint64, varname string, subary []string) (string, error) {
 	var dbkey KeyT
 	var dbvalue BufferT
@@ -135,7 +157,14 @@ func ValE(tptoken uint64, varname string, subary []string) (string, error) {
 	return *retval, err
 }
 
-// IncrE is a STAPI function to increment the given value by the given amount and return the new value
+// IncrE is a STAPI function to increment the given value by the given amount and return the new value.
+//
+// Matching IncrST(), IncrE() wraps ydb_incr_st() to atomically increment the referenced global or local variable node
+// coerced to a number with incr coerced to a number, with the result stored in the node and returned by the function.
+//
+// If ydb_incr_st() returns an error such as NUMOFLOW or INVSTRLEN, the function returns the error. Otherwise, it returns the incremented value of the node.
+//
+// With a nil value for incr, the default increment is 1. Note that the value of the empty string coerced to an integer is zero.
 func IncrE(tptoken uint64, incr, varname string, subary []string) (string, error) {
 	var dbkey KeyT
 	var dbvalue, incrval BufferT
@@ -172,6 +201,20 @@ func IncrE(tptoken uint64, incr, varname string, subary []string) (string, error
 // LockE is a STAPI function whose purpose is to release all locks and then lock the locks designated. The variadic list
 // is pairs of arguments with the first being a string containing the variable name and the second being a string array
 // containing the subscripts, if any, for that variable (null list for no subscripts).
+//
+// Matching LockST(), LockE() releases all lock resources currently held and then attempt to acquire the named lock resources
+// referenced. If no lock resources are specified, it simply releases all lock resources currently held and returns.
+//
+// interface{} is a series of pairs of varname string and subary []string parameters, where a null subary parameter
+// ([]string{}) specifies the unsubscripted lock resource name.
+//
+// If lock resources are specified, upon return, the process will have acquired all of the named lock resources or none of the named lock resources.
+//
+// If timeoutNsec exceeds C.YDB_MAX_TIME_NSEC, the function returns with an error return of TIME2LONG.
+// If the lock resource names exceeds the maximum number supported (currently eleven), the function returns a PARMOFLOW error.
+// If namesubs is not a series of alternating string and []string parameters, the function returns the INVLNPAIRLIST error.
+// If it is able to aquire the lock resource(s) within timeoutNsec nanoseconds, the function returns holding the lock
+// resource(s); otherwise it returns LOCKTIMEOUT. If timeoutNsec is zero, the function makes exactly one attempt to acquire the lock resource(s).
 func LockE(tptoken uint64, timeoutNsec uint64, namesnsubs ...interface{}) error {
 	printEntry("LockE()")
 	if 0 != (uint32(len(namesnsubs)) & 1) {
@@ -238,6 +281,9 @@ func LockE(tptoken uint64, timeoutNsec uint64, namesnsubs ...interface{}) error 
 
 // LockDecrE is a STAPI function to decrement the lock count of the given lock. When the count goes to 0, the lock
 // is considered released.
+//
+// Matching LockDecrST(), LockDecrE() wraps ydb_lock_decr_st() to decrement the count of the lock name
+// referenced, releasing it if the count goes to zero or ignoring the invocation if the process does not hold the lock.
 func LockDecrE(tptoken uint64, varname string, subary []string) error {
 	var dbkey KeyT
 	var err error
@@ -257,6 +303,14 @@ func LockDecrE(tptoken uint64, varname string, subary []string) error {
 
 // LockIncrE is a STAPI function to increase the lock count of a given node within the specified timeout in
 // nanoseconds.
+//
+// Matching  LockIncrST(), LockIncrE() wraps ydb_lock_incr_st() to attempt to acquire the referenced lock
+// resource name without releasing any locks the process already holds.
+//
+// If the process already holds the named lock resource, the function increments its count and returns.
+// If timeoutNsec exceeds C.YDB_MAX_TIME_NSEC, the function returns with an error return TIME2LONG.
+// If it is able to aquire the lock resource within timeoutNsec nanoseconds, it returns holding the lock, otherwise it returns
+// LOCKTIMEOUT. If timeoutNsec is zero, the function makes exactly one attempt to acquire the lock.
 func LockIncrE(tptoken uint64, timeoutNsec uint64, varname string, subary []string) error {
 	var dbkey KeyT
 	var err error
@@ -277,6 +331,10 @@ func LockIncrE(tptoken uint64, timeoutNsec uint64, varname string, subary []stri
 }
 
 // NodeNextE is a STAPI function to return a string array of the subscripts that describe the next node.
+//
+// Matching NodeNextST(), NodeNextE() wraps ydb_node_next_st() to facilitate depth first traversal of a local or global variable tree.
+//
+// If there is a next node, it returns the subscripts of that next node. If the node is the last in the tree, the function returns the NODEEND error.
 func NodeNextE(tptoken uint64, varname string, subary []string) ([]string, error) {
 	var dbkey KeyT
 	var dbsubs BufferTArray
@@ -331,6 +389,12 @@ func NodeNextE(tptoken uint64, varname string, subary []string) ([]string, error
 }
 
 // NodePrevE is a STAPI function to return a string array of the subscripts that describe the next node.
+//
+// Matching NodePrevST(), NodePrevE() wraps ydb_node_previous_st() to facilitate reverse depth first traversal
+// of a local or global variable tree.
+//
+// If there is a previous node, it returns the subscripts of that previous node; an empty string array if that previous node is the root.
+// If the node is the first in the tree, the function returns the NODEEND error.
 func NodePrevE(tptoken uint64, varname string, subary []string) ([]string, error) {
 	var dbkey KeyT
 	var dbsubs BufferTArray
@@ -385,6 +449,9 @@ func NodePrevE(tptoken uint64, varname string, subary []string) ([]string, error
 }
 
 // SetValE is a STAPI function to set a value into the given node (varname and subscripts).
+//
+// Matching SetST(), at the referenced local or global variable node, or the intrinsic special variable, SetValE() wraps
+// ydb_set_st() to set the value specified.
 func SetValE(tptoken uint64, value, varname string, subary []string) error {
 	var dbkey KeyT
 	var dbvalue BufferT
@@ -436,6 +503,15 @@ func SetValE(tptoken uint64, value, varname string, subary []string) error {
 }
 
 // SubNextE is a STAPI function to return the next subscript at the current subscript level.
+//
+// Matching SubNextST(), SubNextE() wraps ydb_subscript_next_st() to facilitate breadth-first traversal of a
+// local or global variable sub-tree.
+//
+// At the level of the last subscript, if there is a next subscript with a node and/or a subtree, it returns that subscript.
+// If there is no next node or subtree at that level of the subtree, the function returns the NODEEND error.
+//
+// In the special case where subary is the null array, SubNextE() returns the name of the next global or local
+// variable, and the NODEEND error if varname is the last global or local variable.
 func SubNextE(tptoken uint64, varname string, subary []string) (string, error) {
 	var dbkey KeyT
 	var dbsub BufferT
@@ -471,6 +547,15 @@ func SubNextE(tptoken uint64, varname string, subary []string) (string, error) {
 }
 
 // SubPrevE is a STAPI function to return the previous subscript at the current subscript level.
+//
+// Matching SubPrevST(), SubPrevE() wraps ydb_subscript_previous_st() to facilitate reverse breadth-first
+// traversal of a local or global variable sub-tree.
+//
+// At the level of the last subscript, if there is a previous subscript with a node and/or a subtree, it returns that subscript.
+// If there is no previous node or subtree at that level of the subtree, the function returns the NODEEND error.
+//
+// In the special case where subary is the null array SubNextE() returns the name of the previous global or local
+// variable, and the NODEEND error if varname is the first global or local variable.
 func SubPrevE(tptoken uint64, varname string, subary []string) (string, error) {
 	var dbkey KeyT
 	var dbsub BufferT
@@ -506,6 +591,11 @@ func SubPrevE(tptoken uint64, varname string, subary []string) (string, error) {
 }
 
 // TpE is a STAPI function to initiate a TP transaction.
+//
+// Matching TpST(), TpE() wraps ydb_tp_st() to implement transaction processing. The varnames array
+// elements are local variable names whose values should be saved, and restored to their original values when the transaction restarts. If
+// there are no varnames array elements, or a sole varnames element is the empty string, no local variables are
+// saved and restored; and if a sole varnames element is "*", all local variables are saved and restored.
 //
 // Parameters
 //
@@ -550,6 +640,10 @@ func TpE(tptoken uint64, tpfn unsafe.Pointer, tpfnparm unsafe.Pointer, transid s
 }
 
 // TpE2 is a Easy API function to drive transactions.
+//
+// Matching TpST2(), TpE() wraps ydb_tp_st() to implement transaction processing. The difference between
+// TpE() and TpE2() is that the former uses C glue code to pass a parameter to the function implementing transaction logic,
+// whereas the latter is a pure Go function call (which may be a closure). 
 //
 // Parameters
 //
