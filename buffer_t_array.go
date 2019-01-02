@@ -430,7 +430,7 @@ func (buftary *BufferTArray) DeleteExclST(tptoken uint64) error {
 	return nil
 }
 
-// TpST() wraps ydb_tp_st() to implement transaction processing. tpfn is a pointer to a C function with two
+// TpST wraps ydb_tp_st() to implement transaction processing. tpfn is a pointer to a C function with two
 // parameters, the first of which is a tptoken and the second of which is tpfnparm, a pointer to an arbitrary
 // data structure in YottaDB heap space.
 //
@@ -497,7 +497,7 @@ var tpMutex sync.Mutex
 var tpIndex uint64
 var tpMap map[uint64]func(uint64) int32
 
-// Matching Go TpE2(), TpST2() wraps ydb_tp_st() to implement transaction processing. The difference between
+// TpST2 wraps ydb_tp_st() to implement transaction processing. The difference between
 // TpST() and TpST2() is that the former uses C glue code to pass a parameter to the function implementing transaction logic,
 // whereas the latter is a pure Go function call (which may be a closure).
 //

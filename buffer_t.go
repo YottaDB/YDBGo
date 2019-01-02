@@ -130,7 +130,6 @@ func (buft *BufferT) Free() {
 //
 // If the C.ydb_buffer_t structure referenced by cbuft has not yet been allocated, return the STRUCTNOTALLOCD error.
 // Otherwise, return the len_alloc field of the C.ydb_buffer_t structure referenced by cbuft.
-
 func (buft *BufferT) LenAlloc(tptoken uint64) (uint32, error) {
 	printEntry("BufferT.LenAlloc()")
 	if nil == buft {
