@@ -295,9 +295,9 @@ func (buft *BufferT) SetLenUsed(tptoken uint64, newLen uint32) error {
 // SetValBAry is a method to set a []byte array into the given buffer.
 //
 // If the C.ydb_buffer_t structure referenced by cbuft has not yet been allocated, return the STRUCTNOTALLOCD error.
-// If the length of val is greater than the len_alloc field of the C.ydb_buffer_t structure referenced by
-// cbuft, make no changes and return INVSTRLEN. Otherwise, copy the bytes of val to the location referenced
-// by the buf_addr field of the C.ydbbuffer_t structure, set the len_used field to the length of val.
+// If the length of value is greater than the len_alloc field of the C.ydb_buffer_t structure referenced by
+// cbuft, make no changes and return INVSTRLEN. Otherwise, copy the bytes of value to the location referenced
+// by the buf_addr field of the C.ydbbuffer_t structure, set the len_used field to the length of value.
 func (buft *BufferT) SetValBAry(tptoken uint64, value *[]byte) error {
 	printEntry("BufferT.SetValBAry()")
 	if nil == buft {
@@ -334,9 +334,9 @@ func (buft *BufferT) SetValBAry(tptoken uint64, value *[]byte) error {
 // SetValStr is a method to set a string into the given buffer.
 //
 // If the C.ydb_buffer_t structure referenced by cbuft has not yet been allocated, return the STRUCTNOTALLOCD error.
-// If the length of val is greater than the len_alloc field of the C.ydb_buffer_t structure referenced by
-// cbuft, make no changes and return INVSTRLEN. Otherwise, copy the bytes of val to the location referenced
-// by the buf_addr field of the C.ydbbuffer_t structure, set the len_used field to the length of val.
+// If the length of value is greater than the len_alloc field of the C.ydb_buffer_t structure referenced by
+// cbuft, make no changes and return INVSTRLEN. Otherwise, copy the bytes of value to the location referenced
+// by the buf_addr field of the C.ydbbuffer_t structure, set the len_used field to the length of value.
 func (buft *BufferT) SetValStr(tptoken uint64, value *string) error {
 	printEntry("BufferT.SetValStr()")
 	if nil == buft {
@@ -349,9 +349,9 @@ func (buft *BufferT) SetValStr(tptoken uint64, value *string) error {
 // SetValStrLit is a method to set a literal string into the given buffer.
 //
 // If the C.ydb_buffer_t structure referenced by cbuft has not yet been allocated, return the STRUCTNOTALLOCD error.
-// If the length of val is greater than the len_alloc field of the C.ydb_buffer_t structure referenced by
-// cbuft, make no changes and return INVSTRLEN. Otherwise, copy the bytes of val to the location referenced
-// by the buf_addr field of the C.ydbbuffer_t structure, set the len_used field to the length of val.
+// If the length of value is greater than the len_alloc field of the C.ydb_buffer_t structure referenced by
+// cbuft, make no changes and return INVSTRLEN. Otherwise, copy the bytes of value to the location referenced
+// by the buf_addr field of the C.ydbbuffer_t structure, set the len_used field to the length of value.
 func (buft *BufferT) SetValStrLit(tptoken uint64, value string) error {
 	printEntry("BufferT.SetValStrLit()")
 	if nil == buft {
