@@ -14,6 +14,7 @@ grep "#define YDB_ERR_" $ydb_dist/libydberrors*.h | awk '{print $2,"=",$3}' >> e
 echo "" >> error_codes.go
 gcc -E $ydb_dist/libyottadb.h | grep YDB | tr ',' ' ' >> error_codes.go
 cat <<EOF >> error_codes.go
+YDB_OK = 0
 )
 
 EOF
