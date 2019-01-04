@@ -667,7 +667,7 @@ func TpE(tptoken uint64, errstr *BufferT, tpfn unsafe.Pointer, tpfnparm unsafe.P
 //
 // Matching TpST2(), TpE() wraps ydb_tp_st() to implement transaction processing. The difference between
 // TpE() and TpE2() is that the former uses C glue code to pass a parameter to the function implementing transaction logic,
-// whereas the latter is a pure Go function call (which may be a closure). 
+// whereas the latter is a pure Go function call (which may be a closure).
 //
 // Parameters
 //

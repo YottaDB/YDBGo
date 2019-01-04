@@ -54,7 +54,7 @@ func (buftary *BufferTArray) Alloc(numBufs, nBytes uint32) {
 	if nil != buftary.cbuftary {
 		buftary.Free() // Get rid of previous allocations and re-allocate
 	}
-	if (0 != numBufs) {
+	if 0 != numBufs {
 		// Allocate new ydb_buffer_t array and initialize
 		len := C.size_t(uint32(C.sizeof_ydb_buffer_t) * numBufs)
 		cbuftary := (*[]C.ydb_buffer_t)(C.malloc(len))
@@ -165,12 +165,12 @@ func (buftary *BufferTArray) ElemLenUsed(tptoken uint64, errstr *BufferT, idx ui
 	}
 	cbuftary := buftary.cbuftary
 	if nil == cbuftary {
-                // Create an error to return
-                errmsg, err := MessageT(tptoken, nil, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
-                if nil != err {
-                        panic(fmt.Sprintf("YDB: Error fetching STRUCTNOTALLOCD: %s", err))
-                }
-                return 0, &YDBError{(int)(C.YDB_ERR_STRUCTNOTALLOCD), errmsg}
+		// Create an error to return
+		errmsg, err := MessageT(tptoken, nil, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
+		if nil != err {
+			panic(fmt.Sprintf("YDB: Error fetching STRUCTNOTALLOCD: %s", err))
+		}
+		return 0, &YDBError{(int)(C.YDB_ERR_STRUCTNOTALLOCD), errmsg}
 	}
 	elemcnt := buftary.elemsAlloc
 	if !(idx < elemcnt) {

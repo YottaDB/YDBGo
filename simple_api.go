@@ -14,8 +14,8 @@ package yottadb
 
 import (
 	"fmt"
-	"strings"
 	"strconv"
+	"strings"
 	"unsafe"
 )
 
@@ -75,8 +75,8 @@ func LockST(tptoken uint64, errstr *BufferT, timeoutNsec uint64, lockname ...*Ke
 	parmindx++
 	if 0 != lockcnt {
 		parmsleft := C.MAXVPARMS - parmindx // We've already used two parms (timeout and namecount)
-		parmsleftorig := parmsleft // Save for error below just-in-case
-		lockindx := 0                // The next lockname index to be read
+		parmsleftorig := parmsleft          // Save for error below just-in-case
+		lockindx := 0                       // The next lockname index to be read
 		// Load the lockname parameters into the plist
 		for 0 < lockcnt {
 			// Make sure enough room for another set of 3 parms
@@ -87,7 +87,7 @@ func LockST(tptoken uint64, errstr *BufferT, timeoutNsec uint64, lockname ...*Ke
 				}
 				// Do some error message substitution
 				errmsg = strings.Replace(errmsg, "!AD", "LockST()", 1)
-				errmsg = strings.Replace(errmsg, "!UL", fmt.Sprintf("%d", parmsleftorig / 3), 1)
+				errmsg = strings.Replace(errmsg, "!UL", fmt.Sprintf("%d", parmsleftorig/3), 1)
 				return &YDBError{(int)(C.YDB_ERR_NAMECOUNT2HI), errmsg}
 			}
 			// Set the 3 parameters for this lockname

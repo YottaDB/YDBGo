@@ -346,7 +346,7 @@ func (key *KeyT) NodeNextST(tptoken uint64, errstr *BufferT, next *BufferTArray)
 //
 // If the number of subscripts of that previous node exceeds prev.elemsAlloc, the method sets prev.elemsUsed to
 // the number of subscripts required, and returns an INSUFFSUBS error. In this case the elemsUsed is greater than elemsAlloc.
-// If one of the C.ydb_buffer_t structures referenced by prev (call the first or only element n) has insufficient space for 
+// If one of the C.ydb_buffer_t structures referenced by prev (call the first or only element n) has insufficient space for
 // the corresponding subscript, the method sets prev.elemsUsed to n, and the len_alloc of that C.ydb_buffer_t structure to the actual space
 // required. The method returns an INVSTRLEN error. In this case the len_used of that structure is greater than its len_alloc.
 // Otherwise, it sets the structure prev to reference the subscripts of that prev node, and prev.elemsUsed to the number of subscripts.
@@ -417,7 +417,7 @@ func (key *KeyT) SetValST(tptoken uint64, errstr *BufferT, value *BufferT) error
 }
 
 // SubNextST is a STAPI method to return the next subscript following the specified node.
-// 
+//
 // Matching SubNextE(), SubNextST() wraps ydb_subscript_next_st() to facilitate breadth-first traversal of a
 // local or global variable sub-tree.
 //
@@ -462,7 +462,7 @@ func (key *KeyT) SubNextST(tptoken uint64, errstr *BufferT, retval *BufferT) err
 // If the length of that previous subscript exceeds sub.len_alloc, the method sets sub.len_used to the
 // actual length of that subscript, and returns an INVSTRLEN error. In this case sub.len_used is greater than
 // sub.len_alloc. Otherwise, it copies that subscript to the buffer referenced by sub.buf_addr, and sets buf.len_used to its length.
-// 
+//
 // If there is no previous node or subtree at that level of the subtree, the method returns the NODEEND error.
 func (key *KeyT) SubPrevST(tptoken uint64, errstr *BufferT, retval *BufferT) error {
 	printEntry("KeyT.SubPrevST()")

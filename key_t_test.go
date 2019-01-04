@@ -546,7 +546,6 @@ func TestKeyTGetValueThatWontFitInBuffer(t *testing.T) {
 	assert.Equal(t, yottadb.YDB_ERR_INVSTRLEN, errcode)
 }
 
-
 func TestKeyTNodeNextWithSmallBufAry(t *testing.T) {
 	// Get a value that doesn't fit in the provided buffer
 	var key yottadb.KeyT
@@ -597,4 +596,3 @@ func TestKeyTNodeNextWithSmallBufAry(t *testing.T) {
 	assert.Equal(t, yottadb.YDB_ERR_INVSTRLEN, errcode)
 	buftary.SetElemUsed(tptoken, nil, 1)
 }
-

@@ -27,7 +27,7 @@ import "C"
 // BufferT is a golang structure that serves as an anchor point for a C allocated ydb_buffer_t structure used
 // to call the YottaDB C Simple APIs.
 type BufferT struct { // Contains a single ydb_buffer_t struct
-	cbuft *C.ydb_buffer_t // C flavor of the ydb_buffer_t struct
+	cbuft     *C.ydb_buffer_t // C flavor of the ydb_buffer_t struct
 	owns_buff bool
 }
 
@@ -136,7 +136,7 @@ func (buft *BufferT) Free() {
 				buft.cbuft = nil
 			}
 		} else {
-			buft.cbuft = nil;
+			buft.cbuft = nil
 		}
 	}
 }

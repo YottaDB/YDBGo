@@ -13,12 +13,12 @@
 package yottadb_test
 
 import (
+	"fmt"
 	"github.com/stretchr/testify/assert"
 	"lang.yottadb.com/go/yottadb"
 	. "lang.yottadb.com/go/yottadb/internal/test_helpers"
-	"testing"
 	"sync"
-	"fmt"
+	"testing"
 )
 
 func TestSimpleAPILockST(t *testing.T) {
@@ -95,5 +95,5 @@ func TestSimpleAPITpFullNesting(t *testing.T) {
 		}(i)
 	}
 	wg.Wait()
-	assert.Equal(t, 100 * 126, hit_tp_too_deep)
+	assert.Equal(t, 100*126, hit_tp_too_deep)
 }

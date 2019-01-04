@@ -20,21 +20,21 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"lang.yottadb.com/go/yottadb"
 	"os"
 	"runtime"
 	"strings"
-	"lang.yottadb.com/go/yottadb"
 )
 
 // Constants for loading varnames and other things with
 const maxvarnmlen uint32 = 8
 const maxwordssubs uint32 = 1
 const maxindexsubs uint32 = 2
-const maxwordlen uint32 = 128     // Size increased from the C version which uses 64 here
+const maxwordlen uint32 = 128 // Size increased from the C version which uses 64 here
 const tptoken uint64 = yottadb.NOTTP
 
 // Define assert function to validate return codes and panic is assertion fails
-func assert_good (good bool) {
+func assert_good(good bool) {
 	if !good {
 		_, file, line, ok := runtime.Caller(1)
 		if ok {
@@ -68,9 +68,9 @@ func Example_wordFreq() {
 	var strvalp, tmp1valp, tmp2valp *string
 	var words []string
 
-	defer yottadb.Exit()            // Be sure to drive cleanup at process exit
+	defer yottadb.Exit() // Be sure to drive cleanup at process exit
 	// Allocate and set up auto-free our two keys
- 	wordsvar.Alloc(maxvarnmlen, maxwordssubs, maxwordlen)
+	wordsvar.Alloc(maxvarnmlen, maxwordssubs, maxwordlen)
 	defer wordsvar.Free()
 	indexvar.Alloc(maxvarnmlen, maxindexsubs, maxwordlen)
 	defer indexvar.Free()
@@ -98,7 +98,7 @@ func Example_wordFreq() {
 	// Set the number of subscripts typically used for our two keys
 	rce = wordsvar.Subary.SetElemUsed(tptoken, nil, maxwordssubs)
 	assertnoerr(rce)
-	rce = indexvar.Subary.SetElemUsed(tptoken, nil, maxindexsubs)      // Reverts to single index temporarily later
+	rce = indexvar.Subary.SetElemUsed(tptoken, nil, maxindexsubs) // Reverts to single index temporarily later
 	assertnoerr(rce)
 
 	// Some structure setup for our word loop below - allocation, and subscript usage
@@ -136,7 +136,7 @@ func Example_wordFreq() {
 			assert_good(0 < len(word))
 			rce = wordsvar.Subary.SetValStr(tptoken, nil, 0, &word)
 			assertnoerr(rce)
-			rce = wordsvar.IncrST(tptoken, nil, nil, &value)       // Returned 'value' is ignored
+			rce = wordsvar.IncrST(tptoken, nil, nil, &value) // Returned 'value' is ignored
 			assertnoerr(rce)
 		}
 	}
@@ -189,7 +189,6 @@ func Example_wordFreq() {
 	reader, err = os.Open("wordfreq_output.txt")
 	assertnoerr(err)
 	readin = bufio.NewReader(reader)
-	
 
 	//  Loop through [^]indexvar array in reverse to print most common words and their counts first.
 	for {
@@ -211,7 +210,7 @@ func Example_wordFreq() {
 		// Now loop through all the vars with this frequency count and print them
 		rce = indexvar.Subary.SetValStr(tptoken, nil, 0, tmp1valp)
 		assertnoerr(rce)
-		rce = indexvar.Subary.SetValStrLit(tptoken, nil, 1, "")        // Init first subscr at this level to run list
+		rce = indexvar.Subary.SetValStrLit(tptoken, nil, 1, "") // Init first subscr at this level to run list
 		assertnoerr(rce)
 
 		for {
@@ -243,9 +242,9 @@ func Example_wordFreq() {
 			res := fmt.Sprintf("%v\t%s\n", *freqcnt, *tmp2valp)
 			if linein != res {
 				fmt.Printf("Warning: lines do nomatch\n> %s\n> %s\n",
-					res, linein);
+					res, linein)
 			}
-			
+
 		}
 	}
 	/* Output: */

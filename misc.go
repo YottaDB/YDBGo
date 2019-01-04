@@ -107,4 +107,3 @@ func Assertnoerror(err error) {
 		}
 	}
 }
-

@@ -13,13 +13,13 @@
 package yottadb_test
 
 import (
-	"lang.yottadb.com/go/yottadb"
-	. "lang.yottadb.com/go/yottadb/internal/test_helpers"
 	"errors"
 	"github.com/stretchr/testify/assert"
+	"lang.yottadb.com/go/yottadb"
+	. "lang.yottadb.com/go/yottadb/internal/test_helpers"
+	"sync"
 	"testing"
 	"time"
-	"sync"
 )
 
 func TestMiscIsLittleEndian(t *testing.T) {

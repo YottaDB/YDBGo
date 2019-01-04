@@ -19,11 +19,11 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strconv"
+	"sync"
 	"testing"
 	"time"
 	"unsafe"
-	"sync"
-	"strconv"
 )
 
 // #cgo pkg-config: yottadb
@@ -275,7 +275,7 @@ func YDBCi(tptoken uint64,
 		return r
 	}
 	return ""
-		
+
 }
 
 func Available(name string) bool {
