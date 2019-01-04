@@ -538,7 +538,7 @@ func (buftary *BufferTArray) TpST2(tptoken uint64, errstr *BufferT, tpfn func(ui
 
 // YdbTpStWrapper is a private callback to wrap calls to the Go closure required for TpST2.
 //export ydbTpStWrapper
-func ydbTpStWrapper(tptoken uint64, errstr *BufferT, tpfnparm unsafe.Pointer) int32 {
+func ydbTpStWrapper(tptoken uint64, errstr *C.ydb_buffer_t, tpfnparm unsafe.Pointer) int32 {
 	index := *((*uint64)(tpfnparm))
 	tpMutex.Lock()
 	v, ok := tpMap[index]

@@ -4,9 +4,9 @@ import "unsafe"
 
 /*
 #include <inttypes.h>
-int MyGoCallBack(uint64_t tptoken, void *tpfnparm);
-int MyGoCallBack_cgo(uint64_t tptoken, void *tpfnparm) {
-    return MyGoCallBack(tptoken, tpfnparm);
+int MyGoCallBack(uint64_t tptoken, ydb_buffer_t *errstr, void *tpfnparm);
+int MyGoCallBack_cgo(uint64_t tptoken, ydb_buffer_t *errstr, void *tpfnparm) {
+    return MyGoCallBack(tptoken, errstr, tpfnparm);
 }
 */
 import "C"

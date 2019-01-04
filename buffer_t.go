@@ -28,25 +28,7 @@ import "C"
 // to call the YottaDB C Simple APIs.
 type BufferT struct { // Contains a single ydb_buffer_t struct
 	cbuft *C.ydb_buffer_t // C flavor of the ydb_buffer_t struct
-	owns_buff bool
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-//
-// Data manipulation methods for BufferT
-//
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-func (buft *BufferT) FromPtr(ptr unsafe.Pointer) {
-	printEntry("BufferT.Alloc()")
-	if nil == buft {
-		panic("*BufferT receiver of Alloc() cannot be nil")
-	}
-	if nil != buft.cbuft {
-		buft.Free()
-	}
-	buft.owns_buff = false
-	buft.cbuft = (*C.ydb_buffer_t)(ptr)
+	//buft.owns_buff = false
 }
 
 // Alloc is a method to allocate the ydb_buffer_t C storage and allocate or re-allocate the buffer pointed
@@ -123,7 +105,8 @@ func (buft *BufferT) DumpToWriter(writer io.Writer) {
 func (buft *BufferT) Free() {
 	printEntry("BufferT.Free()")
 	if nil != buft { // Ignore if buft is null already
-		if buft.owns_buff {
+		/// TODO: add owns_buff
+		if true {
 			cbuftptr := buft.cbuft
 			if nil != cbuftptr {
 				// ydb_buffer_t block exists - free its buffer first if it exists

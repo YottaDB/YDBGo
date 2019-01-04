@@ -145,7 +145,7 @@ func Cmpstrary(astr, bstr *[]string) bool {
 // Note - below export statement is needed so this routine is known.
 //
 //export TestTpRtn
-func TestTpRtn(tptoken uint64, tpfnparm unsafe.Pointer) int {
+func TestTpRtn(tptoken uint64, errstr unsafe.Pointer, tpfnparm unsafe.Pointer) int {
 	var dbkey yottadb.KeyT
 	var dbval yottadb.BufferT
 	var noset yottadb.KeyT

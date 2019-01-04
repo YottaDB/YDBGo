@@ -23,10 +23,10 @@ import (
 // /* Equivalent of gparam_list in callg.h (not available to us) */
 // #define MAXVPARMS 36
 // /* C routine to get around the cgo issue and its lack of support for variadic plist routines */
-// int ydb_go_lock_st(uint64_t tptoken, uintptr_t cvplist);
-// int ydb_go_lock_st(uint64_t tptoken, uintptr_t cvplist)
+// int ydb_go_lock_st(uint64_t tptoken, ydb_buffer_t *errstr, uintptr_t cvplist);
+// int ydb_go_lock_st(uint64_t tptoken, ydb_buffer_t *errstr, uintptr_t cvplist)
 // {
-// 	return ydb_call_variadic_plist_func_st(tptoken, errstr.cbuft, (ydb_vplist_func)&ydb_lock_s, cvplist);
+// 	return ydb_call_variadic_plist_func_st(tptoken, errstr, (ydb_vplist_func)&ydb_lock_s, cvplist);
 // }
 import "C"
 
