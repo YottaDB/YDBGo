@@ -70,7 +70,7 @@ func TestMiscGoTimers(t *testing.T) {
 			//  the test passes
 			//  (i.e., test for 1s with 10% delta, then 2s with 10% delta
 			//   then 4s with 10% delta, etc.)
-			assert.InEpsilon(t, 1, elapsed.Seconds(), .2)
+			assert.InEpsilon(t, 1, elapsed.Seconds(), .1)
 			assert.Equal(t, "", r)
 		}
 		wg.Done()
@@ -84,7 +84,7 @@ func TestMiscGoTimers(t *testing.T) {
 				start := time.Now()
 				time.Sleep(sleepDuration)
 				elapsed := time.Since(start)
-				assert.InEpsilon(t, .1, elapsed.Seconds(), .2)
+				assert.InEpsilon(t, .1, elapsed.Seconds(), .1)
 			}
 			wg.Done()
 		}()
