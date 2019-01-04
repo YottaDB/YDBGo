@@ -82,7 +82,7 @@ func (vplist *variadicPlist) dump(tptoken uint64) {
 	cvplist := vplist.cvplist
 	if nil == cvplist {
 		// Create an error to return
-		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
+		errmsg, err := MessageT(tptoken, nil, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
 		if nil != err {
 			panic(fmt.Sprintf("YDB: Error fetching STRUCTNOTALLOCD: %s", err))
 		}
@@ -114,7 +114,7 @@ func (vplist *variadicPlist) setUsed(tptoken uint64, errstr *BufferT, newUsed ui
 	cvplist := vplist.cvplist
 	if nil == cvplist {
 		// Create an error to return
-		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
+		errmsg, err := MessageT(tptoken, nil, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
 		if nil != err {
 			panic(fmt.Sprintf("YDB: Error fetching STRUCTNOTALLOCD: %s", err))
 		}
@@ -134,7 +134,7 @@ func (vplist *variadicPlist) setVPlistParam(tptoken uint64, errstr *BufferT, par
 	cvplist := vplist.cvplist
 	if nil == cvplist {
 		// Create an error to return
-		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
+		errmsg, err := MessageT(tptoken, nil, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
 		if nil != err {
 			panic(fmt.Sprintf("YDB: Error fetching STRUCTNOTALLOCD: %s", err))
 		}

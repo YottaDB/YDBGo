@@ -134,7 +134,7 @@ func (buft *BufferT) LenAlloc(tptoken uint64) (uint32, error) {
 	cbuftptr := buft.cbuft
 	if nil == cbuftptr {
 		// Create an error to return
-		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
+		errmsg, err := MessageT(tptoken, nil, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
 		if nil != err {
 			panic(fmt.Sprintf("YDB: Error fetching STRUCTNOTALLOCD: %s", err))
 		}
@@ -158,7 +158,7 @@ func (buft *BufferT) LenUsed(tptoken uint64) (uint32, error) {
 	cbuftptr := buft.cbuft
 	if nil == cbuftptr {
 		// Create an error to return
-		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
+		errmsg, err := MessageT(tptoken, nil, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
 		if nil != err {
 			panic(fmt.Sprintf("YDB: Error fetching STRUCTNOTALLOCD: %s", err))
 		}
@@ -167,7 +167,7 @@ func (buft *BufferT) LenUsed(tptoken uint64) (uint32, error) {
 	lenalloc := cbuftptr.len_alloc
 	lenused := cbuftptr.len_used
 	if lenused > lenalloc {
-		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_INVSTRLEN))
+		errmsg, err := MessageT(tptoken, nil, (int)(C.YDB_ERR_INVSTRLEN))
 		if nil != err {
 			panic(fmt.Sprintf("YDB: Error fetching INVSTRLEN: %s", err))
 		}
@@ -191,7 +191,7 @@ func (buft *BufferT) ValBAry(tptoken uint64) (*[]byte, error) {
 	cbuftptr := buft.cbuft
 	if nil == cbuftptr {
 		// Create an error to return
-		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
+		errmsg, err := MessageT(tptoken, nil, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
 		if nil != err {
 			panic(fmt.Sprintf("YDB: Error fetching STRUCTNOTALLOCD: %s", err))
 		}
@@ -202,7 +202,7 @@ func (buft *BufferT) ValBAry(tptoken uint64) (*[]byte, error) {
 	cbufptr := cbuftptr.buf_addr
 	if lenused > lenalloc { // INVSTRLEN from last operation - return what we can and give error
 		bary = C.GoBytes(unsafe.Pointer(cbufptr), C.int(lenalloc)) // Return what we can (alloc size)
-		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_INVSTRLEN))
+		errmsg, err := MessageT(tptoken, nil, (int)(C.YDB_ERR_INVSTRLEN))
 		if nil != err {
 			panic(fmt.Sprintf("YDB: Error fetching INVSTRLEN: %s", err))
 		}
@@ -228,7 +228,7 @@ func (buft *BufferT) ValStr(tptoken uint64) (*string, error) {
 	cbuftptr := buft.cbuft
 	if nil == cbuftptr {
 		// Create an error to return
-		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
+		errmsg, err := MessageT(tptoken, nil, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
 		if nil != err {
 			panic(fmt.Sprintf("YDB: Error fetching STRUCTNOTALLOCD: %s", err))
 		}
@@ -239,7 +239,7 @@ func (buft *BufferT) ValStr(tptoken uint64) (*string, error) {
 	cbufptr := cbuftptr.buf_addr
 	if lenused > lenalloc { // INVSTRLEN from last operation - return what we can and give error
 		str = C.GoStringN(cbufptr, C.int(lenalloc)) // Return what we can (alloc size)
-		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_INVSTRLEN))
+		errmsg, err := MessageT(tptoken, nil, (int)(C.YDB_ERR_INVSTRLEN))
 		if nil != err {
 			panic(fmt.Sprintf("YDB: Error fetching INVSTRLEN: %s", err))
 		}
@@ -269,7 +269,7 @@ func (buft *BufferT) SetLenUsed(tptoken uint64, errstr *BufferT, newLen uint32) 
 	cbuftptr := buft.cbuft
 	if nil == cbuftptr {
 		// Create an error to return
-		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
+		errmsg, err := MessageT(tptoken, nil, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
 		if nil != err {
 			panic(fmt.Sprintf("YDB: Error fetching STRUCTNOTALLOCD: %s", err))
 		}
@@ -277,7 +277,7 @@ func (buft *BufferT) SetLenUsed(tptoken uint64, errstr *BufferT, newLen uint32) 
 	}
 	lenalloc := cbuftptr.len_alloc
 	if newLen > uint32(lenalloc) {
-		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_INVSTRLEN))
+		errmsg, err := MessageT(tptoken, nil, (int)(C.YDB_ERR_INVSTRLEN))
 		if nil != err {
 			panic(fmt.Sprintf("YDB: Error fetching INVSTRLEN: %s", err))
 		}
@@ -301,7 +301,7 @@ func (buft *BufferT) SetValBAry(tptoken uint64, errstr *BufferT, value *[]byte) 
 	cbuftptr := buft.cbuft
 	if nil == cbuftptr {
 		// Create an error to return
-		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
+		errmsg, err := MessageT(tptoken, nil, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
 		if nil != err {
 			panic(fmt.Sprintf("YDB: Error fetching STRUCTNOTALLOCD: %s", err))
 		}
@@ -309,7 +309,7 @@ func (buft *BufferT) SetValBAry(tptoken uint64, errstr *BufferT, value *[]byte) 
 	}
 	vallen := C.uint(len(*value))
 	if vallen > cbuftptr.len_alloc {
-		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_INVSTRLEN))
+		errmsg, err := MessageT(tptoken, nil, (int)(C.YDB_ERR_INVSTRLEN))
 		if nil != err {
 			panic(fmt.Sprintf("YDB: Error fetching INVSTRLEN: %s", err))
 		}
@@ -378,7 +378,7 @@ func (buft *BufferT) Str2ZwrST(tptoken uint64, errstr *BufferT, zwr *BufferT) er
 	}
 	if nil == buft.cbuft || nil == zwr.cbuft {
 		// Create an error to return
-		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
+		errmsg, err := MessageT(tptoken, nil, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
 		if nil != err {
 			panic(fmt.Sprintf("YDB: Error fetching STRUCTNOTALLOCD: %s", err))
 		}
@@ -412,7 +412,7 @@ func (buft *BufferT) Zwr2StrST(tptoken uint64, errstr *BufferT, str *BufferT) er
 	}
 	if nil == buft.cbuft || nil == str.cbuft {
 		// Create an error to return
-		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
+		errmsg, err := MessageT(tptoken, nil, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
 		if nil != err {
 			panic(fmt.Sprintf("YDB: Error fetching STRUCTNOTALLOCD: %s", err))
 		}

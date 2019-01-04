@@ -166,7 +166,7 @@ func (buftary *BufferTArray) ElemLenUsed(tptoken uint64, errstr *BufferT, idx ui
 	cbuftary := buftary.cbuftary
 	if nil == cbuftary {
                 // Create an error to return
-                errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
+                errmsg, err := MessageT(tptoken, nil, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
                 if nil != err {
                         panic(fmt.Sprintf("YDB: Error fetching STRUCTNOTALLOCD: %s", err))
                 }
@@ -175,7 +175,7 @@ func (buftary *BufferTArray) ElemLenUsed(tptoken uint64, errstr *BufferT, idx ui
 	elemcnt := buftary.elemsAlloc
 	if !(idx < elemcnt) {
 		// Create an error to return
-		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_INSUFFSUBS))
+		errmsg, err := MessageT(tptoken, nil, (int)(C.YDB_ERR_INSUFFSUBS))
 		if nil != err {
 			panic(fmt.Sprintf("YDB: Error fetching INSUFFSUBS: %s", err))
 		}
@@ -205,7 +205,7 @@ func (buftary *BufferTArray) ValBAry(tptoken uint64, errstr *BufferT, idx uint32
 	elemcnt := buftary.elemsAlloc
 	if !(idx < elemcnt) {
 		// Create an error to return
-		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_INSUFFSUBS))
+		errmsg, err := MessageT(tptoken, nil, (int)(C.YDB_ERR_INSUFFSUBS))
 		if nil != err {
 			panic(fmt.Sprintf("YDB: Error fetching INSUFFSUBS: %s", err))
 		}
@@ -214,7 +214,7 @@ func (buftary *BufferTArray) ValBAry(tptoken uint64, errstr *BufferT, idx uint32
 	cbuftary := buftary.cbuftary
 	if nil == cbuftary {
 		// Create an error to return
-		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
+		errmsg, err := MessageT(tptoken, nil, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
 		if nil != err {
 			panic(fmt.Sprintf("YDB: Error fetching STRUCTNOTALLOCD: %s", err))
 		}
@@ -226,7 +226,7 @@ func (buftary *BufferTArray) ValBAry(tptoken uint64, errstr *BufferT, idx uint32
 	cbufptr := (*elemptr).buf_addr
 	if lenused > lenalloc { // INVSTRLEN from last operation return what we can and give error
 		bary = C.GoBytes(unsafe.Pointer(cbufptr), C.int(lenalloc)) // Return what we can (alloc size)
-		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_INVSTRLEN))
+		errmsg, err := MessageT(tptoken, nil, (int)(C.YDB_ERR_INVSTRLEN))
 		if nil != err {
 			panic(fmt.Sprintf("YDB: Error fetching INVSTRLEN: %s", err))
 		}
@@ -248,7 +248,7 @@ func (buftary *BufferTArray) ValStr(tptoken uint64, errstr *BufferT, idx uint32)
 	elemcnt := buftary.elemsAlloc
 	if !(idx < elemcnt) {
 		// Create an error to return
-		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_INSUFFSUBS))
+		errmsg, err := MessageT(tptoken, nil, (int)(C.YDB_ERR_INSUFFSUBS))
 		if nil != err {
 			panic(fmt.Sprintf("YDB: Error fetching INSUFFSUBS: %s", err))
 		}
@@ -257,7 +257,7 @@ func (buftary *BufferTArray) ValStr(tptoken uint64, errstr *BufferT, idx uint32)
 	cbuftary := buftary.cbuftary
 	if nil == cbuftary {
 		// Create an error to return
-		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
+		errmsg, err := MessageT(tptoken, nil, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
 		if nil != err {
 			panic(fmt.Sprintf("YDB: Error fetching STRUCTNOTALLOCD: %s", err))
 		}
@@ -269,7 +269,7 @@ func (buftary *BufferTArray) ValStr(tptoken uint64, errstr *BufferT, idx uint32)
 	cbufptr := (*elemptr).buf_addr
 	if lenused > lenalloc { // INVSTRLEN from last operation return what we can and give error
 		str = C.GoStringN(cbufptr, C.int(lenalloc)) // Return what we can (alloc size)
-		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_INVSTRLEN))
+		errmsg, err := MessageT(tptoken, nil, (int)(C.YDB_ERR_INVSTRLEN))
 		if nil != err {
 			panic(fmt.Sprintf("YDB: Error fetching INVSTRLEN: %s", err))
 		}
@@ -289,7 +289,7 @@ func (buftary *BufferTArray) SetElemLenUsed(tptoken uint64, errstr *BufferT, idx
 	elemcnt := buftary.elemsAlloc
 	if !(idx < elemcnt) {
 		// Create an error to return
-		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_INSUFFSUBS))
+		errmsg, err := MessageT(tptoken, nil, (int)(C.YDB_ERR_INSUFFSUBS))
 		if nil != err {
 			panic(fmt.Sprintf("YDB: Error fetching INSUFFSUBS: %s", err))
 		}
@@ -298,7 +298,7 @@ func (buftary *BufferTArray) SetElemLenUsed(tptoken uint64, errstr *BufferT, idx
 	cbuftary := buftary.cbuftary
 	if nil == cbuftary {
 		// Create an error to return
-		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
+		errmsg, err := MessageT(tptoken, nil, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
 		if nil != err {
 			panic(fmt.Sprintf("YDB: Error fetching STRUCTNOTALLOCD: %s", err))
 		}
@@ -307,7 +307,7 @@ func (buftary *BufferTArray) SetElemLenUsed(tptoken uint64, errstr *BufferT, idx
 	elemptr := (*C.ydb_buffer_t)(unsafe.Pointer(uintptr(unsafe.Pointer(cbuftary)) + uintptr(C.sizeof_ydb_buffer_t*idx)))
 	lenalloc := (*elemptr).len_alloc
 	if newLen > uint32(lenalloc) { // INVSTRLEN from last operation - return what we can and give error
-		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_INVSTRLEN))
+		errmsg, err := MessageT(tptoken, nil, (int)(C.YDB_ERR_INVSTRLEN))
 		if nil != err {
 			panic(fmt.Sprintf("YDB: Error fetching INVSTRLEN: %s", err))
 		}
@@ -327,7 +327,7 @@ func (buftary *BufferTArray) SetElemUsed(tptoken uint64, errstr *BufferT, newUse
 	elemcnt := buftary.elemsAlloc
 	if newUsed > elemcnt {
 		// Create an error to return
-		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_INSUFFSUBS))
+		errmsg, err := MessageT(tptoken, nil, (int)(C.YDB_ERR_INSUFFSUBS))
 		if nil != err {
 			panic(fmt.Sprintf("YDB: Error fetching INSUFFSUBS: %s", err))
 		}
@@ -347,7 +347,7 @@ func (buftary *BufferTArray) SetValBAry(tptoken uint64, errstr *BufferT, idx uin
 	elemcnt := buftary.elemsAlloc
 	if !(idx < elemcnt) {
 		// Create an error to return
-		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_INSUFFSUBS))
+		errmsg, err := MessageT(tptoken, nil, (int)(C.YDB_ERR_INSUFFSUBS))
 		if nil != err {
 			panic(fmt.Sprintf("YDB: Error fetching INSUFFSUBS: %s", err))
 		}
@@ -356,7 +356,7 @@ func (buftary *BufferTArray) SetValBAry(tptoken uint64, errstr *BufferT, idx uin
 	cbuftary := buftary.cbuftary
 	if nil == cbuftary {
 		// Create an error to return
-		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
+		errmsg, err := MessageT(tptoken, nil, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
 		if nil != err {
 			panic(fmt.Sprintf("YDB: Error fetching STRUCTNOTALLOCD: %s", err))
 		}
@@ -366,7 +366,7 @@ func (buftary *BufferTArray) SetValBAry(tptoken uint64, errstr *BufferT, idx uin
 	lenalloc := uint32((*elemptr).len_alloc)
 	vallen := uint32(len(*value))
 	if vallen > lenalloc { // INVSTRLEN from last operation - return what we can and give error
-		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_INVSTRLEN))
+		errmsg, err := MessageT(tptoken, nil, (int)(C.YDB_ERR_INVSTRLEN))
 		if nil != err {
 			panic(fmt.Sprintf("YDB: Error fetching INVSTRLEN: %s", err))
 		}

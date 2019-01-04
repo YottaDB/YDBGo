@@ -218,7 +218,7 @@ func IncrE(tptoken uint64, errstr *BufferT, incr, varname string, subary []strin
 func LockE(tptoken uint64, errstr *BufferT, timeoutNsec uint64, namesnsubs ...interface{}) error {
 	printEntry("LockE()")
 	if 0 != (uint32(len(namesnsubs)) & 1) {
-		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_INVLNPAIRLIST))
+		errmsg, err := MessageT(tptoken, nil, (int)(C.YDB_ERR_INVLNPAIRLIST))
 		if nil != err {
 			panic(fmt.Sprintf("YDB: Error fetching INVLNPAIRLIST: %s", err))
 		}
@@ -230,7 +230,7 @@ func LockE(tptoken uint64, errstr *BufferT, timeoutNsec uint64, namesnsubs ...in
 		// Pull in the next varname and verify it is a string
 		newVarname, ok := namesnsubs[i].(string)
 		if !ok {
-			errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_PARAMINVALID))
+			errmsg, err := MessageT(tptoken, nil, (int)(C.YDB_ERR_PARAMINVALID))
 			if nil != err {
 				panic(fmt.Sprintf("YDB: Error fetching PARAMINVALID: %s", err))
 			}
@@ -241,7 +241,7 @@ func LockE(tptoken uint64, errstr *BufferT, timeoutNsec uint64, namesnsubs ...in
 		// Pull in the next subscript array and verify it is an array of strings
 		newSubs, ok := namesnsubs[i+1].([]string)
 		if !ok {
-			errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_PARAMINVALID))
+			errmsg, err := MessageT(tptoken, nil, (int)(C.YDB_ERR_PARAMINVALID))
 			if nil != err {
 				panic(fmt.Sprintf("YDB: Error fetching PARAMINVALID: %s", err))
 			}

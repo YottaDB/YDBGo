@@ -81,7 +81,7 @@ func LockST(tptoken uint64, errstr *BufferT, timeoutNsec uint64, lockname ...*Ke
 		for 0 < lockcnt {
 			// Make sure enough room for another set of 3 parms
 			if 3 > parmsleft {
-				errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_NAMECOUNT2HI))
+				errmsg, err := MessageT(tptoken, nil, (int)(C.YDB_ERR_NAMECOUNT2HI))
 				if nil != err {
 					panic(fmt.Sprintf("YDB: Error fetching NAMECOUNT2HI: %s", err))
 				}
