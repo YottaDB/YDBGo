@@ -28,37 +28,37 @@ func TestBufTAryDeleteExclST(t *testing.T) {
 
 	namelst.Alloc(2, 10) // Need an array of two names not more than 10 bytes
 	// We need to create 4 local variables to test this so do that first (thus also testing KeyT.SetValE()
-	err = yottadb.SetValE(tptoken, "I have a value", "var1", []string{"sub1", "sub2"})
+	err = yottadb.SetValE(tptoken, nil, "I have a value", "var1", []string{"sub1", "sub2"})
 	Assertnoerr(err, t)
-	err = yottadb.SetValE(tptoken, "I wish I was a value", "var2", []string{})
+	err = yottadb.SetValE(tptoken, nil, "I wish I was a value", "var2", []string{})
 	Assertnoerr(err, t)
-	err = yottadb.SetValE(tptoken, "I was a value", "var3", []string{"sub1"})
+	err = yottadb.SetValE(tptoken, nil, "I was a value", "var3", []string{"sub1"})
 	Assertnoerr(err, t)
-	err = yottadb.SetValE(tptoken, "I AM A VALUE", "var4", []string{})
+	err = yottadb.SetValE(tptoken, nil, "I AM A VALUE", "var4", []string{})
 	Assertnoerr(err, t)
 	// Now delete var1 and var3 by exclusively keeping var2 and var 4
-	err = namelst.SetValStrLit(tptoken, 0, "var2")
+	err = namelst.SetValStrLit(tptoken, nil, 0, "var2")
 	Assertnoerr(err, t)
-	err = namelst.SetValStrLit(tptoken, 1, "var4")
+	err = namelst.SetValStrLit(tptoken, nil, 1, "var4")
 	Assertnoerr(err, t)
-	err = namelst.SetElemUsed(tptoken, 2)
+	err = namelst.SetElemUsed(tptoken, nil, 2)
 	Assertnoerr(err, t)
-	err = namelst.DeleteExclST(tptoken)
+	err = namelst.DeleteExclST(tptoken, nil)
 	Assertnoerr(err, t)
 	// OK, delete done, see which vars exist
-	_, err = yottadb.ValE(tptoken, "var1", []string{"sub1", "sub2"}) // Expect this var to be gone
+	_, err = yottadb.ValE(tptoken, nil, "var1", []string{"sub1", "sub2"}) // Expect this var to be gone
 	if nil == err {
 		t.Errorf("var1 found when it should have been deleted (no error occurred when fetched")
 	}
-	_, err = yottadb.ValE(tptoken, "var2", []string{})
+	_, err = yottadb.ValE(tptoken, nil, "var2", []string{})
 	if nil != err {
 		t.Errorf("var2 not found when it should still exist (if ever existed)")
 	}
-	_, err = yottadb.ValE(tptoken, "var3", []string{"sub1"})
+	_, err = yottadb.ValE(tptoken, nil, "var3", []string{"sub1"})
 	if nil == err {
 		t.Errorf("var3 found when it should have been deleted (no error occurred when fetched")
 	}
-	_, err = yottadb.ValE(tptoken, "var4", []string{})
+	_, err = yottadb.ValE(tptoken, nil, "var4", []string{})
 	if nil != err {
 		t.Errorf("var4 not found when it should still exist (if ever existed)")
 	}
@@ -74,18 +74,18 @@ func TestBufTAryTpSt(t *testing.T) {
 
 	namelst.Alloc(2, 10) // Need an array of two names not more than 10 bytes
 	// Start with clean slate then drive TP transaction
-	Dbdeleteall(tptoken, &errors, t)
-	err = novars.TpST(tptoken, TpRtn_cgo(), nil, "BATCH")
+	Dbdeleteall(tptoken, nil, &errors, t)
+	err = novars.TpST(tptoken, nil, TpRtn_cgo(), nil, "BATCH")
 	Assertnoerr(err, t)
 	// Fetch the two nodes to make sure they are there and have correct values
-	val1, err := yottadb.ValE(tptoken, "^Variable1A", []string{"Index0", "Index1", "Index2"})
+	val1, err := yottadb.ValE(tptoken, nil, "^Variable1A", []string{"Index0", "Index1", "Index2"})
 	Assertnoerr(err, t)
 	if "The value of Variable1A" != val1 {
 		t.Logf("FAIL - The fetched value of ^Variable1A(\"Index0\",\"Index1\",\"Index2\") was not correct\n")
 		t.Logf("       Expected: 'The value of Variable1A', Received: '%s'\n", val1)
 		t.Fail()
 	}
-	val2, err := yottadb.ValE(tptoken, "^Variable2B", []string{"Idx0", "Idx1"})
+	val2, err := yottadb.ValE(tptoken, nil, "^Variable2B", []string{"Idx0", "Idx1"})
 	Assertnoerr(err, t)
 	if "The value of Variable2B" != val2 {
 		t.Logf("FAIL - The fetched value of ^Variable2B(\"Idx0\",\"Idx1\") was not correct\n")
@@ -104,8 +104,8 @@ func TestBufTAryDump(t *testing.T) {
 
 	defer value.Free()
 	value.Alloc(10, 64)
-	value.SetValStrLit(tp, 0, "Hello")
-	value.SetElemUsed(tp, 1)
+	value.SetValStrLit(tp, nil, 0, "Hello")
+	value.SetElemUsed(tp, nil, 1)
 	value.DumpToWriter(&buf1)
 	// BufferTArray dump does not show any info about included buffers, so no asserts for
 	//  that; it really only mentions used/available buffers
@@ -169,34 +169,34 @@ func TestBufTAryBAry(t *testing.T) {
 	v := []byte("Hello")
 
 	// Get value from non-allocd value
-	r, err := value.ValBAry(tp, 0)
+	r, err := value.ValBAry(tp, nil, 0)
 	assert.NotNil(t, err)
 	assert.Nil(t, r)
 
 	// Alloc, but get value past the end
 	value.Alloc(10, 64)
-	r, err = value.ValBAry(tp, 11)
+	r, err = value.ValBAry(tp, nil, 11)
 	assert.NotNil(t, err)
 	assert.Nil(t, r)
 
 	// Get a valid value with no content
-	r, err = value.ValBAry(tp, 0)
+	r, err = value.ValBAry(tp, nil, 0)
 
 	// Get a value with some value
 
-	err = value.SetValBAry(tp, 1, &v)
+	err = value.SetValBAry(tp, nil, 1, &v)
 	assert.Nil(t, err)
-	r, err = value.ValBAry(tp, 1)
+	r, err = value.ValBAry(tp, nil, 1)
 	assert.Nil(t, err)
 	assert.Equal(t, *r, v)
 
 	// Try set a value on out of bounds element
-	err = value.SetValBAry(tp, 11, &v)
+	err = value.SetValBAry(tp, nil, 11, &v)
 	assert.NotNil(t, err)
 
 	// Try to set a value on a freed structure
 	value.Free()
-	err = value.SetValBAry(tp, 0, &v)
+	err = value.SetValBAry(tp, nil, 0, &v)
 	assert.NotNil(t, err)
 	errcode := yottadb.ErrorCode(err)
 	//t.Skipf("We need to figure out what the expected result is")
@@ -208,32 +208,32 @@ func TestBufTAryElemLenUsed(t *testing.T) {
 	var tp = yottadb.NOTTP
 
 	// Test non alloc'd structure
-	err := value.SetElemLenUsed(tp, 0, 0)
+	err := value.SetElemLenUsed(tp, nil, 0, 0)
 	assert.NotNil(t, err)
-	r, err := value.ElemLenUsed(tp, 0)
+	r, err := value.ElemLenUsed(tp, nil, 0)
 	assert.NotNil(t, err)
 	assert.Equal(t, r, uint32(0))
 
 	// Allocate, then test with an element past the end
 	value.Alloc(10, 64)
 
-	err = value.SetElemLenUsed(tp, 11, 5)
+	err = value.SetElemLenUsed(tp, nil, 11, 5)
 	assert.NotNil(t, err)
-	r, err = value.ElemLenUsed(tp, 11)
+	r, err = value.ElemLenUsed(tp, nil, 11)
 	assert.NotNil(t, err)
 	assert.Equal(t, r, uint32(0))
 
 	// Set a valid subscript to an invalid length
-	err = value.SetElemLenUsed(tp, 0, 100)
+	err = value.SetElemLenUsed(tp, nil, 0, 100)
 	assert.NotNil(t, err)
-	r, err = value.ElemLenUsed(tp, 0)
+	r, err = value.ElemLenUsed(tp, nil, 0)
 	assert.Nil(t, err)
 	assert.Equal(t, r, uint32(0))
 
 	// Get a valid length
-	err = value.SetElemLenUsed(tp, 0, 50)
+	err = value.SetElemLenUsed(tp, nil, 0, 50)
 	assert.Nil(t, err)
-	r, err = value.ElemLenUsed(tp, 0)
+	r, err = value.ElemLenUsed(tp, nil, 0)
 	assert.Nil(t, err)
 	assert.Equal(t, r, uint32(50))
 }
@@ -243,19 +243,19 @@ func TestBufTAryValStr(t *testing.T) {
 	var tp = yottadb.NOTTP
 
 	// Test before Alloc
-	r, err := value.ValStr(tp, 0)
+	r, err := value.ValStr(tp, nil, 0)
 	assert.NotNil(t, err)
 	assert.Nil(t, r)
 
 	value.Alloc(10, 50)
 
 	// Test after alloc, before setting value outside of range
-	r, err = value.ValStr(tp, 11)
+	r, err = value.ValStr(tp, nil, 11)
 	assert.NotNil(t, err)
 	assert.Nil(t, r)
 
 	// Test after alloc, valid except not defined
-	r, err = value.ValStr(tp, 0)
+	r, err = value.ValStr(tp, nil, 0)
 	assert.Nil(t, err)
 	assert.NotNil(t, r)
 	assert.Equal(t, *r, "")
@@ -270,7 +270,7 @@ func TestBufTAryElemUsed(t *testing.T) {
 	assert.Equal(t, r, uint32(0))
 
 	// Test set
-	err := value.SetElemUsed(tp, 0)
+	err := value.SetElemUsed(tp, nil, 0)
 	assert.Nil(t, err)
 
 	// Alloc, and test
@@ -279,10 +279,10 @@ func TestBufTAryElemUsed(t *testing.T) {
 	r = value.ElemUsed()
 	assert.Equal(t, r, uint32(0))
 
-	err = value.SetElemUsed(tp, 100)
+	err = value.SetElemUsed(tp, nil, 100)
 	assert.NotNil(t, err)
 
-	err = value.SetElemUsed(tp, 5)
+	err = value.SetElemUsed(tp, nil, 5)
 	assert.Nil(t, err)
 
 	r = value.ElemUsed()
@@ -310,17 +310,17 @@ func TestBufferTAryNilRecievers(t *testing.T) {
 	//test_wrapper(func() { value.Free() }) // Free doesn't panic as a nil rec.
 	test_wrapper(func() { value.ElemAlloc() })
 	test_wrapper(func() { value.ElemLenAlloc(0) })
-	test_wrapper(func() { value.ElemLenUsed(tp, 0) })
+	test_wrapper(func() { value.ElemLenUsed(tp, nil, 0) })
 	test_wrapper(func() { value.ElemUsed() })
-	test_wrapper(func() { value.ValBAry(tp, 0) })
-	test_wrapper(func() { value.ValStr(tp, 0) })
-	test_wrapper(func() { value.SetElemLenUsed(tp, 0, 10) })
-	test_wrapper(func() { value.SetElemUsed(tp, 32) })
-	test_wrapper(func() { value.SetValBAry(tp, 0, nil) })
-	test_wrapper(func() { value.SetValStr(tp, 0, nil) })
-	test_wrapper(func() { value.SetValStrLit(tp, 0, "ok") })
-	test_wrapper(func() { value.DeleteExclST(tp) })
-	test_wrapper(func() { value.TpST(tp, nil, nil, "OK") })
+	test_wrapper(func() { value.ValBAry(tp, nil, 0) })
+	test_wrapper(func() { value.ValStr(tp, nil, 0) })
+	test_wrapper(func() { value.SetElemLenUsed(tp, nil, 0, 10) })
+	test_wrapper(func() { value.SetElemUsed(tp, nil, 32) })
+	test_wrapper(func() { value.SetValBAry(tp, nil, 0, nil) })
+	test_wrapper(func() { value.SetValStr(tp, nil, 0, nil) })
+	test_wrapper(func() { value.SetValStrLit(tp, nil, 0, "ok") })
+	test_wrapper(func() { value.DeleteExclST(tp, nil) })
+	test_wrapper(func() { value.TpST(tp, nil, nil, nil, "OK") })
 }
 
 func TestBufTAryTpSt2(t *testing.T) {
@@ -332,21 +332,21 @@ func TestBufTAryTpSt2(t *testing.T) {
 
 	namelst.Alloc(2, 10) // Need an array of two names not more than 10 bytes
 	// Start with clean slate then drive TP transaction
-	Dbdeleteall(tptoken, &errors, t)
-	//err = novars.TpST(tptoken, TpRtn_cgo(), nil, "BATCH")
-	err = novars.TpST2(tptoken, func(tp uint64) int32 {
-		return int32(TestTpRtn(tp, nil))
+	Dbdeleteall(tptoken, nil, &errors, t)
+	//err = novars.TpST(tptoken, nil, TpRtn_cgo(), nil, "BATCH")
+	err = novars.TpST2(tptoken, nil, func(tp uint64, errstr *yottadb.BufferT) int32 {
+		return int32(TestTpRtn(tp, nil, nil))
 	}, "BATCH")
 	Assertnoerr(err, t)
 	// Fetch the two nodes to make sure they are there and have correct values
-	val1, err := yottadb.ValE(tptoken, "^Variable1A", []string{"Index0", "Index1", "Index2"})
+	val1, err := yottadb.ValE(tptoken, nil, "^Variable1A", []string{"Index0", "Index1", "Index2"})
 	Assertnoerr(err, t)
 	if "The value of Variable1A" != val1 {
 		t.Logf("FAIL - The fetched value of ^Variable1A(\"Index0\",\"Index1\",\"Index2\") was not correct\n")
 		t.Logf("       Expected: 'The value of Variable1A', Received: '%s'\n", val1)
 		t.Fail()
 	}
-	val2, err := yottadb.ValE(tptoken, "^Variable2B", []string{"Idx0", "Idx1"})
+	val2, err := yottadb.ValE(tptoken, nil, "^Variable2B", []string{"Idx0", "Idx1"})
 	Assertnoerr(err, t)
 	if "The value of Variable2B" != val2 {
 		t.Logf("FAIL - The fetched value of ^Variable2B(\"Idx0\",\"Idx1\") was not correct\n")
@@ -356,12 +356,12 @@ func TestBufTAryTpSt2(t *testing.T) {
 }
 
 func TestBufTAryTpNest(t *testing.T) {
-	var tproutine func(uint64) int32
+	var tproutine func(uint64, *yottadb.BufferT) int32
 	nest := 0
-	tproutine = func(tptoken uint64) int32 {
+	tproutine = func(tptoken uint64, errstr *yottadb.BufferT) int32 {
 		if nest < 130 {
 			nest++
-			e := yottadb.TpE2(tptoken, tproutine, "BATCH", []string{})
+			e := yottadb.TpE2(tptoken, nil, tproutine, "BATCH", []string{})
 			if e == nil {
 				return 0
 			}
@@ -369,6 +369,6 @@ func TestBufTAryTpNest(t *testing.T) {
 		}
 		return 0
 	}
-	e := tproutine(yottadb.NOTTP)
+	e := tproutine(yottadb.NOTTP, nil)
 	assert.Equal(t, int32(yottadb.YDB_ERR_TPTOODEEP), e)
 }

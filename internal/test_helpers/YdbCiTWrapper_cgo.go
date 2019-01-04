@@ -14,8 +14,8 @@ package test_helpers
 
 // #include "libyottadb.h"
 // #include "libydberrors.h"
-// int TestTpRtn_cgo(uint64_t tptoken, uintptr_t in); // Forward declaration
-// void ydb_ci_t_wrapper(unsigned long tptoken, char *name, ydb_string_t *arg) {
-//     ydb_ci_t((uint64_t)tptoken, name, arg);
+// int TestTpRtn_cgo(uint64_t tptoken, ydb_buffer_t *errmsg, uintptr_t in); // Forward declaration
+// void ydb_ci_t_wrapper(unsigned long tptoken, ydb_buffer_t *errmsg, char *name, ydb_string_t *arg) {
+//     ydb_ci_t((uint64_t)tptoken, errmsg, name, arg);
 // }
 import "C"

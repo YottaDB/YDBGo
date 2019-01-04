@@ -29,16 +29,16 @@ func TestSimpleAPILockST(t *testing.T) {
 	var errors int
 
 	dbkey.Alloc(VarSiz, AryDim, SubSiz) // Reallocate the key
-	err = dbkey.Varnm.SetValStrLit(tptoken, "^Variable1A")
+	err = dbkey.Varnm.SetValStrLit(tptoken, nil, "^Variable1A")
 	Assertnoerr(err, t)
-	err = dbkey.Subary.SetValStrLit(tptoken, 0, "Index0")
+	err = dbkey.Subary.SetValStrLit(tptoken, nil, 0, "Index0")
 	Assertnoerr(err, t)
-	err = dbkey.Subary.SetElemUsed(tptoken, 1)
+	err = dbkey.Subary.SetElemUsed(tptoken, nil, 1)
 	Assertnoerr(err, t)
-	err = yottadb.LockST(tptoken, timeout, &dbkey) // 10 second timeout
+	err = yottadb.LockST(tptoken, nil, timeout, &dbkey) // 10 second timeout
 	Assertnoerr(err, t)
 	VerifyLockExists([]byte("^Variable1A(\"Index0\")"), &errors, true, t)
-	err = yottadb.LockST(tptoken, 0) // Release all locks
+	err = yottadb.LockST(tptoken, nil, 0) // Release all locks
 	Assertnoerr(err, t)
 }
 
@@ -56,7 +56,7 @@ func TestSimpleAPILockManyParms(t *testing.T) {
 		locks[i] = &t
 	}
 
-	err := yottadb.LockST(yottadb.NOTTP, 0, locks...)
+	err := yottadb.LockST(yottadb.NOTTP, nil, 0, locks...)
 	assert.NotNil(t, err)
 	errmsg = err.Error()
 	expectederrmsg := "%YDB-E-NAMECOUNT2HI, Number of varnames (namecount parameter in a LockST() call) exceeds maximum (11)"
@@ -68,10 +68,10 @@ func TestSimpleAPITpFullNesting(t *testing.T) {
 	hit_tp_too_deep := 0
 	var fn func(string, uint64) error
 	fn = func(myId string, tptoken uint64) error {
-		return yottadb.TpE2(tptoken, func(tptoken uint64) int32 {
-			curTpLevel, err := yottadb.ValE(tptoken, "$TLEVEL", []string{})
+		return yottadb.TpE2(tptoken, nil, func(tptoken uint64, errstr *yottadb.BufferT) int32 {
+			curTpLevel, err := yottadb.ValE(tptoken, nil, "$TLEVEL", []string{})
 			yottadb.Assertnoerror(err)
-			err = yottadb.SetValE(tptoken, "", "^x", []string{myId, curTpLevel})
+			err = yottadb.SetValE(tptoken, nil, "", "^x", []string{myId, curTpLevel})
 			yottadb.Assertnoerror(err)
 			err = fn(myId, tptoken)
 			if nil != err {

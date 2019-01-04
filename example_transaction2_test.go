@@ -19,11 +19,11 @@ func Example_transactionProcessing2() {
 	// Restore all YDB local buffers on a TP-restart
 	defer buffertary1.Free()
 	buffertary1.Alloc(1, 32)
-	err = buffertary1.SetValStrLit(tptoken, 0, "*")
+	err = buffertary1.SetValStrLit(tptoken, nil, 0, "*")
 	if err != nil {
 		panic(err)
 	}
-	err = buffertary1.TpST2(tptoken, func(tptoken uint64) int32 {
+	err = buffertary1.TpST2(tptoken, nil, func(tptoken uint64, errstr *yottadb.BufferT) int32 {
 		fmt.Printf("Hello from MyGoCallBack!\n")
 		return 0
 	}, "TEST")

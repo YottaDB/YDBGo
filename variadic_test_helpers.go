@@ -53,17 +53,17 @@ func TestVariadicPlistHelper(debugFlag bool, errors *int) error {
 	v1.Alloc(32)
 	v2.Alloc(32)
 	expectedstr = C.expectedbuf1
-	v1.SetValStr(NOTTP, &expectedstr)
+	v1.SetValStr(NOTTP, nil, &expectedstr)
 	expectedstr = C.expectedbuf2
-	v2.SetValStr(NOTTP, &expectedstr)
+	v2.SetValStr(NOTTP, nil, &expectedstr)
 	// Place items in variable length parm list non-serially
-	vplist.setVPlistParam(NOTTP, 3, uintptr(unsafe.Pointer(v2.cbuft)))
-	vplist.setVPlistParam(NOTTP, 2, uintptr(unsafe.Pointer(v1.cbuft)))
-	vplist.setVPlistParam(NOTTP, 0, uintptr(3)) // The count of parms passed in
-	vplist.setVPlistParam(NOTTP, 1, uintptr(42))
-	vplist.setUsed(NOTTP, 4)
+	vplist.setVPlistParam(NOTTP, nil, 3, uintptr(unsafe.Pointer(v2.cbuft)))
+	vplist.setVPlistParam(NOTTP, nil, 2, uintptr(unsafe.Pointer(v1.cbuft)))
+	vplist.setVPlistParam(NOTTP, nil, 0, uintptr(3)) // The count of parms passed in
+	vplist.setVPlistParam(NOTTP, nil, 1, uintptr(42))
+	vplist.setUsed(NOTTP, nil, 4)
 	// TODO: we should verify the return value of this function and return an error if not correct
-	vplist.callVariadicPlistFuncST(NOTTP, C.YdB_vArIaDiC_pLiSt_TeSt)
+	vplist.callVariadicPlistFuncST(NOTTP, nil, C.YdB_vArIaDiC_pLiSt_TeSt)
 	if debugFlag {
 		fmt.Println("VPLST: Variadic plist test complete!")
 	}

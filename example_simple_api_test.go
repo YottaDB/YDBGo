@@ -30,15 +30,15 @@ func Example_simpleAPI() {
 	//  as it allocates C memory which Go doesn't know to free!
 	defer key1.Free()
 	key1.Alloc(64, 10, 64)
-	err = key1.Varnm.SetValStrLit(tptoken, "^hello")
+	err = key1.Varnm.SetValStrLit(tptoken, nil, "^hello")
 	if err != nil {
 		panic(err)
 	}
-	err = key1.Subary.SetElemUsed(tptoken, 1)
+	err = key1.Subary.SetElemUsed(tptoken, nil, 1)
 	if err != nil {
 		panic(err)
 	}
-	err = key1.Subary.SetValStrLit(tptoken, 0, "world")
+	err = key1.Subary.SetValStrLit(tptoken, nil, 0, "world")
 	if err != nil {
 		panic(err)
 	}
@@ -47,13 +47,13 @@ func Example_simpleAPI() {
 	// Reminder, you MUST always defer Free of each structure you allocate
 	defer buff1.Free()
 	buff1.Alloc(64)
-	err = buff1.SetValStrLit(tptoken, "Go world")
+	err = buff1.SetValStrLit(tptoken, nil, "Go world")
 	if err != nil {
 		panic(err)
 	}
 
 	// Set the value
-	err = key1.SetValST(tptoken, &buff1)
+	err = key1.SetValST(tptoken, nil, &buff1)
 	if err != nil {
 		panic(err)
 	}
@@ -71,7 +71,7 @@ func Example_simpleAPI() {
 	if (*val1) != "" {
 		panic("Buffer not empty when it should be!")
 	}
-	err = key1.ValST(tptoken, &buff1)
+	err = key1.ValST(tptoken, nil, &buff1)
 	if err != nil {
 		panic(err)
 	}
@@ -81,28 +81,28 @@ func Example_simpleAPI() {
 	}
 
 	// Set a few more nodes so we can iterate through them
-	err = key1.Subary.SetValStrLit(tptoken, 0, "shire")
+	err = key1.Subary.SetValStrLit(tptoken, nil, 0, "shire")
 	if err != nil {
 		panic(err)
 	}
-	err = buff1.SetValStrLit(tptoken, "Go Middle Earth")
+	err = buff1.SetValStrLit(tptoken, nil, "Go Middle Earth")
 	if err != nil {
 		panic(err)
 	}
-	err = key1.SetValST(tptoken, &buff1)
+	err = key1.SetValST(tptoken, nil, &buff1)
 	if err != nil {
 		panic(err)
 	}
 
-	err = key1.Subary.SetValStrLit(tptoken, 0, "Winterfell")
+	err = key1.Subary.SetValStrLit(tptoken, nil, 0, "Winterfell")
 	if err != nil {
 		panic(err)
 	}
-	err = buff1.SetValStrLit(tptoken, "Go Westeros")
+	err = buff1.SetValStrLit(tptoken, nil, "Go Westeros")
 	if err != nil {
 		panic(err)
 	}
-	err = key1.SetValST(tptoken, &buff1)
+	err = key1.SetValST(tptoken, nil, &buff1)
 	if err != nil {
 		panic(err)
 	}
@@ -113,9 +113,9 @@ func Example_simpleAPI() {
 
 	// Start iterating through the list at the start by setting the last subscript
 	//  to ""; stop when we get the error code meaning end
-	err = key1.Subary.SetValStrLit(tptoken, 0, "")
+	err = key1.Subary.SetValStrLit(tptoken, nil, 0, "")
 	for true {
-		err = key1.SubNextST(tptoken, &cur_sub)
+		err = key1.SubNextST(tptoken, nil, &cur_sub)
 		if err != nil {
 			error_code := yottadb.ErrorCode(err)
 			if error_code == yottadb.YDB_ERR_NODEEND {
@@ -130,7 +130,7 @@ func Example_simpleAPI() {
 		}
 		fmt.Printf("%s ", (*val1))
 		// Move to that key by setting the next node in the key
-		key1.Subary.SetValStr(tptoken, 0, val1)
+		key1.Subary.SetValStr(tptoken, nil, 0, val1)
 	}
 	/* Output: Winterfell shire world */
 }

@@ -57,15 +57,15 @@ func Assertnoerr(err error, t *testing.T) {
 //
 // Routine to empty the database of everything currently defined in it
 //
-func Dbdeleteall(tptoken uint64, errors *int, t *testing.T) {
+func Dbdeleteall(tptoken uint64, errstr *yottadb.BufferT, errors *int, t *testing.T) {
 	var dbkey yottadb.KeyT
 
 	defer dbkey.Free()
 	dbkey.Alloc(VarSiz, AryDim, SubSiz)
-	err := dbkey.Varnm.SetValStrLit(tptoken, "^%") // Start with first possible key
+	err := dbkey.Varnm.SetValStrLit(tptoken, nil, "^%") // Start with first possible key
 	Assertnoerr(err, t)
 	for {
-		err = dbkey.SubNextST(tptoken, &dbkey.Varnm) // Find the 'next' global name
+		err = dbkey.SubNextST(tptoken, nil, &dbkey.Varnm) // Find the 'next' global name
 		if nil != err {
 			if int(C.YDB_ERR_NODEEND) == yottadb.ErrorCode(err) {
 				break
@@ -76,7 +76,7 @@ func Dbdeleteall(tptoken uint64, errors *int, t *testing.T) {
 			}
 			Assertnoerr(err, t) // Unknown error - cause panic
 		}
-		err = dbkey.DeleteST(tptoken, C.YDB_DEL_TREE) // Delete the tree at that global
+		err = dbkey.DeleteST(tptoken, nil, C.YDB_DEL_TREE) // Delete the tree at that global
 		Assertnoerr(err, t)
 	}
 }
@@ -113,11 +113,11 @@ func VerifyLockExists(lockvalidation []byte, errors *int, giveerror bool, t *tes
 //
 // Routine to take a BufferTArray full of subscripts and turn it into a string array of the same subscripts
 //
-func Buftary2strary(tptoken uint64, buftary *yottadb.BufferTArray, t *testing.T) (*[]string, error) {
+func Buftary2strary(tptoken uint64, errstr *yottadb.BufferT, buftary *yottadb.BufferTArray, t *testing.T) (*[]string, error) {
 	arraylen := int(buftary.ElemUsed())
 	retval := make([]string, arraylen)
 	for i := 0; arraylen > i; i++ {
-		subval, err := (*buftary).ValStr(tptoken, uint32(i))
+		subval, err := (*buftary).ValStr(tptoken, nil, uint32(i))
 		Assertnoerr(err, t)
 		retval[i] = *subval
 	}
@@ -159,39 +159,39 @@ func TestTpRtn(tptoken uint64, errstr unsafe.Pointer, tpfnparm unsafe.Pointer) i
 	if nil != tpfnparm {
 		fmt.Println("Non-zero value for parameter (no idea why)")
 	}
-	err = yottadb.SetValE(tptoken, "I am not the value you seek", "^Variable1A", []string{})
+	err = yottadb.SetValE(tptoken, nil, "I am not the value you seek", "^Variable1A", []string{})
 	if nil != err {
 		fmt.Println("First SetE error: ", err)
 	}
 	dbkey.Alloc(VarSiz, AryDim, SubSiz)
 	dbval.Alloc(ValSiz)
-	err = dbkey.Varnm.SetValStrLit(tptoken, "^Variable1A")
+	err = dbkey.Varnm.SetValStrLit(tptoken, nil, "^Variable1A")
 	Assertnoerr(err, nil)
-	err = dbkey.Subary.SetValStrLit(tptoken, 0, "Index0")
+	err = dbkey.Subary.SetValStrLit(tptoken, nil, 0, "Index0")
 	Assertnoerr(err, nil)
-	err = dbkey.Subary.SetValStrLit(tptoken, 1, "Index1")
+	err = dbkey.Subary.SetValStrLit(tptoken, nil, 1, "Index1")
 	Assertnoerr(err, nil)
-	err = dbkey.Subary.SetValStrLit(tptoken, 2, "Index2")
+	err = dbkey.Subary.SetValStrLit(tptoken, nil, 2, "Index2")
 	Assertnoerr(err, nil)
-	err = dbkey.Subary.SetElemUsed(tptoken, 3)
+	err = dbkey.Subary.SetElemUsed(tptoken, nil, 3)
 	Assertnoerr(err, nil)
-	err = dbval.SetValStrLit(tptoken, "The value of Variable1A")
+	err = dbval.SetValStrLit(tptoken, nil, "The value of Variable1A")
 	Assertnoerr(err, nil)
-	err = dbkey.SetValST(tptoken, &dbval)
+	err = dbkey.SetValST(tptoken, nil, &dbval)
 	if nil != err {
 		fmt.Println("First SetS error: ", err)
 	}
-	err = dbkey.Varnm.SetValStrLit(tptoken, "^Variable2B")
+	err = dbkey.Varnm.SetValStrLit(tptoken, nil, "^Variable2B")
 	Assertnoerr(err, nil)
-	err = dbkey.Subary.SetValStrLit(tptoken, 0, "Idx0")
+	err = dbkey.Subary.SetValStrLit(tptoken, nil, 0, "Idx0")
 	Assertnoerr(err, nil)
-	err = dbkey.Subary.SetValStrLit(tptoken, 1, "Idx1")
+	err = dbkey.Subary.SetValStrLit(tptoken, nil, 1, "Idx1")
 	Assertnoerr(err, nil)
-	err = dbval.SetValStrLit(tptoken, "The value of Variable2B")
+	err = dbval.SetValStrLit(tptoken, nil, "The value of Variable2B")
 	Assertnoerr(err, nil)
-	err = dbkey.Subary.SetElemUsed(tptoken, 2)
+	err = dbkey.Subary.SetElemUsed(tptoken, nil, 2)
 	Assertnoerr(err, nil)
-	err = dbkey.SetValST(tptoken, &dbval)
+	err = dbkey.SetValST(tptoken, nil, &dbval)
 	if nil != err {
 		fmt.Println("Second SetS error: ", err)
 		rc = yottadb.ErrorCode(err)
@@ -247,18 +247,18 @@ func YDBCi(tptoken uint64,
 	ydb_ci_mutex.Lock()
 	defer ydb_ci_mutex.Unlock()
 	localname := "^YDBTestYDBCiTemporaryVariable"
-	err := yottadb.DeleteE(tptoken, C.YDB_DEL_TREE, localname, nil)
+	err := yottadb.DeleteE(tptoken, nil, C.YDB_DEL_TREE, localname, nil)
 	yottadb.Assertnoerror(err)
-	err = yottadb.SetValE(tptoken, funcname, localname, []string{"rtn"})
+	err = yottadb.SetValE(tptoken, nil, funcname, localname, []string{"rtn"})
 	yottadb.Assertnoerror(err)
 	expect := "0"
 	if expect_return {
 		expect = "1"
 	}
-	err = yottadb.SetValE(tptoken, expect, localname, []string{"return"})
+	err = yottadb.SetValE(tptoken, nil, expect, localname, []string{"return"})
 	if args != nil {
 		for i := 0; i < len(args); i++ {
-			err = yottadb.SetValE(tptoken, args[i], localname, []string{"args",
+			err = yottadb.SetValE(tptoken, nil, args[i], localname, []string{"args",
 				strconv.Itoa(i)})
 		}
 	}
@@ -270,7 +270,7 @@ func YDBCi(tptoken uint64,
 	C.free(unsafe.Pointer(callname.address))
 	C.free(unsafe.Pointer(callname))
 	if expect_return {
-		r, err := yottadb.ValE(tptoken, localname, []string{"retval"})
+		r, err := yottadb.ValE(tptoken, nil, localname, []string{"retval"})
 		yottadb.Assertnoerror(err)
 		return r
 	}

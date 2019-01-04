@@ -13,13 +13,13 @@ import (
 // methods from the simple API (those methods on KeyT, BufferT, and BufferArrayT).
 func Example_easyAPI() {
 	// Set global node ["^hello", "world"] to "Go World"
-	err := yottadb.SetValE(yottadb.NOTTP, "Go World", "^hello", []string{"world"})
+	err := yottadb.SetValE(yottadb.NOTTP, nil, "Go World", "^hello", []string{"world"})
 	if err != nil {
 		panic(err)
 	}
 
 	// Retrieve the value that was set
-	r, err := yottadb.ValE(yottadb.NOTTP, "^hello", []string{"world"})
+	r, err := yottadb.ValE(yottadb.NOTTP, nil, "^hello", []string{"world"})
 	if err != nil {
 		panic(err)
 	}
@@ -28,18 +28,18 @@ func Example_easyAPI() {
 	}
 
 	// Set a few more nodes so we can iterate through them
-	err = yottadb.SetValE(yottadb.NOTTP, "Go Middle Earth", "^hello", []string{"shire"})
+	err = yottadb.SetValE(yottadb.NOTTP, nil, "Go Middle Earth", "^hello", []string{"shire"})
 	if err != nil {
 		panic(err)
 	}
-	err = yottadb.SetValE(yottadb.NOTTP, "Go Westeros", "^hello", []string{"Winterfell"})
+	err = yottadb.SetValE(yottadb.NOTTP, nil, "Go Westeros", "^hello", []string{"Winterfell"})
 	if err != nil {
 		panic(err)
 	}
 
 	var cur_sub = ""
 	for true {
-		cur_sub, err = yottadb.SubNextE(yottadb.NOTTP, "^hello", []string{cur_sub})
+		cur_sub, err = yottadb.SubNextE(yottadb.NOTTP, nil, "^hello", []string{cur_sub})
 		if err != nil {
 			error_code := yottadb.ErrorCode(err)
 			if error_code == yottadb.YDB_ERR_NODEEND {

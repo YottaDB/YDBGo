@@ -28,7 +28,18 @@ import "C"
 // to call the YottaDB C Simple APIs.
 type BufferT struct { // Contains a single ydb_buffer_t struct
 	cbuft *C.ydb_buffer_t // C flavor of the ydb_buffer_t struct
-	//buft.owns_buff = false
+	owns_buff bool
+}
+
+func (buft *BufferT) FromPtr(pointer unsafe.Pointer) {
+	if nil == buft {
+		panic("*BufferT receiver of FromPtr() cannot be nil")
+	}
+	if nil != buft.cbuft {
+		buft.Free()
+	}
+	buft.cbuft = (*C.ydb_buffer_t)(pointer)
+	buft.owns_buff = false
 }
 
 // Alloc is a method to allocate the ydb_buffer_t C storage and allocate or re-allocate the buffer pointed
@@ -45,7 +56,14 @@ func (buft *BufferT) Alloc(nBytes uint32) {
 		panic("*BufferT receiver of Alloc() cannot be nil")
 	}
 	if nil != buft.cbuft {
-		buft.Free()
+		// We already have a ydb_buffer_t, just get rid of current buffer for re-allocate
+		cbuftptr = buft.cbuft
+		cbufptr := cbuftptr.buf_addr
+		if buft.owns_buff {
+			C.free(unsafe.Pointer(cbufptr))
+		}
+		cbuftptr.buf_addr = nil
+
 	} else {
 		// Allocate a C flavor ydb_buffer_t struct to pass to simpleAPI
 		buft.cbuft = (*C.ydb_buffer_t)(C.malloc(C.size_t(C.sizeof_ydb_buffer_t)))
@@ -61,6 +79,7 @@ func (buft *BufferT) Alloc(nBytes uint32) {
 		cbuftptr.buf_addr = nil // Making sure a potentially de-allocated buffer is not pointed to
 	}
 	cbuftptr.len_alloc = C.uint(nBytes)
+	buft.owns_buff = true
 }
 
 // Dump is a method to dump the contents of a BufferT block for debugging purposes.
@@ -106,7 +125,7 @@ func (buft *BufferT) Free() {
 	printEntry("BufferT.Free()")
 	if nil != buft { // Ignore if buft is null already
 		/// TODO: add owns_buff
-		if true {
+		if buft.owns_buff {
 			cbuftptr := buft.cbuft
 			if nil != cbuftptr {
 				// ydb_buffer_t block exists - free its buffer first if it exists
@@ -338,7 +357,7 @@ func (buft *BufferT) SetValStr(tptoken uint64, errstr *BufferT, value *string) e
 		panic("*BufferT receiver of SetValStr() cannot be nil")
 	}
 	valuebary := []byte(*value)
-	return buft.SetValBAry(tptoken, &valuebary)
+	return buft.SetValBAry(tptoken, errstr, &valuebary)
 }
 
 // SetValStrLit is a method to set a literal string into the given buffer.
@@ -353,7 +372,7 @@ func (buft *BufferT) SetValStrLit(tptoken uint64, errstr *BufferT, value string)
 		panic("*BufferT receiver of SetValStrLit() cannot be nil")
 	}
 	valuebary := []byte(value)
-	return buft.SetValBAry(tptoken, &valuebary)
+	return buft.SetValBAry(tptoken, errstr, &valuebary)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -384,7 +403,11 @@ func (buft *BufferT) Str2ZwrST(tptoken uint64, errstr *BufferT, zwr *BufferT) er
 		}
 		return &YDBError{(int)(C.YDB_ERR_STRUCTNOTALLOCD), errmsg}
 	}
-	rc := C.ydb_str2zwr_st(C.uint64_t(tptoken), errstr.cbuft, buft.cbuft, zwr.cbuft)
+	var cbuft *C.ydb_buffer_t
+	if errstr != nil {
+		cbuft = errstr.cbuft
+	}
+	rc := C.ydb_str2zwr_st(C.uint64_t(tptoken), cbuft, buft.cbuft, zwr.cbuft)
 	if C.YDB_OK != rc {
 		err := NewError(int(rc))
 		return err
@@ -418,7 +441,11 @@ func (buft *BufferT) Zwr2StrST(tptoken uint64, errstr *BufferT, str *BufferT) er
 		}
 		return &YDBError{(int)(C.YDB_ERR_STRUCTNOTALLOCD), errmsg}
 	}
-	rc := C.ydb_zwr2str_st(C.uint64_t(tptoken), errstr.cbuft, buft.cbuft, str.cbuft)
+	var cbuft *C.ydb_buffer_t
+	if errstr != nil {
+		cbuft = errstr.cbuft
+	}
+	rc := C.ydb_zwr2str_st(C.uint64_t(tptoken), cbuft, buft.cbuft, str.cbuft)
 	if C.YDB_OK != rc {
 		err := NewError(int(rc))
 		return err

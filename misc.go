@@ -62,18 +62,18 @@ func initkey(tptoken uint64, errstr *BufferT, dbkey *KeyT, varname *string, suba
 		}
 	}
 	dbkey.Alloc(uint32(len(*varname)), subcnt, maxsublen)
-	dbkey.Varnm.SetValStr(tptoken, varname)
+	dbkey.Varnm.SetValStr(tptoken, errstr, varname)
 	if nil != err {
 		panic(fmt.Sprintf("YDB: Unexpected error with SetValStr(): %s", err))
 	}
 	// Load subscripts into KeyT (if any)
 	for i = 0; i < subcnt; i++ {
-		err = dbkey.Subary.SetValStr(tptoken, i, &((*subary)[i]))
+		err = dbkey.Subary.SetValStr(tptoken, errstr, i, &((*subary)[i]))
 		if nil != err {
 			panic(fmt.Sprintf("YDB: Unexpected error with SetValStr(): %s", err))
 		}
 	}
-	err = dbkey.Subary.SetElemUsed(tptoken, subcnt)
+	err = dbkey.Subary.SetElemUsed(tptoken, errstr, subcnt)
 	if nil != err {
 		panic(fmt.Sprintf("YDB: Unexpected error with SetUsed(): %s", err))
 	}

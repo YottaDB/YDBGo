@@ -37,14 +37,14 @@ func Example_transactionProcessing() {
 	// Restore all YDB local buffers on a TP-restart
 	defer buffertary1.Free()
 	buffertary1.Alloc(1, 32)
-	err = buffertary1.SetValStrLit(tptoken, 0, "*")
+	err = buffertary1.SetValStrLit(tptoken, nil, 0, "*")
 	if err != nil {
 		panic(err)
 	}
 	//# /*
-	err = buffertary1.TpST(tptoken, test_helpers.GetMyGoCallBackCgo(), nil, "TEST")
+	err = buffertary1.TpST(tptoken, nil, test_helpers.GetMyGoCallBackCgo(), nil, "TEST")
 	//# */
-	//# err = buffertary1.TpST(tptoken, GetMyGoCallBackCgo(), nil, "TEST")
+	//# err = buffertary1.TpST(tptoken, nil, GetMyGoCallBackCgo(), nil, "TEST")
 	if err != nil {
 		panic(err)
 	}

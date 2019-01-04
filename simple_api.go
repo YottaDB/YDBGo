@@ -54,24 +54,24 @@ func LockST(tptoken uint64, errstr *BufferT, timeoutNsec uint64, lockname ...*Ke
 	// we're fine and can proceed but if we are 32 bit, then the 64 bit timeoutNsec parameter needs to be split
 	// in half across two parms which will be reassembled in ydb_lock_s().
 	if 64 == strconv.IntSize {
-		vplist.setVPlistParam(tptoken, parmindx, uintptr(timeoutNsec))
+		vplist.setVPlistParam(tptoken, errstr, parmindx, uintptr(timeoutNsec))
 		parmindx++
 	} else {
 		if IsLittleEndian() {
-			vplist.setVPlistParam(tptoken, parmindx, uintptr(timeoutNsec&0xffffffff))
+			vplist.setVPlistParam(tptoken, errstr, parmindx, uintptr(timeoutNsec&0xffffffff))
 			parmindx++
-			vplist.setVPlistParam(tptoken, parmindx, uintptr(timeoutNsec>>32))
+			vplist.setVPlistParam(tptoken, errstr, parmindx, uintptr(timeoutNsec>>32))
 			parmindx++
 		} else {
-			vplist.setVPlistParam(tptoken, parmindx, uintptr(timeoutNsec>>32))
+			vplist.setVPlistParam(tptoken, errstr, parmindx, uintptr(timeoutNsec>>32))
 			parmindx++
-			vplist.setVPlistParam(tptoken, parmindx, uintptr(timeoutNsec&0xffffffff))
+			vplist.setVPlistParam(tptoken, errstr, parmindx, uintptr(timeoutNsec&0xffffffff))
 			parmindx++
 		}
 	}
 	lockcnt = len(lockname)
 	namecnt = lockcnt
-	vplist.setVPlistParam(tptoken, parmindx, uintptr(namecnt))
+	vplist.setVPlistParam(tptoken, errstr, parmindx, uintptr(namecnt))
 	parmindx++
 	if 0 != lockcnt {
 		parmsleft := C.MAXVPARMS - parmindx // We've already used two parms (timeout and namecount)
@@ -91,15 +91,15 @@ func LockST(tptoken uint64, errstr *BufferT, timeoutNsec uint64, lockname ...*Ke
 				return &YDBError{(int)(C.YDB_ERR_NAMECOUNT2HI), errmsg}
 			}
 			// Set the 3 parameters for this lockname
-			vplist.setVPlistParam(tptoken, parmindx, uintptr(unsafe.Pointer((*lockname[lockindx]).Varnm.cbuft)))
+			vplist.setVPlistParam(tptoken, errstr, parmindx, uintptr(unsafe.Pointer((*lockname[lockindx]).Varnm.cbuft)))
 			parmindx++
 			parmsleft--
-			vplist.setVPlistParam(tptoken, parmindx, uintptr((*lockname[lockindx]).Subary.elemsUsed))
+			vplist.setVPlistParam(tptoken, errstr, parmindx, uintptr((*lockname[lockindx]).Subary.elemsUsed))
 			parmindx++
 			parmsleft--
 			subgobuftary := &((*lockname[lockindx]).Subary)
 			subbuftary := unsafe.Pointer(subgobuftary.cbuftary)
-			vplist.setVPlistParam(tptoken, parmindx, uintptr(subbuftary))
+			vplist.setVPlistParam(tptoken, errstr, parmindx, uintptr(subbuftary))
 			parmindx++
 			parmsleft--
 			// Housekeeping
@@ -107,12 +107,16 @@ func LockST(tptoken uint64, errstr *BufferT, timeoutNsec uint64, lockname ...*Ke
 			lockcnt--
 		}
 	}
-	vplist.setUsed(tptoken, uint32(parmindx))
+	vplist.setUsed(tptoken, errstr, uint32(parmindx))
 	// At this point, vplist now contains the plist we want to send to ydb_lock_s(). However, Golang/cgo does not permit
 	// either the call or even creating a function pointer to ydb_lock_s(). So instead of driving vplist.callVariadicPlistFuncST()
 	// which is what we would normally do here, we're going to call a C helper function (defined in the cgo preamble at the
 	// top of this routine) to do the call that callVariadicPlistFuncST() would have done.
-	rc := C.ydb_go_lock_st(C.uint64_t(tptoken), errstr.cbuft, (C.uintptr_t)(uintptr(unsafe.Pointer(vplist.cvplist))))
+	var cbuft *C.ydb_buffer_t
+	if errstr != nil {
+		cbuft = errstr.cbuft
+	}
+	rc := C.ydb_go_lock_st(C.uint64_t(tptoken), cbuft, (C.uintptr_t)(uintptr(unsafe.Pointer(vplist.cvplist))))
 	if C.YDB_OK != rc {
 		err := NewError(int(rc))
 		return err

@@ -389,7 +389,7 @@ func (buftary *BufferTArray) SetValStr(tptoken uint64, errstr *BufferT, idx uint
 		panic("*BufferTArray receiver of SetValBAry() cannot be nil")
 	}
 	valuebary := []byte(*value)
-	return buftary.SetValBAry(tptoken, idx, &valuebary)
+	return buftary.SetValBAry(tptoken, errstr, idx, &valuebary)
 }
 
 // SetValStrLit is a method to set a string literal (value) into the buffer at the given index (idx).
@@ -399,7 +399,7 @@ func (buftary *BufferTArray) SetValStrLit(tptoken uint64, errstr *BufferT, idx u
 		panic("*BufferTArray receiver of SetValBAry() cannot be nil")
 	}
 	valuebary := []byte(value)
-	return buftary.SetValBAry(tptoken, idx, &valuebary)
+	return buftary.SetValBAry(tptoken, errstr, idx, &valuebary)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -416,12 +416,16 @@ func (buftary *BufferTArray) SetValStrLit(tptoken uint64, errstr *BufferT, idx u
 // In the event that the elemsUsed exceeds C.YDB_MAX_NAMES, the error return is ERRNAMECOUNT2HI.
 //
 // As M and Go application code cannot be mixed in the same process, the warning in ydb_delete_excl_s() does not apply.
-func (buftary *BufferTArray) DeleteExclST(tptoken uint64) error {
+func (buftary *BufferTArray) DeleteExclST(tptoken uint64, errstr *BufferT) error {
 	printEntry("BufferTArray.DeleteExclST()")
 	if nil == buftary {
 		panic("*BufferTArray receiver of DeleteExclST() cannot be nil")
 	}
-	rc := C.ydb_delete_excl_st(C.uint64_t(tptoken), errstr.cbuft, C.int(buftary.elemsUsed),
+	var cbuft *C.ydb_buffer_t
+	if errstr != nil {
+		cbuft = errstr.cbuft
+	}
+	rc := C.ydb_delete_excl_st(C.uint64_t(tptoken), cbuft, C.int(buftary.elemsUsed),
 		(*C.ydb_buffer_t)(unsafe.Pointer(buftary.cbuftary)))
 	if C.YDB_OK != rc {
 		err := NewError(int(rc))
@@ -482,7 +486,11 @@ func (buftary *BufferTArray) TpST(tptoken uint64, errstr *BufferT, tpfn unsafe.P
 	tid := C.CString(transid)
 	defer C.free(unsafe.Pointer(tid)) // Should stay regular free since this was system malloc'd
 	cbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(buftary.cbuftary))
-	rc := C.ydb_tp_st(C.uint64_t(tptoken), errstr.cbuft, (C.ydb_tpfnptr_t)(tpfn), tpfnparm, tid,
+	var cbuft *C.ydb_buffer_t
+	if errstr != nil {
+		cbuft = errstr.cbuft
+	}
+	rc := C.ydb_tp_st(C.uint64_t(tptoken), cbuft, (C.ydb_tpfnptr_t)(tpfn), tpfnparm, tid,
 		C.int(buftary.elemsUsed), cbuftary)
 	if C.YDB_OK != rc {
 		err := NewError(int(rc))
@@ -495,7 +503,7 @@ func (buftary *BufferTArray) TpST(tptoken uint64, errstr *BufferT, tpfn unsafe.P
 //  so the callback can retrieve it without passing pointers to C.
 var tpMutex sync.Mutex
 var tpIndex uint64
-var tpMap map[uint64]func(uint64) int32
+var tpMap map[uint64]func(uint64, *BufferT) int32
 
 // TpST2 wraps ydb_tp_st() to implement transaction processing. The difference between
 // TpST() and TpST2() is that the former uses C glue code to pass a parameter to the function implementing transaction logic,
@@ -512,19 +520,23 @@ var tpMap map[uint64]func(uint64) int32
 //  for example), so should not change any data outside of the database
 //
 // transid  - See docs for ydb_tp_s() in the MLPG.
-func (buftary *BufferTArray) TpST2(tptoken uint64, errstr *BufferT, tpfn func(uint64) int32, transid string) error {
+func (buftary *BufferTArray) TpST2(tptoken uint64, errstr *BufferT, tpfn func(uint64, *BufferT) int32, transid string) error {
 	tid := C.CString(transid)
 	tpMutex.Lock()
 	tpfnparm := tpIndex
 	tpIndex++
 	if tpMap == nil {
-		tpMap = make(map[uint64]func(uint64) int32)
+		tpMap = make(map[uint64]func(uint64, *BufferT) int32)
 	}
 	tpMap[tpfnparm] = tpfn
 	tpMutex.Unlock()
 	defer C.free(unsafe.Pointer(tid))
 	cbuftary := (*C.ydb_buffer_t)(unsafe.Pointer((*buftary).cbuftary))
-	rc := C.ydb_tp_st(C.uint64_t(tptoken), errstr.cbuft, (C.ydb_tpfnptr_t)(C.ydb_tp_st_wrapper_cgo),
+	var cbuft *C.ydb_buffer_t
+	if errstr != nil {
+		cbuft = errstr.cbuft
+	}
+	rc := C.ydb_tp_st(C.uint64_t(tptoken), cbuft, (C.ydb_tpfnptr_t)(C.ydb_tp_st_wrapper_cgo),
 		unsafe.Pointer(&tpfnparm), tid, C.int((*buftary).elemsUsed), cbuftary)
 	tpMutex.Lock()
 	delete(tpMap, tpfnparm)
@@ -543,8 +555,10 @@ func ydbTpStWrapper(tptoken uint64, errstr *C.ydb_buffer_t, tpfnparm unsafe.Poin
 	tpMutex.Lock()
 	v, ok := tpMap[index]
 	tpMutex.Unlock()
+	var errbuff BufferT
+	errbuff.FromPtr((unsafe.Pointer)(errstr))
 	if !ok {
 		panic("Couldn't find callback routine")
 	}
-	return (v)(tptoken)
+	return (v)(tptoken, &errbuff)
 }
