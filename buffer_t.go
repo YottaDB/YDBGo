@@ -28,6 +28,7 @@ import "C"
 // to call the YottaDB C Simple APIs.
 type BufferT struct { // Contains a single ydb_buffer_t struct
 	cbuft *C.ydb_buffer_t // C flavor of the ydb_buffer_t struct
+	owns_buff bool
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -35,6 +36,18 @@ type BufferT struct { // Contains a single ydb_buffer_t struct
 // Data manipulation methods for BufferT
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+
+func (buft *BufferT) FromPtr(ptr unsafe.Pointer) {
+	printEntry("BufferT.Alloc()")
+	if nil == buft {
+		panic("*BufferT receiver of Alloc() cannot be nil")
+	}
+	if nil != buft.cbuft {
+		buft.Free()
+	}
+	buft.owns_buff = false
+	buft.cbuft = (*C.ydb_buffer_t)(ptr)
+}
 
 // Alloc is a method to allocate the ydb_buffer_t C storage and allocate or re-allocate the buffer pointed
 // to by that struct.
@@ -50,11 +63,7 @@ func (buft *BufferT) Alloc(nBytes uint32) {
 		panic("*BufferT receiver of Alloc() cannot be nil")
 	}
 	if nil != buft.cbuft {
-		// We already have a ydb_buffer_t, just get rid of current buffer for re-allocate
-		cbuftptr = buft.cbuft
-		cbufptr := cbuftptr.buf_addr
-		C.free(unsafe.Pointer(cbufptr))
-		cbuftptr.buf_addr = nil
+		buft.Free()
 	} else {
 		// Allocate a C flavor ydb_buffer_t struct to pass to simpleAPI
 		buft.cbuft = (*C.ydb_buffer_t)(C.malloc(C.size_t(C.sizeof_ydb_buffer_t)))
@@ -114,14 +123,18 @@ func (buft *BufferT) DumpToWriter(writer io.Writer) {
 func (buft *BufferT) Free() {
 	printEntry("BufferT.Free()")
 	if nil != buft { // Ignore if buft is null already
-		cbuftptr := buft.cbuft
-		if nil != cbuftptr {
-			// ydb_buffer_t block exists - free its buffer first if it exists
-			if nil != cbuftptr.buf_addr {
-				C.free(unsafe.Pointer(cbuftptr.buf_addr))
+		if buft.owns_buff {
+			cbuftptr := buft.cbuft
+			if nil != cbuftptr {
+				// ydb_buffer_t block exists - free its buffer first if it exists
+				if nil != cbuftptr.buf_addr {
+					C.free(unsafe.Pointer(cbuftptr.buf_addr))
+				}
+				C.free(unsafe.Pointer(cbuftptr))
+				buft.cbuft = nil
 			}
-			C.free(unsafe.Pointer(cbuftptr))
-			buft.cbuft = nil
+		} else {
+			buft.cbuft = nil;
 		}
 	}
 }
