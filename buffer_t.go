@@ -401,7 +401,7 @@ func (buft *BufferT) Str2ZwrST(tptoken uint64, errstr *BufferT, zwr *BufferT) er
 		}
 		return &YDBError{(int)(C.YDB_ERR_STRUCTNOTALLOCD), errmsg}
 	}
-	rc := C.ydb_str2zwr_st(C.uint64_t(tptoken), buft.cbuft, zwr.cbuft)
+	rc := C.ydb_str2zwr_st(C.uint64_t(tptoken), errstr.cbuft, buft.cbuft, zwr.cbuft)
 	if C.YDB_OK != rc {
 		err := NewError(int(rc))
 		return err
@@ -435,7 +435,7 @@ func (buft *BufferT) Zwr2StrST(tptoken uint64, errstr *BufferT, str *BufferT) er
 		}
 		return &YDBError{(int)(C.YDB_ERR_STRUCTNOTALLOCD), errmsg}
 	}
-	rc := C.ydb_zwr2str_st(C.uint64_t(tptoken), buft.cbuft, str.cbuft)
+	rc := C.ydb_zwr2str_st(C.uint64_t(tptoken), errstr.cbuft, buft.cbuft, str.cbuft)
 	if C.YDB_OK != rc {
 		err := NewError(int(rc))
 		return err

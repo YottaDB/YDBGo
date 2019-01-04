@@ -26,7 +26,7 @@ import (
 // int ydb_go_lock_st(uint64_t tptoken, uintptr_t cvplist);
 // int ydb_go_lock_st(uint64_t tptoken, uintptr_t cvplist)
 // {
-// 	return ydb_call_variadic_plist_func_st(tptoken, (ydb_vplist_func)&ydb_lock_s, cvplist);
+// 	return ydb_call_variadic_plist_func_st(tptoken, errstr.cbuft, (ydb_vplist_func)&ydb_lock_s, cvplist);
 // }
 import "C"
 
@@ -112,7 +112,7 @@ func LockST(tptoken uint64, errstr *BufferT, timeoutNsec uint64, lockname ...*Ke
 	// either the call or even creating a function pointer to ydb_lock_s(). So instead of driving vplist.callVariadicPlistFuncST()
 	// which is what we would normally do here, we're going to call a C helper function (defined in the cgo preamble at the
 	// top of this routine) to do the call that callVariadicPlistFuncST() would have done.
-	rc := C.ydb_go_lock_st(C.uint64_t(tptoken), (C.uintptr_t)(uintptr(unsafe.Pointer(vplist.cvplist))))
+	rc := C.ydb_go_lock_st(C.uint64_t(tptoken), errstr.cbuft, (C.uintptr_t)(uintptr(unsafe.Pointer(vplist.cvplist))))
 	if C.YDB_OK != rc {
 		err := NewError(int(rc))
 		return err

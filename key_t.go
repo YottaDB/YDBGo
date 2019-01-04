@@ -104,7 +104,7 @@ func (key *KeyT) DataST(tptoken uint64) (uint32, error) {
 	}
 	subgobuftary := &(key.Subary)
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(subgobuftary.cbuftary))
-	rc := C.ydb_data_st(C.uint64_t(tptoken), vargobuft, C.int(subgobuftary.elemsUsed), subbuftary,
+	rc := C.ydb_data_st(C.uint64_t(tptoken), errstr.cbuft, vargobuft, C.int(subgobuftary.elemsUsed), subbuftary,
 		&retval)
 	if C.YDB_OK != rc {
 		err := NewError(int(rc))
@@ -129,7 +129,7 @@ func (key *KeyT) DeleteST(tptoken uint64, errstr *BufferT, deltype int) error {
 	}
 	subgobuftary := &(key.Subary)
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(subgobuftary.cbuftary))
-	rc := C.ydb_delete_st(C.uint64_t(tptoken), vargobuft, C.int(subgobuftary.elemsUsed), subbuftary,
+	rc := C.ydb_delete_st(C.uint64_t(tptoken), errstr.cbuft, vargobuft, C.int(subgobuftary.elemsUsed), subbuftary,
 		C.int(deltype))
 	if C.YDB_OK != rc {
 		err := NewError(int(rc))
@@ -158,7 +158,7 @@ func (key *KeyT) ValST(tptoken uint64, errstr *BufferT, retval *BufferT) error {
 	}
 	subgobuftary := &(key.Subary)
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(subgobuftary.cbuftary))
-	rc := C.ydb_get_st(C.uint64_t(tptoken), vargobuft, C.int(subgobuftary.elemsUsed), subbuftary,
+	rc := C.ydb_get_st(C.uint64_t(tptoken), errstr.cbuft, vargobuft, C.int(subgobuftary.elemsUsed), subbuftary,
 		retval.cbuft)
 	if C.YDB_OK != rc {
 		err := NewError(int(rc))
@@ -198,7 +198,7 @@ func (key *KeyT) IncrST(tptoken uint64, errstr *BufferT, incr, retval *BufferT) 
 	} else {
 		incrcbuft = unsafe.Pointer(incr.cbuft)
 	}
-	rc := C.ydb_incr_st(C.uint64_t(tptoken), vargobuft, C.int(subgobuftary.elemsUsed), subbuftary,
+	rc := C.ydb_incr_st(C.uint64_t(tptoken), errstr.cbuft, vargobuft, C.int(subgobuftary.elemsUsed), subbuftary,
 		(*C.ydb_buffer_t)(incrcbuft),
 		retval.cbuft)
 	if C.YDB_OK != rc {
@@ -224,7 +224,7 @@ func (key *KeyT) LockDecrST(tptoken uint64) error {
 	}
 	subgobuftary := &(key.Subary)
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(subgobuftary.cbuftary))
-	rc := C.ydb_lock_decr_st(C.uint64_t(tptoken), vargobuft, C.int(subgobuftary.elemsUsed), subbuftary)
+	rc := C.ydb_lock_decr_st(C.uint64_t(tptoken), errstr.cbuft, vargobuft, C.int(subgobuftary.elemsUsed), subbuftary)
 	if C.YDB_OK != rc {
 		err := NewError(int(rc))
 		return err
@@ -252,7 +252,7 @@ func (key *KeyT) LockIncrST(tptoken uint64, errstr *BufferT, timeoutNsec uint64)
 	}
 	subgobuftary := &(key.Subary)
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(subgobuftary.cbuftary))
-	rc := C.ydb_lock_incr_st(C.uint64_t(tptoken), C.ulonglong(timeoutNsec), vargobuft,
+	rc := C.ydb_lock_incr_st(C.uint64_t(tptoken), errstr.cbuft, C.ulonglong(timeoutNsec), vargobuft,
 		C.int(subgobuftary.elemsUsed), subbuftary)
 	if C.YDB_OK != rc {
 		err := NewError(int(rc))
@@ -300,7 +300,7 @@ func (key *KeyT) NodeNextST(tptoken uint64, errstr *BufferT, next *BufferTArray)
 	}
 	subgobuftary := &(key.Subary)
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(subgobuftary.cbuftary))
-	rc := C.ydb_node_next_st(C.uint64_t(tptoken), vargobuft, C.int(subgobuftary.elemsUsed), subbuftary,
+	rc := C.ydb_node_next_st(C.uint64_t(tptoken), errstr.cbuft, vargobuft, C.int(subgobuftary.elemsUsed), subbuftary,
 		(*C.int)(unsafe.Pointer(nextElemsPtr)), (*C.ydb_buffer_t)(unsafe.Pointer(nextSubaryPtr)))
 	if C.YDB_OK != rc {
 		err := NewError(int(rc))
@@ -348,7 +348,7 @@ func (key *KeyT) NodePrevST(tptoken uint64, errstr *BufferT, prev *BufferTArray)
 	}
 	subgobuftary := &(key.Subary)
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(subgobuftary.cbuftary))
-	rc := C.ydb_node_previous_st(C.uint64_t(tptoken), vargobuft, C.int(subgobuftary.elemsUsed),
+	rc := C.ydb_node_previous_st(C.uint64_t(tptoken), errstr.cbuft, vargobuft, C.int(subgobuftary.elemsUsed),
 		subbuftary, (*C.int)(unsafe.Pointer(prevElemsPtr)), (*C.ydb_buffer_t)(unsafe.Pointer(prevSubaryPtr)))
 	if C.YDB_OK != rc {
 		err := NewError(int(rc))
@@ -371,7 +371,7 @@ func (key *KeyT) SetValST(tptoken uint64, errstr *BufferT, value *BufferT) error
 		panic("KeyT varname is not allocated, is nil, or has a 0 length")
 	}
 	cbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(key.Subary.cbuftary))
-	rc := C.ydb_set_st(C.uint64_t(tptoken), vargobuft, C.int(key.Subary.elemsUsed), cbuftary,
+	rc := C.ydb_set_st(C.uint64_t(tptoken), errstr.cbuft, vargobuft, C.int(key.Subary.elemsUsed), cbuftary,
 		value.cbuft)
 	if C.YDB_OK != rc {
 		err := NewError(int(rc))
@@ -404,7 +404,7 @@ func (key *KeyT) SubNextST(tptoken uint64, errstr *BufferT, retval *BufferT) err
 	}
 	subgobuftary := &(key.Subary)
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(subgobuftary.cbuftary))
-	rc := C.ydb_subscript_next_st(C.uint64_t(tptoken), vargobuft, C.int(subgobuftary.elemsUsed),
+	rc := C.ydb_subscript_next_st(C.uint64_t(tptoken), errstr.cbuft, vargobuft, C.int(subgobuftary.elemsUsed),
 		subbuftary, retval.cbuft)
 	if C.YDB_OK != rc {
 		err := NewError(int(rc))
@@ -435,7 +435,7 @@ func (key *KeyT) SubPrevST(tptoken uint64, errstr *BufferT, retval *BufferT) err
 	}
 	subgobuftary := &(key.Subary)
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(subgobuftary.cbuftary))
-	rc := C.ydb_subscript_previous_st(C.uint64_t(tptoken), vargobuft, C.int(subgobuftary.elemsUsed),
+	rc := C.ydb_subscript_previous_st(C.uint64_t(tptoken), errstr.cbuft, vargobuft, C.int(subgobuftary.elemsUsed),
 		subbuftary, retval.cbuft)
 	if C.YDB_OK != rc {
 		err := NewError(int(rc))

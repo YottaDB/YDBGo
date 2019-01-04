@@ -421,7 +421,7 @@ func (buftary *BufferTArray) DeleteExclST(tptoken uint64) error {
 	if nil == buftary {
 		panic("*BufferTArray receiver of DeleteExclST() cannot be nil")
 	}
-	rc := C.ydb_delete_excl_st(C.uint64_t(tptoken), C.int(buftary.elemsUsed),
+	rc := C.ydb_delete_excl_st(C.uint64_t(tptoken), errstr.cbuft, C.int(buftary.elemsUsed),
 		(*C.ydb_buffer_t)(unsafe.Pointer(buftary.cbuftary)))
 	if C.YDB_OK != rc {
 		err := NewError(int(rc))
@@ -482,7 +482,7 @@ func (buftary *BufferTArray) TpST(tptoken uint64, errstr *BufferT, tpfn unsafe.P
 	tid := C.CString(transid)
 	defer C.free(unsafe.Pointer(tid)) // Should stay regular free since this was system malloc'd
 	cbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(buftary.cbuftary))
-	rc := C.ydb_tp_st(C.uint64_t(tptoken), (C.ydb_tpfnptr_t)(tpfn), tpfnparm, tid,
+	rc := C.ydb_tp_st(C.uint64_t(tptoken), errstr.cbuft, (C.ydb_tpfnptr_t)(tpfn), tpfnparm, tid,
 		C.int(buftary.elemsUsed), cbuftary)
 	if C.YDB_OK != rc {
 		err := NewError(int(rc))
@@ -524,7 +524,7 @@ func (buftary *BufferTArray) TpST2(tptoken uint64, errstr *BufferT, tpfn func(ui
 	tpMutex.Unlock()
 	defer C.free(unsafe.Pointer(tid))
 	cbuftary := (*C.ydb_buffer_t)(unsafe.Pointer((*buftary).cbuftary))
-	rc := C.ydb_tp_st(C.uint64_t(tptoken), (C.ydb_tpfnptr_t)(C.ydb_tp_st_wrapper_cgo),
+	rc := C.ydb_tp_st(C.uint64_t(tptoken), errstr.cbuft, (C.ydb_tpfnptr_t)(C.ydb_tp_st_wrapper_cgo),
 		unsafe.Pointer(&tpfnparm), tid, C.int((*buftary).elemsUsed), cbuftary)
 	tpMutex.Lock()
 	delete(tpMap, tpfnparm)

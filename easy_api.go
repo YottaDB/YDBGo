@@ -41,7 +41,7 @@ func DataE(tptoken uint64, errstr *BufferT, varname string, subary []string) (ui
 	initkey(tptoken, &dbkey, &varname, &subary)
 	vargobuft := dbkey.Varnm.cbuft
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(dbkey.Subary.cbuftary))
-	rc := C.ydb_data_st(C.uint64_t(tptoken), vargobuft, C.int(dbkey.Subary.elemsUsed), subbuftary, &retval)
+	rc := C.ydb_data_st(C.uint64_t(tptoken), errstr.cbuft, vargobuft, C.int(dbkey.Subary.elemsUsed), subbuftary, &retval)
 	if C.YDB_OK != rc {
 		err = NewError(int(rc))
 		return 0, err
@@ -64,7 +64,7 @@ func DeleteE(tptoken uint64, errstr *BufferT, deltype int, varname string, subar
 	initkey(tptoken, &dbkey, &varname, &subary)
 	vargobuft := dbkey.Varnm.cbuft
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(dbkey.Subary.cbuftary))
-	rc := C.ydb_delete_st(C.uint64_t(tptoken), vargobuft, C.int(dbkey.Subary.elemsUsed), subbuftary,
+	rc := C.ydb_delete_st(C.uint64_t(tptoken), errstr.cbuft, vargobuft, C.int(dbkey.Subary.elemsUsed), subbuftary,
 		C.int(deltype))
 	if C.YDB_OK != rc {
 		err = NewError(int(rc))
@@ -188,7 +188,7 @@ func IncrE(tptoken uint64, errstr *BufferT, incr, varname string, subary []strin
 	// large enough for any reasonable value being incremented.
 	vargobuft := dbkey.Varnm.cbuft
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(dbkey.Subary.cbuftary))
-	rc := C.ydb_incr_st(C.uint64_t(tptoken), vargobuft, C.int(dbkey.Subary.elemsUsed), subbuftary,
+	rc := C.ydb_incr_st(C.uint64_t(tptoken), errstr.cbuft, vargobuft, C.int(dbkey.Subary.elemsUsed), subbuftary,
 		incrval.cbuft, dbvalue.cbuft)
 	if C.YDB_OK != rc {
 		err = NewError(int(rc))
@@ -293,7 +293,7 @@ func LockDecrE(tptoken uint64, errstr *BufferT, varname string, subary []string)
 	initkey(tptoken, &dbkey, &varname, &subary)
 	vargobuft := dbkey.Varnm.cbuft
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(dbkey.Subary.cbuftary))
-	rc := C.ydb_lock_decr_st(C.uint64_t(tptoken), vargobuft, C.int(dbkey.Subary.elemsUsed), subbuftary)
+	rc := C.ydb_lock_decr_st(C.uint64_t(tptoken), errstr.cbuft, vargobuft, C.int(dbkey.Subary.elemsUsed), subbuftary)
 	if C.YDB_OK != rc {
 		err = NewError(int(rc))
 		return err
@@ -320,7 +320,7 @@ func LockIncrE(tptoken uint64, errstr *BufferT, timeoutNsec uint64, varname stri
 	initkey(tptoken, &dbkey, &varname, &subary)
 	vargobuft := dbkey.Varnm.cbuft
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(dbkey.Subary.cbuftary))
-	rc := C.ydb_lock_incr_st(C.uint64_t(tptoken), C.ulonglong(timeoutNsec), vargobuft,
+	rc := C.ydb_lock_incr_st(C.uint64_t(tptoken), errstr.cbuft, C.ulonglong(timeoutNsec), vargobuft,
 		C.int(dbkey.Subary.elemsUsed), subbuftary)
 	if C.YDB_OK != rc {
 		err = NewError(int(rc))
@@ -493,7 +493,7 @@ func SetValE(tptoken uint64, errstr *BufferT, value, varname string, subary []st
 	}
 	vargobuft := dbkey.Varnm.cbuft
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(dbkey.Subary.cbuftary))
-	rc := C.ydb_set_st(C.uint64_t(tptoken), vargobuft, C.int(dbkey.Subary.elemsUsed), subbuftary,
+	rc := C.ydb_set_st(C.uint64_t(tptoken), errstr.cbuft, vargobuft, C.int(dbkey.Subary.elemsUsed), subbuftary,
 		dbvalue.cbuft)
 	if C.YDB_OK != rc {
 		err := NewError(int(rc))

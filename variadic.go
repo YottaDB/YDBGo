@@ -60,7 +60,7 @@ func (vplist *variadicPlist) callVariadicPlistFuncST(tptoken uint64, errstr *Buf
 	if nil == vplist {
 		panic("*variadicPlist receiver of callVariadicPlistFuncST() cannot be nil")
 	}
-	return int(C.ydb_call_variadic_plist_func_st(C.uint64_t(tptoken), (C.ydb_vplist_func)(vpfunc),
+	return int(C.ydb_call_variadic_plist_func_st(C.uint64_t(tptoken), errstr.cbuft, (C.ydb_vplist_func)(vpfunc),
 		(C.uintptr_t)(uintptr(unsafe.Pointer(vplist.cvplist)))))
 }
 
