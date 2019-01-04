@@ -158,7 +158,7 @@ func (buftary *BufferTArray) ElemLenAlloc(tptoken uint64) uint32 {
 }
 
 // ElemLenUsed is a method to retrieve the buffer used length associated with a given buffer referenced by its index.
-func (buftary *BufferTArray) ElemLenUsed(tptoken uint64, idx uint32) (uint32, error) {
+func (buftary *BufferTArray) ElemLenUsed(tptoken uint64, errstr *BufferT, idx uint32) (uint32, error) {
 	printEntry("BufferTArray.ElemLenUsed()")
 	if nil == buftary {
 		panic("*BufferTArray receiver of ElemLenUsed() cannot be nil")
@@ -195,7 +195,7 @@ func (buftary *BufferTArray) ElemUsed() uint32 {
 }
 
 // ValBAry is a method to fetch the buffer of the indicated array element and return it as a byte array pointer.
-func (buftary *BufferTArray) ValBAry(tptoken uint64, idx uint32) (*[]byte, error) {
+func (buftary *BufferTArray) ValBAry(tptoken uint64, errstr *BufferT, idx uint32) (*[]byte, error) {
 	var bary []byte
 
 	printEntry("BufferTArray.ValBAry()")
@@ -238,7 +238,7 @@ func (buftary *BufferTArray) ValBAry(tptoken uint64, idx uint32) (*[]byte, error
 }
 
 // ValStr is a method to fetch the buffer of the indicated array element and return it as a string pointer.
-func (buftary *BufferTArray) ValStr(tptoken uint64, idx uint32) (*string, error) {
+func (buftary *BufferTArray) ValStr(tptoken uint64, errstr *BufferT, idx uint32) (*string, error) {
 	var str string
 
 	printEntry("BufferTArray.ValStr()")
@@ -281,7 +281,7 @@ func (buftary *BufferTArray) ValStr(tptoken uint64, idx uint32) (*string, error)
 }
 
 // SetElemLenUsed is a method to set the len_used field of a given ydb_buffer_t struct in the BufferTArray.
-func (buftary *BufferTArray) SetElemLenUsed(tptoken uint64, idx, newLen uint32) error {
+func (buftary *BufferTArray) SetElemLenUsed(tptoken uint64, errstr *BufferT, idx, newLen uint32) error {
 	printEntry("BufferTArray.SetElemLenUsed()")
 	if nil == buftary {
 		panic("*BufferTArray receiver of SetElemLenUsed() cannot be nil")
@@ -319,7 +319,7 @@ func (buftary *BufferTArray) SetElemLenUsed(tptoken uint64, idx, newLen uint32) 
 }
 
 // SetElemUsed is a method to set the number of used buffers in the BufferTArray.
-func (buftary *BufferTArray) SetElemUsed(tptoken uint64, newUsed uint32) error {
+func (buftary *BufferTArray) SetElemUsed(tptoken uint64, errstr *BufferT, newUsed uint32) error {
 	printEntry("BufferTArray.SetElemUsed()")
 	if nil == buftary {
 		panic("*BufferTArray receiver of SetElemUsed() cannot be nil")
@@ -339,7 +339,7 @@ func (buftary *BufferTArray) SetElemUsed(tptoken uint64, newUsed uint32) error {
 }
 
 // SetValBAry is a method to set a byte array (value) into the buffer at the given index (idx).
-func (buftary *BufferTArray) SetValBAry(tptoken uint64, idx uint32, value *[]byte) error {
+func (buftary *BufferTArray) SetValBAry(tptoken uint64, errstr *BufferT, idx uint32, value *[]byte) error {
 	printEntry("BufferTArray.SetValBAry()")
 	if nil == buftary {
 		panic("*BufferTArray receiver of SetValBAry() cannot be nil")
@@ -383,7 +383,7 @@ func (buftary *BufferTArray) SetValBAry(tptoken uint64, idx uint32, value *[]byt
 }
 
 // SetValStr is a method to set a string (value) into the buffer at the given index (idx).
-func (buftary *BufferTArray) SetValStr(tptoken uint64, idx uint32, value *string) error {
+func (buftary *BufferTArray) SetValStr(tptoken uint64, errstr *BufferT, idx uint32, value *string) error {
 	printEntry("BufferTArray.SetValStr()")
 	if nil == buftary {
 		panic("*BufferTArray receiver of SetValBAry() cannot be nil")
@@ -393,7 +393,7 @@ func (buftary *BufferTArray) SetValStr(tptoken uint64, idx uint32, value *string
 }
 
 // SetValStrLit is a method to set a string literal (value) into the buffer at the given index (idx).
-func (buftary *BufferTArray) SetValStrLit(tptoken uint64, idx uint32, value string) error {
+func (buftary *BufferTArray) SetValStrLit(tptoken uint64, errstr *BufferT, idx uint32, value string) error {
 	printEntry("BufferTArray.SetValStrLit()")
 	if nil == buftary {
 		panic("*BufferTArray receiver of SetValBAry() cannot be nil")
@@ -474,7 +474,7 @@ func (buftary *BufferTArray) DeleteExclST(tptoken uint64) error {
 //              Note these parameters MUST LIVE in C allocated memory or the call is likely to fail.
 //
 // transid  - See docs for ydb_tp_s() in the MLPG.
-func (buftary *BufferTArray) TpST(tptoken uint64, tpfn unsafe.Pointer, tpfnparm unsafe.Pointer, transid string) error {
+func (buftary *BufferTArray) TpST(tptoken uint64, errstr *BufferT, tpfn unsafe.Pointer, tpfnparm unsafe.Pointer, transid string) error {
 	printEntry("BufferTArray.TpST()")
 	if nil == buftary {
 		panic("*BufferTArray receiver of TpST() cannot be nil")
@@ -512,7 +512,7 @@ var tpMap map[uint64]func(uint64) int32
 //  for example), so should not change any data outside of the database
 //
 // transid  - See docs for ydb_tp_s() in the MLPG.
-func (buftary *BufferTArray) TpST2(tptoken uint64, tpfn func(uint64) int32, transid string) error {
+func (buftary *BufferTArray) TpST2(tptoken uint64, errstr *BufferT, tpfn func(uint64) int32, transid string) error {
 	tid := C.CString(transid)
 	tpMutex.Lock()
 	tpfnparm := tpIndex
@@ -538,7 +538,7 @@ func (buftary *BufferTArray) TpST2(tptoken uint64, tpfn func(uint64) int32, tran
 
 // YdbTpStWrapper is a private callback to wrap calls to the Go closure required for TpST2.
 //export ydbTpStWrapper
-func ydbTpStWrapper(tptoken uint64, tpfnparm unsafe.Pointer) int32 {
+func ydbTpStWrapper(tptoken uint64, errstr *BufferT, tpfnparm unsafe.Pointer) int32 {
 	index := *((*uint64)(tpfnparm))
 	tpMutex.Lock()
 	v, ok := tpMap[index]

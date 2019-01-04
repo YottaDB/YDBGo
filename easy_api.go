@@ -31,7 +31,7 @@ import "C"
 //
 // Matching DataST(), DataE() function wraps and returns the result of ydb_data_st(). In the event of an error, the return
 // value is unspecified.
-func DataE(tptoken uint64, varname string, subary []string) (uint32, error) {
+func DataE(tptoken uint64, errstr *BufferT, varname string, subary []string) (uint32, error) {
 	var retval C.uint
 	var dbkey KeyT
 	var err error
@@ -55,7 +55,7 @@ func DataE(tptoken uint64, varname string, subary []string) (uint32, error) {
 // delete a local or global variable node or (sub)tree, with a value of
 // C.YDB_DEL_NODE for deltype specifying that only the node should be deleted, leaving the (sub)tree untouched, and a value
 // of C.YDB_DEL_TREE specifying that the node as well as the(sub)tree are to be deleted.
-func DeleteE(tptoken uint64, deltype int, varname string, subary []string) error {
+func DeleteE(tptoken uint64, errstr *BufferT, deltype int, varname string, subary []string) error {
 	var dbkey KeyT
 	var err error
 
@@ -83,7 +83,7 @@ func DeleteE(tptoken uint64, deltype int, varname string, subary []string) error
 // ERRNAMECOUNT2HI. Otherwise, if ydb_delete_excl_st() returns an error, the function returns the error.
 //
 // As M and Go application code cannot be mixed in the same process, the warning in ydb_delete_excl_s() does not apply.
-func DeleteExclE(tptoken uint64, varnames []string) error {
+func DeleteExclE(tptoken uint64, errstr *BufferT, varnames []string) error {
 	var vnames BufferTArray
 	var maxvarnmlen, varnmcnt, varnmlen uint32
 	var i int
@@ -123,7 +123,7 @@ func DeleteExclE(tptoken uint64, varnames []string) error {
 //
 // If ydb_get_s() returns an error such as GVUNDEF, INVSVN, LVUNDEF,
 // the function returns the error. Otherwise, it returns the value at the node.
-func ValE(tptoken uint64, varname string, subary []string) (string, error) {
+func ValE(tptoken uint64, errstr *BufferT, varname string, subary []string) (string, error) {
 	var dbkey KeyT
 	var dbvalue BufferT
 	var err error
@@ -165,7 +165,7 @@ func ValE(tptoken uint64, varname string, subary []string) (string, error) {
 // If ydb_incr_st() returns an error such as NUMOFLOW or INVSTRLEN, the function returns the error. Otherwise, it returns the incremented value of the node.
 //
 // With a nil value for incr, the default increment is 1. Note that the value of the empty string coerced to an integer is zero.
-func IncrE(tptoken uint64, incr, varname string, subary []string) (string, error) {
+func IncrE(tptoken uint64, errstr *BufferT, incr, varname string, subary []string) (string, error) {
 	var dbkey KeyT
 	var dbvalue, incrval BufferT
 	var err error
@@ -215,7 +215,7 @@ func IncrE(tptoken uint64, incr, varname string, subary []string) (string, error
 // If namesubs is not a series of alternating string and []string parameters, the function returns the INVLNPAIRLIST error.
 // If it is able to aquire the lock resource(s) within timeoutNsec nanoseconds, the function returns holding the lock
 // resource(s); otherwise it returns LOCKTIMEOUT. If timeoutNsec is zero, the function makes exactly one attempt to acquire the lock resource(s).
-func LockE(tptoken uint64, timeoutNsec uint64, namesnsubs ...interface{}) error {
+func LockE(tptoken uint64, errstr *BufferT, timeoutNsec uint64, namesnsubs ...interface{}) error {
 	printEntry("LockE()")
 	if 0 != (uint32(len(namesnsubs)) & 1) {
 		errmsg, err := MessageT(tptoken, (int)(C.YDB_ERR_INVLNPAIRLIST))
@@ -284,7 +284,7 @@ func LockE(tptoken uint64, timeoutNsec uint64, namesnsubs ...interface{}) error 
 //
 // Matching LockDecrST(), LockDecrE() wraps ydb_lock_decr_st() to decrement the count of the lock name
 // referenced, releasing it if the count goes to zero or ignoring the invocation if the process does not hold the lock.
-func LockDecrE(tptoken uint64, varname string, subary []string) error {
+func LockDecrE(tptoken uint64, errstr *BufferT, varname string, subary []string) error {
 	var dbkey KeyT
 	var err error
 
@@ -311,7 +311,7 @@ func LockDecrE(tptoken uint64, varname string, subary []string) error {
 // If timeoutNsec exceeds C.YDB_MAX_TIME_NSEC, the function returns with an error return TIME2LONG.
 // If it is able to aquire the lock resource within timeoutNsec nanoseconds, it returns holding the lock, otherwise it returns
 // LOCKTIMEOUT. If timeoutNsec is zero, the function makes exactly one attempt to acquire the lock.
-func LockIncrE(tptoken uint64, timeoutNsec uint64, varname string, subary []string) error {
+func LockIncrE(tptoken uint64, errstr *BufferT, timeoutNsec uint64, varname string, subary []string) error {
 	var dbkey KeyT
 	var err error
 
@@ -335,7 +335,7 @@ func LockIncrE(tptoken uint64, timeoutNsec uint64, varname string, subary []stri
 // Matching NodeNextST(), NodeNextE() wraps ydb_node_next_st() to facilitate depth first traversal of a local or global variable tree.
 //
 // If there is a next node, it returns the subscripts of that next node. If the node is the last in the tree, the function returns the NODEEND error.
-func NodeNextE(tptoken uint64, varname string, subary []string) ([]string, error) {
+func NodeNextE(tptoken uint64, errstr *BufferT, varname string, subary []string) ([]string, error) {
 	var dbkey KeyT
 	var dbsubs BufferTArray
 	var err error
@@ -395,7 +395,7 @@ func NodeNextE(tptoken uint64, varname string, subary []string) ([]string, error
 //
 // If there is a previous node, it returns the subscripts of that previous node; an empty string array if that previous node is the root.
 // If the node is the first in the tree, the function returns the NODEEND error.
-func NodePrevE(tptoken uint64, varname string, subary []string) ([]string, error) {
+func NodePrevE(tptoken uint64, errstr *BufferT, varname string, subary []string) ([]string, error) {
 	var dbkey KeyT
 	var dbsubs BufferTArray
 	var err error
@@ -452,7 +452,7 @@ func NodePrevE(tptoken uint64, varname string, subary []string) ([]string, error
 //
 // Matching SetST(), at the referenced local or global variable node, or the intrinsic special variable, SetValE() wraps
 // ydb_set_st() to set the value specified.
-func SetValE(tptoken uint64, value, varname string, subary []string) error {
+func SetValE(tptoken uint64, errstr *BufferT, value, varname string, subary []string) error {
 	var dbkey KeyT
 	var dbvalue BufferT
 	var maxsublen, sublen, i uint32
@@ -512,7 +512,7 @@ func SetValE(tptoken uint64, value, varname string, subary []string) error {
 //
 // In the special case where subary is the null array, SubNextE() returns the name of the next global or local
 // variable, and the NODEEND error if varname is the last global or local variable.
-func SubNextE(tptoken uint64, varname string, subary []string) (string, error) {
+func SubNextE(tptoken uint64, errstr *BufferT, varname string, subary []string) (string, error) {
 	var dbkey KeyT
 	var dbsub BufferT
 	var err error
@@ -556,7 +556,7 @@ func SubNextE(tptoken uint64, varname string, subary []string) (string, error) {
 //
 // In the special case where subary is the null array SubNextE() returns the name of the previous global or local
 // variable, and the NODEEND error if varname is the first global or local variable.
-func SubPrevE(tptoken uint64, varname string, subary []string) (string, error) {
+func SubPrevE(tptoken uint64, errstr *BufferT, varname string, subary []string) (string, error) {
 	var dbkey KeyT
 	var dbsub BufferT
 	var err error
@@ -610,7 +610,7 @@ func SubPrevE(tptoken uint64, varname string, subary []string) (string, error) {
 // varnames - a list of local YottaDB variables to reset should the transaction
 //  be restarted; if this is an array of 1 string with a value of "*" all YDB
 //  local variables get reset after a TP_RESTART
-func TpE(tptoken uint64, tpfn unsafe.Pointer, tpfnparm unsafe.Pointer, transid string, varnames []string) error {
+func TpE(tptoken uint64, errstr *BufferT, tpfn unsafe.Pointer, tpfnparm unsafe.Pointer, transid string, varnames []string) error {
 	var vnames BufferTArray
 	var maxvarnmlen, varnmcnt, varnmlen uint32
 	var i int
@@ -658,7 +658,7 @@ func TpE(tptoken uint64, tpfn unsafe.Pointer, tpfnparm unsafe.Pointer, transid s
 // varnames - a list of local YottaDB variables to reset should the transaction
 //  be restarted; if this is an array of 1 string with a value of "*" all YDB
 //  local variables get reset after a TP_RESTART
-func TpE2(tptoken uint64, tpfn func(uint64) int32, transid string, varnames []string) error {
+func TpE2(tptoken uint64, errstr *BufferT, tpfn func(uint64) int32, transid string, varnames []string) error {
 	var vnames BufferTArray
 	var maxvarnmlen, varnmcnt, varnmlen uint32
 	var i int

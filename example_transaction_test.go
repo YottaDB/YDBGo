@@ -17,7 +17,7 @@ const dummyVarToForceGoDocToShowComments = 42
 //# //go:generate gengluecode -pkg yottadb_test -func MyGoCallBack
 
 //# //export MyGoCallBack
-//# func MyGoCallBack(tptoken uint64, tpfnarg unsafe.Pointer) int {
+//# func MyGoCallBack(tptoken uint64, errstr *BufferT, tpfnarg unsafe.Pointer) int {
 //#	// This violates TP transactions, but useful for demonstration
 //#	fmt.Printf("Hello from MyGoCallBack!\n")
 //#	return 0

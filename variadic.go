@@ -55,7 +55,7 @@ func (vplist *variadicPlist) alloc() {
 // callVariadicPlistFuncSt is a variadicPlist method to drive a variadic plist function with the given
 // plist. The function pointer must be to a C routine as cgo does not allow golang function pointers to
 // be passed to C.
-func (vplist *variadicPlist) callVariadicPlistFuncST(tptoken uint64, vpfunc unsafe.Pointer) int {
+func (vplist *variadicPlist) callVariadicPlistFuncST(tptoken uint64, errstr *BufferT, vpfunc unsafe.Pointer) int {
 	printEntry("variadicPlist.callVariadicPlistFuncST()")
 	if nil == vplist {
 		panic("*variadicPlist receiver of callVariadicPlistFuncST() cannot be nil")
@@ -106,7 +106,7 @@ func (vplist *variadicPlist) dump(tptoken uint64) {
 }
 
 // setUsed is a variadicPlist method to set the number of used elements in the variadic plist array.
-func (vplist *variadicPlist) setUsed(tptoken uint64, newUsed uint32) error {
+func (vplist *variadicPlist) setUsed(tptoken uint64, errstr *BufferT, newUsed uint32) error {
 	printEntry("variadicPlist.setUsed")
 	if nil == vplist {
 		panic("*variadicPlist receiver of setUsed() cannot be nil")
@@ -126,7 +126,7 @@ func (vplist *variadicPlist) setUsed(tptoken uint64, newUsed uint32) error {
 
 // setVPlistParam is a varidicPlist method to set an entry to the variable plist - note the addresses we
 // add here MUST point to C allocated memory and NOT Golang allocated memory or a crash will result.
-func (vplist *variadicPlist) setVPlistParam(tptoken uint64, paramindx int, paramaddr uintptr) error {
+func (vplist *variadicPlist) setVPlistParam(tptoken uint64, errstr *BufferT, paramindx int, paramaddr uintptr) error {
 	printEntry("variadicPlist.setVPlistParm")
 	if nil == vplist {
 		panic("*variadicPlist receiver of setVPlistParam() cannot be nil")

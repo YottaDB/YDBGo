@@ -278,7 +278,7 @@ func (buft *BufferT) ValStr(tptoken uint64) (*string, error) {
 //
 // Note that even if newLen is not greater than the value of len_alloc, setting a len_used value greater than the
 // number of meaningful bytes in the buffer will likely lead to hard-to-debug errors.
-func (buft *BufferT) SetLenUsed(tptoken uint64, newLen uint32) error {
+func (buft *BufferT) SetLenUsed(tptoken uint64, errstr *BufferT, newLen uint32) error {
 	printEntry("BufferT.SetLenUsed()")
 	if nil == buft {
 		panic("*BufferT receiver of SetLenUsed() cannot be nil")
@@ -310,7 +310,7 @@ func (buft *BufferT) SetLenUsed(tptoken uint64, newLen uint32) error {
 // If the length of value is greater than the len_alloc field of the C.ydb_buffer_t structure referenced by
 // cbuft, make no changes and return INVSTRLEN. Otherwise, copy the bytes of value to the location referenced
 // by the buf_addr field of the C.ydbbuffer_t structure, set the len_used field to the length of value.
-func (buft *BufferT) SetValBAry(tptoken uint64, value *[]byte) error {
+func (buft *BufferT) SetValBAry(tptoken uint64, errstr *BufferT, value *[]byte) error {
 	printEntry("BufferT.SetValBAry()")
 	if nil == buft {
 		panic("*BufferT receiver of SetValBAry() cannot be nil")
@@ -349,7 +349,7 @@ func (buft *BufferT) SetValBAry(tptoken uint64, value *[]byte) error {
 // If the length of value is greater than the len_alloc field of the C.ydb_buffer_t structure referenced by
 // cbuft, make no changes and return INVSTRLEN. Otherwise, copy the bytes of value to the location referenced
 // by the buf_addr field of the C.ydbbuffer_t structure, set the len_used field to the length of value.
-func (buft *BufferT) SetValStr(tptoken uint64, value *string) error {
+func (buft *BufferT) SetValStr(tptoken uint64, errstr *BufferT, value *string) error {
 	printEntry("BufferT.SetValStr()")
 	if nil == buft {
 		panic("*BufferT receiver of SetValStr() cannot be nil")
@@ -364,7 +364,7 @@ func (buft *BufferT) SetValStr(tptoken uint64, value *string) error {
 // If the length of value is greater than the len_alloc field of the C.ydb_buffer_t structure referenced by
 // cbuft, make no changes and return INVSTRLEN. Otherwise, copy the bytes of value to the location referenced
 // by the buf_addr field of the C.ydbbuffer_t structure, set the len_used field to the length of value.
-func (buft *BufferT) SetValStrLit(tptoken uint64, value string) error {
+func (buft *BufferT) SetValStrLit(tptoken uint64, errstr *BufferT, value string) error {
 	printEntry("BufferT.SetValStrLit()")
 	if nil == buft {
 		panic("*BufferT receiver of SetValStrLit() cannot be nil")
@@ -385,7 +385,7 @@ func (buft *BufferT) SetValStrLit(tptoken uint64, value string) error {
 // If len_alloc is not large enough, set len_used to the required length, and return an INVSTRLEN error. In this case,
 // len_used will be greater than len_alloc until corrected by application code. Otherwise, set the buffer referenced by buf_addr
 // to the zwrite format string, and set len_used to the length.
-func (buft *BufferT) Str2ZwrST(tptoken uint64, zwr *BufferT) error {
+func (buft *BufferT) Str2ZwrST(tptoken uint64, errstr *BufferT, zwr *BufferT) error {
 	printEntry("BufferT.Str2ZwrST()")
 	if nil == buft {
 		panic("*BufferT receiver of Str2ZwrST() cannot be nil")
@@ -419,7 +419,7 @@ func (buft *BufferT) Str2ZwrST(tptoken uint64, zwr *BufferT) error {
 // by buf_addr to the unencoded string, set len_used to the length.
 //
 // Note that the length of a string in zwrite format is always greater than or equal to the string in its original, unencoded format.
-func (buft *BufferT) Zwr2StrST(tptoken uint64, str *BufferT) error {
+func (buft *BufferT) Zwr2StrST(tptoken uint64, errstr *BufferT, str *BufferT) error {
 	printEntry("BufferT.Zwr2StrST()")
 	if nil == buft {
 		panic("*BufferT receiver of Zwr2StrST() cannot be nil")

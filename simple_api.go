@@ -42,7 +42,7 @@ import "C"
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // LockST is a STAPI function that releases all existing locks then locks the supplied variadic list of lock keys.
-func LockST(tptoken uint64, timeoutNsec uint64, lockname ...*KeyT) error {
+func LockST(tptoken uint64, errstr *BufferT, timeoutNsec uint64, lockname ...*KeyT) error {
 	var vplist variadicPlist
 	var lockcnt, namecnt int
 	var parmindx int

@@ -118,7 +118,7 @@ func (key *KeyT) DataST(tptoken uint64) (uint32, error) {
 // Matching DeleteE(), DeleteST() wraps ydb_delete_st() to delete a local or global variable node or (sub)tree, with a value of
 // C.YDB_DEL_NODE for deltype specifying that only the node should be deleted, leaving the (sub)tree untouched, and a value
 // of C.YDB_DEL_TREE specifying that the node as well as the (sub)tree are to be deleted.
-func (key *KeyT) DeleteST(tptoken uint64, deltype int) error {
+func (key *KeyT) DeleteST(tptoken uint64, errstr *BufferT, deltype int) error {
 	printEntry("KeyT.DeleteST()")
 	if nil == key {
 		panic("*KeyT receiver of DeleteST() cannot be nil")
@@ -147,7 +147,7 @@ func (key *KeyT) DeleteST(tptoken uint64, deltype int) error {
 // and returns the error. If the length of the data to be returned exceeds retval.getLenAlloc(), the method sets the len_used` of
 // the C.ydb_buffer_t referenced by retval to the required length, and returns an INVSTRLEN error. Otherwise, it copies the data
 // to the buffer referenced by the retval.buf_addr, and sets retval.lenUsed to its length.
-func (key *KeyT) ValST(tptoken uint64, retval *BufferT) error {
+func (key *KeyT) ValST(tptoken uint64, errstr *BufferT, retval *BufferT) error {
 	printEntry("KeyT.ValST()")
 	if nil == key {
 		panic("*KeyT receiver of ValST() cannot be nil")
@@ -180,7 +180,7 @@ func (key *KeyT) ValST(tptoken uint64, retval *BufferT) error {
 // Otherwise, it copies the data to the buffer referenced by the retval.buf_addr, sets retval.lenUsed to its length.
 //
 // With a nil value for incr, the default increment is 1. Note that the value of the empty string coerced to an integer is zero.
-func (key *KeyT) IncrST(tptoken uint64, incr, retval *BufferT) error {
+func (key *KeyT) IncrST(tptoken uint64, errstr *BufferT, incr, retval *BufferT) error {
 	var incrcbuft unsafe.Pointer
 
 	printEntry("KeyT.IncrST()")
@@ -241,7 +241,7 @@ func (key *KeyT) LockDecrST(tptoken uint64) error {
 // If timeoutNsec exceeds C.YDB_MAX_TIME_NSEC, the method returns with an error return TIME2LONG.
 // If it is able to aquire the lock resource within timeoutNsec nanoseconds, it returns holding the lock, otherwise it returns
 // LOCK_TIMEOUT. If timeoutNsec is zero, the method makes exactly one attempt to acquire the lock.
-func (key *KeyT) LockIncrST(tptoken uint64, timeoutNsec uint64) error {
+func (key *KeyT) LockIncrST(tptoken uint64, errstr *BufferT, timeoutNsec uint64) error {
 	printEntry("KeyT.LockIncrST()")
 	if nil == key {
 		panic("*KeyT receiver of LockIncrST() cannot be nil")
@@ -276,7 +276,7 @@ func (key *KeyT) LockIncrST(tptoken uint64, timeoutNsec uint64) error {
 // Otherwise, it sets the structure next to reference the subscripts of that next node, and next.elemsUsed to the number of subscripts.
 //
 // If the node is the last in the tree, the method returns the NODEEND error, making no changes to the structures below next.
-func (key *KeyT) NodeNextST(tptoken uint64, next *BufferTArray) error {
+func (key *KeyT) NodeNextST(tptoken uint64, errstr *BufferT, next *BufferTArray) error {
 	var nextElemsPtr *uint32
 	var dummyElemUsed uint32
 	var nextSubaryPtr *[]C.ydb_buffer_t
@@ -324,7 +324,7 @@ func (key *KeyT) NodeNextST(tptoken uint64, next *BufferTArray) error {
 // Otherwise, it sets the structure prev to reference the subscripts of that prev node, and prev.elemsUsed to the number of subscripts.
 //
 // If the node is the first in the tree, the method returns the NODEEND error making no changes to the structures below prev.
-func (key *KeyT) NodePrevST(tptoken uint64, prev *BufferTArray) error {
+func (key *KeyT) NodePrevST(tptoken uint64, errstr *BufferT, prev *BufferTArray) error {
 	var prevElemsPtr *uint32
 	var dummyElemUsed uint32
 	var prevSubaryPtr *[]C.ydb_buffer_t
@@ -361,7 +361,7 @@ func (key *KeyT) NodePrevST(tptoken uint64, prev *BufferTArray) error {
 //
 // Matching SetE(), at the referenced local or global variable node, or the intrinsic special variable, SetValST() wraps
 // ydb_set_st() to set the value specified by val.
-func (key *KeyT) SetValST(tptoken uint64, value *BufferT) error {
+func (key *KeyT) SetValST(tptoken uint64, errstr *BufferT, value *BufferT) error {
 	printEntry("KeyT.SetValST()")
 	if nil == key {
 		panic("*KeyT receiver of SetValST() cannot be nil")
@@ -393,7 +393,7 @@ func (key *KeyT) SetValST(tptoken uint64, value *BufferT) error {
 // sub.buf_addr, and sets sub.len_used to its length.
 //
 // If there is no next node or subtree at that level of the subtree, the method returns the NODEEND error.
-func (key *KeyT) SubNextST(tptoken uint64, retval *BufferT) error {
+func (key *KeyT) SubNextST(tptoken uint64, errstr *BufferT, retval *BufferT) error {
 	printEntry("KeyT.SubNextST()")
 	if nil == key {
 		panic("*KeyT receiver of SubNextST() cannot be nil")
@@ -424,7 +424,7 @@ func (key *KeyT) SubNextST(tptoken uint64, retval *BufferT) error {
 // sub.len_alloc. Otherwise, it copies that subscript to the buffer referenced by sub.buf_addr, and sets buf.len_used to its length.
 // 
 // If there is no previous node or subtree at that level of the subtree, the method returns the NODEEND error.
-func (key *KeyT) SubPrevST(tptoken uint64, retval *BufferT) error {
+func (key *KeyT) SubPrevST(tptoken uint64, errstr *BufferT, retval *BufferT) error {
 	printEntry("KeyT.SubPrevST()")
 	if nil == key {
 		panic("*KeyT receiver of SubPrevST() cannot be nil")

@@ -48,7 +48,7 @@ func printEntry(funcName string) {
 }
 
 // initkey is a function to initialize a provided key with the provided varname and subscript array in string form.
-func initkey(tptoken uint64, dbkey *KeyT, varname *string, subary *[]string) {
+func initkey(tptoken uint64, errstr *BufferT, dbkey *KeyT, varname *string, subary *[]string) {
 	var maxsublen, sublen, i uint32
 	var err error
 
