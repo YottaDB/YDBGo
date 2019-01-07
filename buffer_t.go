@@ -27,8 +27,8 @@ import "C"
 // BufferT is a golang structure that serves as an anchor point for a C allocated ydb_buffer_t structure used
 // to call the YottaDB C Simple APIs.
 type BufferT struct { // Contains a single ydb_buffer_t struct
-	cbuft     *C.ydb_buffer_t // C flavor of the ydb_buffer_t struct
-	ownsBuff bool
+	cbuft    *C.ydb_buffer_t // C flavor of the ydb_buffer_t struct
+	ownsBuff bool            // If true, we should clean the cbuft when Free'd
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -37,7 +37,11 @@ type BufferT struct { // Contains a single ydb_buffer_t struct
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-func (buft *BufferT) FromPtr(pointer unsafe.Pointer) {
+// BufferTFromPtr sets this BufferT internal structure to point to the given buffer
+//
+// This method should be used to create BufferT's in a TpST callback routine where
+//  a raw pointer to the parents errmsg is provided
+func (buft *BufferT) BufferTFromPtr(pointer unsafe.Pointer) {
 	if nil == buft {
 		panic("*BufferT receiver of FromPtr() cannot be nil")
 	}

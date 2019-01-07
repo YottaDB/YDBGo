@@ -556,7 +556,7 @@ func ydbTpStWrapper(tptoken uint64, errstr *C.ydb_buffer_t, tpfnparm unsafe.Poin
 	v, ok := tpMap[index]
 	tpMutex.Unlock()
 	var errbuff BufferT
-	errbuff.FromPtr((unsafe.Pointer)(errstr))
+	errbuff.BufferTFromPtr((unsafe.Pointer)(errstr))
 	if !ok {
 		panic("Couldn't find callback routine")
 	}

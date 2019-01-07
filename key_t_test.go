@@ -19,6 +19,7 @@ import (
 	. "lang.yottadb.com/go/yottadb/internal/test_helpers"
 	"strconv"
 	"testing"
+	"sync"
 )
 
 func TestDataSt(t *testing.T) {
@@ -595,4 +596,84 @@ func TestKeyTNodeNextWithSmallBufAry(t *testing.T) {
 	errcode = yottadb.ErrorCode(err)
 	assert.Equal(t, yottadb.YDB_ERR_INVSTRLEN, errcode)
 	buftary.SetElemUsed(tptoken, nil, 1)
+}
+
+func TestKeyTGetWithUndefGlobal(t *testing.T) {
+	var key yottadb.KeyT
+	var errstr, out yottadb.BufferT
+
+	tptoken := yottadb.NOTTP
+
+	key.Alloc(10, 1, 10)
+	key.Varnm.SetValStrLit(tptoken, nil, "^MyVal")
+	key.Subary.SetValStrLit(tptoken, nil, 0, "")
+
+	defer errstr.Free()
+	errstr.Alloc(64)
+	defer out.Free()
+	out.Alloc(64)
+
+	err := key.ValST(tptoken, &errstr, &out)
+	assert.NotNil(t, err)
+	assert.Contains(t, err.Error(), "YDB-E-GVUNDEF")
+}
+
+func TestKeyTSetWithDifferentErrors(t *testing.T) {
+	var key1, key2 yottadb.KeyT
+	var tmp yottadb.BufferT
+	var wg sync.WaitGroup
+
+	tptoken := yottadb.NOTTP
+
+	// GVUNDEF error
+	key1.Alloc(10, 1, 10)
+	key1.Varnm.SetValStrLit(tptoken, nil, "^MyVal")
+	key1.Subary.SetValStrLit(tptoken, nil, 0, "")
+
+	// INVSTRLEN error
+	key2.Alloc(10, 1, 64)
+	key2.Varnm.SetValStrLit(tptoken, nil, "^MyVal2")
+	key2.Subary.SetValStrLit(tptoken, nil, 0, "")
+	defer tmp.Free()
+	tmp.Alloc(10)
+	tmp.SetValStrLit(tptoken, nil, "1234567890")
+	key2.SetValST(tptoken, nil, &tmp)
+
+	// Kick off procs to test
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func() {
+			var errstr, out yottadb.BufferT
+			defer errstr.Free()
+			errstr.Alloc(64)
+			defer out.Free()
+			out.Alloc(5)
+
+			for j := 0; j < 1000; j++ {
+				err := key1.ValST(tptoken, &errstr, &out)
+				assert.NotNil(t, err)
+				assert.Contains(t, err.Error(), "YDB-E-GVUNDEF")
+			}
+			wg.Done()
+		}()
+	}
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func() {
+			var errstr, out yottadb.BufferT
+			defer errstr.Free()
+			errstr.Alloc(64)
+			defer out.Free()
+			out.Alloc(5)
+
+			for j := 0; j < 1000; j++ {
+				err := key2.ValST(tptoken, &errstr, &out)
+				assert.NotNil(t, err)
+				assert.Contains(t, err.Error(), "YDB-E-INVSTRLEN")
+			}
+			wg.Done()
+		}()
+	}
+
+	wg.Wait()
 }

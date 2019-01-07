@@ -17,7 +17,9 @@ const dummyVarToForceGoDocToShowComments = 42
 //# //go:generate gengluecode -pkg yottadb_test -func MyGoCallBack
 
 //# //export MyGoCallBack
-//# func MyGoCallBack(tptoken uint64, errstr *BufferT, tpfnarg unsafe.Pointer) int {
+//# func MyGoCallBack(tptoken uint64, errstr *BufferT, tpfnarg unsafe.Pointer, errptr unsafe.Pointer) int {
+//#     var errstr yottadb.BufferT
+//#     errstr.BufferTFromPtr(errptr)
 //#	// This violates TP transactions, but useful for demonstration
 //#	fmt.Printf("Hello from MyGoCallBack!\n")
 //#	return 0
@@ -27,6 +29,7 @@ const dummyVarToForceGoDocToShowComments = 42
 func Example_transactionProcessing() {
 	// Allocate a key to set our value equal too
 	var buffertary1 yottadb.BufferTArray
+	var errstr yottadb.BufferT
 	var tptoken uint64
 	var err error
 
@@ -37,12 +40,15 @@ func Example_transactionProcessing() {
 	// Restore all YDB local buffers on a TP-restart
 	defer buffertary1.Free()
 	buffertary1.Alloc(1, 32)
-	err = buffertary1.SetValStrLit(tptoken, nil, 0, "*")
+	errstr.Alloc(64)
+	defer errstr.Free()
+	
+	err = buffertary1.SetValStrLit(tptoken, &errstr, 0, "*")
 	if err != nil {
 		panic(err)
 	}
 	//# /*
-	err = buffertary1.TpST(tptoken, nil, test_helpers.GetMyGoCallBackCgo(), nil, "TEST")
+	err = buffertary1.TpST(tptoken, &errstr, test_helpers.GetMyGoCallBackCgo(), nil, "TEST")
 	//# */
 	//# err = buffertary1.TpST(tptoken, nil, GetMyGoCallBackCgo(), nil, "TEST")
 	if err != nil {
