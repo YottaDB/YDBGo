@@ -428,7 +428,7 @@ func (buftary *BufferTArray) DeleteExclST(tptoken uint64, errstr *BufferT) error
 	rc := C.ydb_delete_excl_st(C.uint64_t(tptoken), cbuft, C.int(buftary.elemsUsed),
 		(*C.ydb_buffer_t)(unsafe.Pointer(buftary.cbuftary)))
 	if C.YDB_OK != rc {
-		err := NewError(int(rc))
+		err := NewError(int(rc), errstr)
 		return err
 	}
 	return nil
@@ -493,7 +493,7 @@ func (buftary *BufferTArray) TpST(tptoken uint64, errstr *BufferT, tpfn unsafe.P
 	rc := C.ydb_tp_st(C.uint64_t(tptoken), cbuft, (C.ydb_tpfnptr_t)(tpfn), tpfnparm, tid,
 		C.int(buftary.elemsUsed), cbuftary)
 	if C.YDB_OK != rc {
-		err := NewError(int(rc))
+		err := NewError(int(rc), errstr)
 		return err
 	}
 	return nil
@@ -542,7 +542,7 @@ func (buftary *BufferTArray) TpST2(tptoken uint64, errstr *BufferT, tpfn func(ui
 	delete(tpMap, tpfnparm)
 	tpMutex.Unlock()
 	if C.YDB_OK != rc {
-		err := NewError(int(rc))
+		err := NewError(int(rc), errstr)
 		return err
 	}
 	return nil

@@ -26,7 +26,7 @@ func TestErrorErrorCode(t *testing.T) {
 	assert.Equal(t, r, -1)
 
 	// Get a valid YDB-error
-	err = yottadb.NewError(-151027930)
+	err = yottadb.NewError(-151027930, nil)
 	assert.NotNil(t, err)
 	r = yottadb.ErrorCode(err)
 	assert.Equal(t, r, -151027930)
@@ -36,7 +36,7 @@ func TestErrorNewError(t *testing.T) {
 	err_tprestart := -150376595
 
 	// Attempt to get a TPRESTART error, which has special handling
-	err := yottadb.NewError(err_tprestart)
+	err := yottadb.NewError(err_tprestart, nil)
 	r := yottadb.ErrorCode(err)
 	assert.Equal(t, r, err_tprestart)
 }

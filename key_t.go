@@ -111,7 +111,7 @@ func (key *KeyT) DataST(tptoken uint64, errstr *BufferT) (uint32, error) {
 	rc := C.ydb_data_st(C.uint64_t(tptoken), cbuft, vargobuft, C.int(subgobuftary.elemsUsed), subbuftary,
 		&retval)
 	if C.YDB_OK != rc {
-		err := NewError(int(rc))
+		err := NewError(int(rc), errstr)
 		return 0, err
 	}
 	return uint32(retval), nil
@@ -140,7 +140,7 @@ func (key *KeyT) DeleteST(tptoken uint64, errstr *BufferT, deltype int) error {
 	rc := C.ydb_delete_st(C.uint64_t(tptoken), cbuft, vargobuft, C.int(subgobuftary.elemsUsed), subbuftary,
 		C.int(deltype))
 	if C.YDB_OK != rc {
-		err := NewError(int(rc))
+		err := NewError(int(rc), errstr)
 		return err
 	}
 	return nil
@@ -173,7 +173,7 @@ func (key *KeyT) ValST(tptoken uint64, errstr *BufferT, retval *BufferT) error {
 	rc := C.ydb_get_st(C.uint64_t(tptoken), cbuft, vargobuft, C.int(subgobuftary.elemsUsed), subbuftary,
 		retval.cbuft)
 	if C.YDB_OK != rc {
-		err := NewError(int(rc))
+		err := NewError(int(rc), errstr)
 		return err
 	}
 	// Returned string should be snug in the retval buffer
@@ -218,7 +218,7 @@ func (key *KeyT) IncrST(tptoken uint64, errstr *BufferT, incr, retval *BufferT) 
 		(*C.ydb_buffer_t)(incrcbuft),
 		retval.cbuft)
 	if C.YDB_OK != rc {
-		err := NewError(int(rc))
+		err := NewError(int(rc), errstr)
 		return err
 	}
 	// Returned string should be snug in the retval buffer
@@ -246,7 +246,7 @@ func (key *KeyT) LockDecrST(tptoken uint64, errstr *BufferT) error {
 	}
 	rc := C.ydb_lock_decr_st(C.uint64_t(tptoken), cbuft, vargobuft, C.int(subgobuftary.elemsUsed), subbuftary)
 	if C.YDB_OK != rc {
-		err := NewError(int(rc))
+		err := NewError(int(rc), errstr)
 		return err
 	}
 	return nil
@@ -279,7 +279,7 @@ func (key *KeyT) LockIncrST(tptoken uint64, errstr *BufferT, timeoutNsec uint64)
 	rc := C.ydb_lock_incr_st(C.uint64_t(tptoken), cbuft, C.ulonglong(timeoutNsec), vargobuft,
 		C.int(subgobuftary.elemsUsed), subbuftary)
 	if C.YDB_OK != rc {
-		err := NewError(int(rc))
+		err := NewError(int(rc), errstr)
 		return err
 	}
 	return nil
@@ -331,7 +331,7 @@ func (key *KeyT) NodeNextST(tptoken uint64, errstr *BufferT, next *BufferTArray)
 	rc := C.ydb_node_next_st(C.uint64_t(tptoken), cbuft, vargobuft, C.int(subgobuftary.elemsUsed), subbuftary,
 		(*C.int)(unsafe.Pointer(nextElemsPtr)), (*C.ydb_buffer_t)(unsafe.Pointer(nextSubaryPtr)))
 	if C.YDB_OK != rc {
-		err := NewError(int(rc))
+		err := NewError(int(rc), errstr)
 		return err
 	}
 	return nil
@@ -383,7 +383,7 @@ func (key *KeyT) NodePrevST(tptoken uint64, errstr *BufferT, prev *BufferTArray)
 	rc := C.ydb_node_previous_st(C.uint64_t(tptoken), cbuft, vargobuft, C.int(subgobuftary.elemsUsed),
 		subbuftary, (*C.int)(unsafe.Pointer(prevElemsPtr)), (*C.ydb_buffer_t)(unsafe.Pointer(prevSubaryPtr)))
 	if C.YDB_OK != rc {
-		err := NewError(int(rc))
+		err := NewError(int(rc), errstr)
 		return err
 	}
 	return nil
@@ -410,7 +410,7 @@ func (key *KeyT) SetValST(tptoken uint64, errstr *BufferT, value *BufferT) error
 	rc := C.ydb_set_st(C.uint64_t(tptoken), cbuft, vargobuft, C.int(key.Subary.elemsUsed), cbuftary,
 		value.cbuft)
 	if C.YDB_OK != rc {
-		err := NewError(int(rc))
+		err := NewError(int(rc), errstr)
 		return err
 	}
 	return nil
@@ -447,7 +447,7 @@ func (key *KeyT) SubNextST(tptoken uint64, errstr *BufferT, retval *BufferT) err
 	rc := C.ydb_subscript_next_st(C.uint64_t(tptoken), cbuft, vargobuft, C.int(subgobuftary.elemsUsed),
 		subbuftary, retval.cbuft)
 	if C.YDB_OK != rc {
-		err := NewError(int(rc))
+		err := NewError(int(rc), errstr)
 		return err
 	}
 	return nil
@@ -482,7 +482,7 @@ func (key *KeyT) SubPrevST(tptoken uint64, errstr *BufferT, retval *BufferT) err
 	rc := C.ydb_subscript_previous_st(C.uint64_t(tptoken), cbuft, vargobuft, C.int(subgobuftary.elemsUsed),
 		subbuftary, retval.cbuft)
 	if C.YDB_OK != rc {
-		err := NewError(int(rc))
+		err := NewError(int(rc), errstr)
 		return err
 	}
 	return nil
