@@ -679,3 +679,16 @@ func TestKeyTSetWithDifferentErrors(t *testing.T) {
 
 	wg.Wait()
 }
+
+func TestKeyTSimpleAPITPDeadlock(t *testing.T) {
+	t.Skipf("This test causes a deadlock; we do not currently believe this can be avoided")
+	fn := func(tptoken uint64, errstr *yottadb.BufferT) int32 {
+		err := yottadb.SetValE(yottadb.NOTTP, errstr, "Hello world", "^Hello", []string{})
+		assert.NotNil(t, err)
+		assert.Equal(t, "", err.Error())
+		return 0
+	}
+	err := yottadb.TpE2(yottadb.NOTTP, nil, fn, "BATCH", []string{})
+	assert.NotNil(t, err)
+	assert.Equal(t, "", err.Error())
+}

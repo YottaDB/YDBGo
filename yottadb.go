@@ -26,6 +26,5 @@ const debugFlag bool = false
 var easyAPIDefaultDataSize uint32 = 256  // Init value - may grow - Base allocation for returned data values
 var easyAPIDefaultSubscrCnt uint32 = 10  // Init value - may grow - Base subscript count allocation for returned subscr list
 var easyAPIDefaultSubscrSize uint32 = 32 // Init value - may grow - Base subscript size allocation for returned subscr list
-var lastErrorRaised int                  // In case certain errors repeat - used to stop loops
 
 //go:generate ./scripts/gen_error_codes.sh

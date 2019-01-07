@@ -59,12 +59,6 @@ func NewError(errnum int, errstr *BufferT) error {
 		// Shortcut for this performance sensitive error - not a user error
 		return &YDBError{errnum, "TPRESTART"}
 	}
-	// If we are seeing C.YDB_ERR_SIMPLEAPINEST sequentially, the likelihood is we are in an error
-	// loop which we need to break out of with a panic.
-	if ((int)(C.YDB_ERR_SIMPLEAPINEST) == errnum) && ((int)(C.YDB_ERR_SIMPLEAPINEST) == lastErrorRaised) {
-		panic("YDB: Detected a SIMPLEAPINEST error loop")
-	}
-	lastErrorRaised = errnum
 	if nil != errstr && nil != errstr.cbuft {
 		errmsg := C.GoString((*C.char)(errstr.cbuft.buf_addr))
 		return &YDBError{errnum, errmsg}
