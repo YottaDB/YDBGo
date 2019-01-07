@@ -417,11 +417,11 @@ func (buftary *BufferTArray) SetValStrLit(tptoken uint64, errstr *BufferT, idx u
 //
 // As M and Go application code cannot be mixed in the same process, the warning in ydb_delete_excl_s() does not apply.
 func (buftary *BufferTArray) DeleteExclST(tptoken uint64, errstr *BufferT) error {
+	var cbuft *C.ydb_buffer_t
 	printEntry("BufferTArray.DeleteExclST()")
 	if nil == buftary {
 		panic("*BufferTArray receiver of DeleteExclST() cannot be nil")
 	}
-	var cbuft *C.ydb_buffer_t
 	if errstr != nil {
 		cbuft = errstr.cbuft
 	}
@@ -479,6 +479,7 @@ func (buftary *BufferTArray) DeleteExclST(tptoken uint64, errstr *BufferT) error
 //
 // transid  - See docs for ydb_tp_s() in the MLPG.
 func (buftary *BufferTArray) TpST(tptoken uint64, errstr *BufferT, tpfn unsafe.Pointer, tpfnparm unsafe.Pointer, transid string) error {
+	var cbuft *C.ydb_buffer_t
 	printEntry("BufferTArray.TpST()")
 	if nil == buftary {
 		panic("*BufferTArray receiver of TpST() cannot be nil")
@@ -486,7 +487,6 @@ func (buftary *BufferTArray) TpST(tptoken uint64, errstr *BufferT, tpfn unsafe.P
 	tid := C.CString(transid)
 	defer C.free(unsafe.Pointer(tid)) // Should stay regular free since this was system malloc'd
 	cbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(buftary.cbuftary))
-	var cbuft *C.ydb_buffer_t
 	if errstr != nil {
 		cbuft = errstr.cbuft
 	}
@@ -521,6 +521,7 @@ var tpMap map[uint64]func(uint64, *BufferT) int32
 //
 // transid  - See docs for ydb_tp_s() in the MLPG.
 func (buftary *BufferTArray) TpST2(tptoken uint64, errstr *BufferT, tpfn func(uint64, *BufferT) int32, transid string) error {
+	var cbuft *C.ydb_buffer_t
 	tid := C.CString(transid)
 	tpMutex.Lock()
 	tpfnparm := tpIndex
@@ -532,7 +533,6 @@ func (buftary *BufferTArray) TpST2(tptoken uint64, errstr *BufferT, tpfn func(ui
 	tpMutex.Unlock()
 	defer C.free(unsafe.Pointer(tid))
 	cbuftary := (*C.ydb_buffer_t)(unsafe.Pointer((*buftary).cbuftary))
-	var cbuft *C.ydb_buffer_t
 	if errstr != nil {
 		cbuft = errstr.cbuft
 	}

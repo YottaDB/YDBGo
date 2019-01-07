@@ -28,8 +28,14 @@ import "C"
 // to call the YottaDB C Simple APIs.
 type BufferT struct { // Contains a single ydb_buffer_t struct
 	cbuft     *C.ydb_buffer_t // C flavor of the ydb_buffer_t struct
-	owns_buff bool
+	ownsBuff bool
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Data manipulation methods for BufferT
+//
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 func (buft *BufferT) FromPtr(pointer unsafe.Pointer) {
 	if nil == buft {
@@ -39,7 +45,7 @@ func (buft *BufferT) FromPtr(pointer unsafe.Pointer) {
 		buft.Free()
 	}
 	buft.cbuft = (*C.ydb_buffer_t)(pointer)
-	buft.owns_buff = false
+	buft.ownsBuff = false
 }
 
 // Alloc is a method to allocate the ydb_buffer_t C storage and allocate or re-allocate the buffer pointed
@@ -59,7 +65,7 @@ func (buft *BufferT) Alloc(nBytes uint32) {
 		// We already have a ydb_buffer_t, just get rid of current buffer for re-allocate
 		cbuftptr = buft.cbuft
 		cbufptr := cbuftptr.buf_addr
-		if buft.owns_buff {
+		if buft.ownsBuff {
 			C.free(unsafe.Pointer(cbufptr))
 		}
 		cbuftptr.buf_addr = nil
@@ -79,7 +85,7 @@ func (buft *BufferT) Alloc(nBytes uint32) {
 		cbuftptr.buf_addr = nil // Making sure a potentially de-allocated buffer is not pointed to
 	}
 	cbuftptr.len_alloc = C.uint(nBytes)
-	buft.owns_buff = true
+	buft.ownsBuff = true
 }
 
 // Dump is a method to dump the contents of a BufferT block for debugging purposes.
@@ -124,8 +130,7 @@ func (buft *BufferT) DumpToWriter(writer io.Writer) {
 func (buft *BufferT) Free() {
 	printEntry("BufferT.Free()")
 	if nil != buft { // Ignore if buft is null already
-		/// TODO: add owns_buff
-		if buft.owns_buff {
+		if buft.ownsBuff {
 			cbuftptr := buft.cbuft
 			if nil != cbuftptr {
 				// ydb_buffer_t block exists - free its buffer first if it exists

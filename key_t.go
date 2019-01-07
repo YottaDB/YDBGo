@@ -93,6 +93,7 @@ func (key *KeyT) Free() {
 // is unspecified.
 func (key *KeyT) DataST(tptoken uint64, errstr *BufferT) (uint32, error) {
 	var retval C.uint
+	var cbuft *C.ydb_buffer_t
 
 	printEntry("KeyT.DataST()")
 	if nil == key {
@@ -104,7 +105,6 @@ func (key *KeyT) DataST(tptoken uint64, errstr *BufferT) (uint32, error) {
 	}
 	subgobuftary := &(key.Subary)
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(subgobuftary.cbuftary))
-	var cbuft *C.ydb_buffer_t
 	if errstr != nil {
 		cbuft = errstr.cbuft
 	}
@@ -123,6 +123,7 @@ func (key *KeyT) DataST(tptoken uint64, errstr *BufferT) (uint32, error) {
 // C.YDB_DEL_NODE for deltype specifying that only the node should be deleted, leaving the (sub)tree untouched, and a value
 // of C.YDB_DEL_TREE specifying that the node as well as the (sub)tree are to be deleted.
 func (key *KeyT) DeleteST(tptoken uint64, errstr *BufferT, deltype int) error {
+	var cbuft *C.ydb_buffer_t
 	printEntry("KeyT.DeleteST()")
 	if nil == key {
 		panic("*KeyT receiver of DeleteST() cannot be nil")
@@ -133,7 +134,6 @@ func (key *KeyT) DeleteST(tptoken uint64, errstr *BufferT, deltype int) error {
 	}
 	subgobuftary := &(key.Subary)
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(subgobuftary.cbuftary))
-	var cbuft *C.ydb_buffer_t
 	if errstr != nil {
 		cbuft = errstr.cbuft
 	}
@@ -156,6 +156,7 @@ func (key *KeyT) DeleteST(tptoken uint64, errstr *BufferT, deltype int) error {
 // the C.ydb_buffer_t referenced by retval to the required length, and returns an INVSTRLEN error. Otherwise, it copies the data
 // to the buffer referenced by the retval.buf_addr, and sets retval.lenUsed to its length.
 func (key *KeyT) ValST(tptoken uint64, errstr *BufferT, retval *BufferT) error {
+	var cbuft *C.ydb_buffer_t
 	printEntry("KeyT.ValST()")
 	if nil == key {
 		panic("*KeyT receiver of ValST() cannot be nil")
@@ -166,7 +167,6 @@ func (key *KeyT) ValST(tptoken uint64, errstr *BufferT, retval *BufferT) error {
 	}
 	subgobuftary := &(key.Subary)
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(subgobuftary.cbuftary))
-	var cbuft *C.ydb_buffer_t
 	if errstr != nil {
 		cbuft = errstr.cbuft
 	}
@@ -194,6 +194,7 @@ func (key *KeyT) ValST(tptoken uint64, errstr *BufferT, retval *BufferT) error {
 // With a nil value for incr, the default increment is 1. Note that the value of the empty string coerced to an integer is zero.
 func (key *KeyT) IncrST(tptoken uint64, errstr *BufferT, incr, retval *BufferT) error {
 	var incrcbuft unsafe.Pointer
+	var cbuft *C.ydb_buffer_t
 
 	printEntry("KeyT.IncrST()")
 	if nil == key {
@@ -210,7 +211,6 @@ func (key *KeyT) IncrST(tptoken uint64, errstr *BufferT, incr, retval *BufferT) 
 	} else {
 		incrcbuft = unsafe.Pointer(incr.cbuft)
 	}
-	var cbuft *C.ydb_buffer_t
 	if errstr != nil {
 		cbuft = errstr.cbuft
 	}
@@ -230,6 +230,7 @@ func (key *KeyT) IncrST(tptoken uint64, errstr *BufferT, incr, retval *BufferT) 
 // Matching LockDecrE(), LockDecrST() wraps ydb_lock_decr_st() to decrement the count of the lock name
 // referenced, releasing it if the count goes to zero or ignoring the invocation if the process does not hold the lock.
 func (key *KeyT) LockDecrST(tptoken uint64, errstr *BufferT) error {
+	var cbuft *C.ydb_buffer_t
 	printEntry("KeyT.LockDecrST()")
 	if nil == key {
 		panic("*KeyT receiver of LockDecrST() cannot be nil")
@@ -240,7 +241,6 @@ func (key *KeyT) LockDecrST(tptoken uint64, errstr *BufferT) error {
 	}
 	subgobuftary := &(key.Subary)
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(subgobuftary.cbuftary))
-	var cbuft *C.ydb_buffer_t
 	if errstr != nil {
 		cbuft = errstr.cbuft
 	}
@@ -262,6 +262,7 @@ func (key *KeyT) LockDecrST(tptoken uint64, errstr *BufferT) error {
 // If it is able to aquire the lock resource within timeoutNsec nanoseconds, it returns holding the lock, otherwise it returns
 // LOCK_TIMEOUT. If timeoutNsec is zero, the method makes exactly one attempt to acquire the lock.
 func (key *KeyT) LockIncrST(tptoken uint64, errstr *BufferT, timeoutNsec uint64) error {
+	var cbuft *C.ydb_buffer_t
 	printEntry("KeyT.LockIncrST()")
 	if nil == key {
 		panic("*KeyT receiver of LockIncrST() cannot be nil")
@@ -272,7 +273,6 @@ func (key *KeyT) LockIncrST(tptoken uint64, errstr *BufferT, timeoutNsec uint64)
 	}
 	subgobuftary := &(key.Subary)
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(subgobuftary.cbuftary))
-	var cbuft *C.ydb_buffer_t
 	if errstr != nil {
 		cbuft = errstr.cbuft
 	}
@@ -304,6 +304,7 @@ func (key *KeyT) NodeNextST(tptoken uint64, errstr *BufferT, next *BufferTArray)
 	var nextElemsPtr *uint32
 	var dummyElemUsed uint32
 	var nextSubaryPtr *[]C.ydb_buffer_t
+	var cbuft *C.ydb_buffer_t
 
 	printEntry("KeyT.NodeNextST()")
 	if nil == key {
@@ -324,7 +325,6 @@ func (key *KeyT) NodeNextST(tptoken uint64, errstr *BufferT, next *BufferTArray)
 	}
 	subgobuftary := &(key.Subary)
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(subgobuftary.cbuftary))
-	var cbuft *C.ydb_buffer_t
 	if errstr != nil {
 		cbuft = errstr.cbuft
 	}
@@ -356,6 +356,7 @@ func (key *KeyT) NodePrevST(tptoken uint64, errstr *BufferT, prev *BufferTArray)
 	var prevElemsPtr *uint32
 	var dummyElemUsed uint32
 	var prevSubaryPtr *[]C.ydb_buffer_t
+	var cbuft *C.ydb_buffer_t
 
 	printEntry("KeyT.NodePrevST()")
 	if nil == key {
@@ -376,7 +377,6 @@ func (key *KeyT) NodePrevST(tptoken uint64, errstr *BufferT, prev *BufferTArray)
 	}
 	subgobuftary := &(key.Subary)
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(subgobuftary.cbuftary))
-	var cbuft *C.ydb_buffer_t
 	if errstr != nil {
 		cbuft = errstr.cbuft
 	}
@@ -394,6 +394,7 @@ func (key *KeyT) NodePrevST(tptoken uint64, errstr *BufferT, prev *BufferTArray)
 // Matching SetE(), at the referenced local or global variable node, or the intrinsic special variable, SetValST() wraps
 // ydb_set_st() to set the value specified by val.
 func (key *KeyT) SetValST(tptoken uint64, errstr *BufferT, value *BufferT) error {
+	var cbuft *C.ydb_buffer_t
 	printEntry("KeyT.SetValST()")
 	if nil == key {
 		panic("*KeyT receiver of SetValST() cannot be nil")
@@ -403,7 +404,6 @@ func (key *KeyT) SetValST(tptoken uint64, errstr *BufferT, value *BufferT) error
 		panic("KeyT varname is not allocated, is nil, or has a 0 length")
 	}
 	cbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(key.Subary.cbuftary))
-	var cbuft *C.ydb_buffer_t
 	if errstr != nil {
 		cbuft = errstr.cbuft
 	}
@@ -430,6 +430,7 @@ func (key *KeyT) SetValST(tptoken uint64, errstr *BufferT, value *BufferT) error
 //
 // If there is no next node or subtree at that level of the subtree, the method returns the NODEEND error.
 func (key *KeyT) SubNextST(tptoken uint64, errstr *BufferT, retval *BufferT) error {
+	var cbuft *C.ydb_buffer_t
 	printEntry("KeyT.SubNextST()")
 	if nil == key {
 		panic("*KeyT receiver of SubNextST() cannot be nil")
@@ -440,7 +441,6 @@ func (key *KeyT) SubNextST(tptoken uint64, errstr *BufferT, retval *BufferT) err
 	}
 	subgobuftary := &(key.Subary)
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(subgobuftary.cbuftary))
-	var cbuft *C.ydb_buffer_t
 	if errstr != nil {
 		cbuft = errstr.cbuft
 	}
@@ -465,6 +465,7 @@ func (key *KeyT) SubNextST(tptoken uint64, errstr *BufferT, retval *BufferT) err
 //
 // If there is no previous node or subtree at that level of the subtree, the method returns the NODEEND error.
 func (key *KeyT) SubPrevST(tptoken uint64, errstr *BufferT, retval *BufferT) error {
+	var cbuft *C.ydb_buffer_t
 	printEntry("KeyT.SubPrevST()")
 	if nil == key {
 		panic("*KeyT receiver of SubPrevST() cannot be nil")
@@ -475,7 +476,6 @@ func (key *KeyT) SubPrevST(tptoken uint64, errstr *BufferT, retval *BufferT) err
 	}
 	subgobuftary := &(key.Subary)
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(subgobuftary.cbuftary))
-	var cbuft *C.ydb_buffer_t
 	if errstr != nil {
 		cbuft = errstr.cbuft
 	}

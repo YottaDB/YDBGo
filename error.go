@@ -52,7 +52,7 @@ func ErrorCode(err error) int {
 // using (for example) GetE() to fetch $ZSTATUS because ydb_zstatus does not require a tptoken. This means
 // that we don't need to pass tptoken to all the data access methods (For example, GetValStr()).
 //
-func NewError(errnum int) error {
+func NewError(errnum int, errstr *BufferT) error {
 	var msgptr *C.char
 
 	if (int)(C.YDB_ERR_TPRESTART) == errnum {
@@ -65,6 +65,10 @@ func NewError(errnum int) error {
 		panic("YDB: Detected a SIMPLEAPINEST error loop")
 	}
 	lastErrorRaised = errnum
+	if nil != errstr && nil != errstr.cbuft {
+		errmsg := C.GoString((*C.char)(errstr.cbuft.buf_addr))
+		return &YDBError{errnum, errmsg}
+	}
 	// Fetch $ZSTATUS to return as the error string
 	msgptr = (*C.char)(C.malloc(C.size_t(C.YDB_MAX_ERRORMSG)))
 	C.ydb_zstatus(msgptr, C.int(C.YDB_MAX_ERRORMSG))
