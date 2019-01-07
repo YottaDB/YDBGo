@@ -42,7 +42,7 @@ func Example_transactionProcessing() {
 	buffertary1.Alloc(1, 32)
 	errstr.Alloc(64)
 	defer errstr.Free()
-	
+
 	err = buffertary1.SetValStrLit(tptoken, &errstr, 0, "*")
 	if err != nil {
 		panic(err)

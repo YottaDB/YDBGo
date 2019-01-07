@@ -18,8 +18,8 @@ import (
 	"lang.yottadb.com/go/yottadb"
 	. "lang.yottadb.com/go/yottadb/internal/test_helpers"
 	"strconv"
-	"testing"
 	"sync"
+	"testing"
 )
 
 func TestDataSt(t *testing.T) {
@@ -634,7 +634,7 @@ func TestKeyTSetWithDifferentErrors(t *testing.T) {
 			key1.Alloc(10, 1, 10)
 			key1.Varnm.SetValStrLit(tptoken, nil, "^MyVal")
 			key1.Subary.SetValStrLit(tptoken, nil, 0, "")
-			
+
 			defer errstr.Free()
 			errstr.Alloc(64)
 			defer out.Free()
@@ -662,7 +662,7 @@ func TestKeyTSetWithDifferentErrors(t *testing.T) {
 			tmp.Alloc(10)
 			tmp.SetValStrLit(tptoken, nil, "1234567890")
 			key2.SetValST(tptoken, nil, &tmp)
-			
+
 			defer errstr.Free()
 			errstr.Alloc(64)
 			defer out.Free()
