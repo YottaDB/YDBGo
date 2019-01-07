@@ -619,31 +619,22 @@ func TestKeyTGetWithUndefGlobal(t *testing.T) {
 }
 
 func TestKeyTSetWithDifferentErrors(t *testing.T) {
-	var key1, key2 yottadb.KeyT
-	var tmp yottadb.BufferT
 	var wg sync.WaitGroup
 
 	tptoken := yottadb.NOTTP
-
-	// GVUNDEF error
-	key1.Alloc(10, 1, 10)
-	key1.Varnm.SetValStrLit(tptoken, nil, "^MyVal")
-	key1.Subary.SetValStrLit(tptoken, nil, 0, "")
-
-	// INVSTRLEN error
-	key2.Alloc(10, 1, 64)
-	key2.Varnm.SetValStrLit(tptoken, nil, "^MyVal2")
-	key2.Subary.SetValStrLit(tptoken, nil, 0, "")
-	defer tmp.Free()
-	tmp.Alloc(10)
-	tmp.SetValStrLit(tptoken, nil, "1234567890")
-	key2.SetValST(tptoken, nil, &tmp)
 
 	// Kick off procs to test
 	for i := 0; i < 10; i++ {
 		wg.Add(1)
 		go func() {
 			var errstr, out yottadb.BufferT
+			var key1 yottadb.KeyT
+
+			// GVUNDEF error
+			key1.Alloc(10, 1, 10)
+			key1.Varnm.SetValStrLit(tptoken, nil, "^MyVal")
+			key1.Subary.SetValStrLit(tptoken, nil, 0, "")
+			
 			defer errstr.Free()
 			errstr.Alloc(64)
 			defer out.Free()
@@ -660,7 +651,18 @@ func TestKeyTSetWithDifferentErrors(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		wg.Add(1)
 		go func() {
-			var errstr, out yottadb.BufferT
+			var errstr, tmp, out yottadb.BufferT
+			var key2 yottadb.KeyT
+
+			// INVSTRLEN error
+			key2.Alloc(10, 1, 64)
+			key2.Varnm.SetValStrLit(tptoken, nil, "^MyVal2")
+			key2.Subary.SetValStrLit(tptoken, nil, 0, "")
+			defer tmp.Free()
+			tmp.Alloc(10)
+			tmp.SetValStrLit(tptoken, nil, "1234567890")
+			key2.SetValST(tptoken, nil, &tmp)
+			
 			defer errstr.Free()
 			errstr.Alloc(64)
 			defer out.Free()
