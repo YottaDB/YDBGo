@@ -30,7 +30,7 @@ import (
 // #include "libyottadb.h"
 // #include "libydberrors.h"
 // int TestTpRtn_cgo(uint64_t tptoken, uintptr_t in); // Forward declaration
-// void ydb_ci_t_wrapper(unsigned long tptoken, char *name, ydb_string_t *arg);
+// void ydb_ci_t_wrapper(unsigned long tptoken, ydb_buffer_t *errstr, char *name, ydb_string_t *arg);
 import "C"
 
 const VarSiz uint32 = 15                        // Max size of varname including '^'
@@ -240,6 +240,7 @@ var ydb_ci_mutex sync.Mutex
 
 // YDBCi calls a M routine and returns the result (if any; else, returns an empty string)
 func YDBCi(tptoken uint64,
+	errstr *yottadb.BufferT,
 	expect_return bool,
 	funcname string,
 	args ...string) string {
@@ -265,8 +266,10 @@ func YDBCi(tptoken uint64,
 	callname := (*C.ydb_string_t)(C.malloc(C.size_t(C.sizeof_ydb_string_t)))
 	callname.length = C.ulong(len(localname))
 	callname.address = C.CString(localname)
-	C.ydb_ci_t_wrapper(C.ulong(tptoken), C.CString("ydbmcallback"), callname)
-	//C.ydb_ci_t(tptoken, C.CString("ydbmcallback", callname))
+	/// TODO: we can't currently get a the C struct in errstr to pass here, so pass
+	///  null instead. When/if this is moved into the yottadb package, we should
+	///  pass in errstr.cbuft like in other simple API methods
+	C.ydb_ci_t_wrapper(C.ulong(tptoken), nil, C.CString("ydbmcallback"), callname)
 	C.free(unsafe.Pointer(callname.address))
 	C.free(unsafe.Pointer(callname))
 	if expect_return {

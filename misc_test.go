@@ -45,7 +45,7 @@ func TestYDBCi(t *testing.T) {
 	if !Available("ydb_ci") {
 		t.Skipf("Skipping call-in tests as ydb_ci is not configured")
 	}
-	r := YDBCi(yottadb.NOTTP, true, "hello^helloM", "World")
+	r := YDBCi(yottadb.NOTTP, nil, true, "hello^helloM", "World")
 	assert.Equal(t, r, "World")
 }
 
@@ -61,7 +61,7 @@ func TestMiscGoTimers(t *testing.T) {
 	go func() {
 		for i := 0; i < 2; i++ {
 			start := time.Now()
-			r := YDBCi(yottadb.NOTTP, false, "run^TestMiscGoTimers")
+			r := YDBCi(yottadb.NOTTP, nil, false, "run^TestMiscGoTimers")
 			elapsed := time.Since(start)
 			// This test failed on a loaded system with a 11% insteasd
 			//  of the allowed 10 % on 2019-01-01, if it continues to fail
