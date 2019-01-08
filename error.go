@@ -59,7 +59,7 @@ func NewError(errnum int, errstr *BufferT) error {
 		// Shortcut for this performance sensitive error - not a user error
 		return &YDBError{errnum, "TPRESTART"}
 	}
-	if nil != errstr && nil != errstr.cbuft {
+	if (nil != errstr) && (nil != errstr.cbuft) {
 		errmsg := C.GoString((*C.char)(errstr.cbuft.buf_addr))
 		return &YDBError{errnum, errmsg}
 	}
