@@ -37,10 +37,12 @@ type BufferT struct { // Contains a single ydb_buffer_t struct
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// BufferTFromPtr sets this BufferT internal structure to point to the given buffer
+// BufferTFromPtr sets this BufferT internal structure to point to the given buffer.
 //
-// This method should be used to create BufferT's in a TpST callback routine where
-//  a raw pointer to the parents errmsg is provided
+// Intended for use by functions implementing transaction logic, the method sets cbuft in the BufferT structure to errstr.
+//
+// Note: Modifying errstr, or accessing memory it references may lead to code that behaves unpredictably and is hard to debug. Always
+// “wrap” it using FromPtr() and use the methods for the BufferT structure.
 func (buft *BufferT) BufferTFromPtr(pointer unsafe.Pointer) {
 	if nil == buft {
 		panic("*BufferT receiver of FromPtr() cannot be nil")
