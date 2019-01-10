@@ -49,17 +49,10 @@ func TestYDBCi(t *testing.T) {
 	assert.Equal(t, r, "World")
 }
 
-func TestMiscGoTimers(t *testing.T) {
-	// Verify that Go timers do not interfere with YDB timers; kick off a thread
-	//  which invokes a M routine that sleeps 100ms 10 times, kick off 10 go routines
-	//  which sleep for 100ms
-	var wg sync.WaitGroup
-	if !Available("ydb_ci") {
-		t.Skipf("Skipping call-in tests as ydb_ci is not configured")
-	}
+func miscGoTimersHelper(t *testing.T, wg *sync.WaitGroup, loops int) {
 	wg.Add(1)
 	go func() {
-		for i := 0; i < 2; i++ {
+		for i := 0; i < loops; i++ {
 			start := time.Now()
 			r := YDBCi(yottadb.NOTTP, nil, false, "run^TestMiscGoTimers")
 			elapsed := time.Since(start)
@@ -75,6 +68,17 @@ func TestMiscGoTimers(t *testing.T) {
 		}
 		wg.Done()
 	}()
+}
+
+func TestMiscGoTimers(t *testing.T) {
+	// Verify that Go timers do not interfere with YDB timers; kick off a thread
+	//  which invokes a M routine that sleeps 100ms 10 times, kick off 10 go routines
+	//  which sleep for 100ms
+	var wg sync.WaitGroup
+	if !Available("ydb_ci") {
+		t.Skipf("Skipping call-in tests as ydb_ci is not configured")
+	}
+	miscGoTimersHelper(t, &wg, 2)
 	sleepDuration, e := time.ParseDuration("100ms")
 	assert.Nil(t, e)
 	for i := 0; i < 10; i++ {
@@ -90,4 +94,128 @@ func TestMiscGoTimers(t *testing.T) {
 		}()
 	}
 	wg.Wait()
+}
+
+func TestMiscGoSelectWithYdbTimers(t *testing.T) {
+	// Verify Go channels do not interfere with YDB timers
+	var wg sync.WaitGroup
+	if !Available("ydb_ci") {
+		t.Skipf("Skipping call-in tests as ydb_ci is not configured")
+	}
+	miscGoTimersHelper(t, &wg, 10)
+	// Spawn off consume-producer routines, sending 100 messages at 10ms intervals (10s test)
+	sleepDuration, e := time.ParseDuration("10ms")
+	recvCount := 0
+	ch := make(chan int)
+	assert.Nil(t, e)
+	wg.Add(1)
+	go func() {
+		for i := 0; i < 100; i++ {
+			ch <- i
+			time.Sleep(sleepDuration)
+		}
+		close(ch)
+		wg.Done()
+	}()
+	wg.Add(1)
+	go func() {
+		for range ch {
+			recvCount++
+		}
+		wg.Done()
+	}()
+	wg.Wait()
+	assert.Equal(t, 100, recvCount)
+}
+
+func TestMiscGoSelectWithYdbTimers2(t *testing.T) {
+	// Verify Go select/channels do not interfere with YDB timers
+	var wg sync.WaitGroup
+	if !Available("ydb_ci") {
+		t.Skipf("Skipping call-in tests as ydb_ci is not configured")
+	}
+	miscGoTimersHelper(t, &wg, 10)
+	// Spawn off consume-producer routines, sending 100 messages at 10ms intervals (10s test)
+	sleepDuration, e := time.ParseDuration("10ms")
+	recvCount := 0
+	ch := make(chan int)
+	assert.Nil(t, e)
+	wg.Add(1)
+	go func() {
+		for i := 0; i < 100; i++ {
+			ch <- i
+			time.Sleep(sleepDuration)
+		}
+		ch <- -1
+		close(ch)
+		wg.Done()
+	}()
+	wg.Add(1)
+	go func() {
+		for true {
+			done := false
+			select {
+			case x := <-ch:
+				if x == -1 {
+					done = true
+					break
+				}
+				recvCount++
+			default:
+				continue
+			}
+			if done {
+				break
+			}
+		}
+		wg.Done()
+	}()
+	wg.Wait()
+	assert.Equal(t, 100, recvCount)
+}
+
+func TestMiscGoSelectWithYdbTimers3(t *testing.T) {
+	// Verify Go select/channels/time.After does not interfere with YDB timers
+	var wg sync.WaitGroup
+	if !Available("ydb_ci") {
+		t.Skipf("Skipping call-in tests as ydb_ci is not configured")
+	}
+	miscGoTimersHelper(t, &wg, 10)
+	// Spawn off consume-producer routines, sending 100 messages at 10ms intervals (10s test)
+	sleepDuration, e := time.ParseDuration("10ms")
+	recvCount := 0
+	ch := make(chan int)
+	assert.Nil(t, e)
+	wg.Add(1)
+	go func() {
+		for i := 0; i < 100; i++ {
+			ch <- i
+			time.Sleep(sleepDuration)
+		}
+		ch <- -1
+		close(ch)
+		wg.Done()
+	}()
+	wg.Add(1)
+	go func() {
+		for true {
+			done := false
+			select {
+			case x := <-ch:
+				if x == -1 {
+					done = true
+					break
+				}
+				recvCount++
+			case <-time.After(5 * time.Millisecond):
+				continue
+			}
+			if done {
+				break
+			}
+		}
+		wg.Done()
+	}()
+	wg.Wait()
+	assert.Equal(t, 100, recvCount)
 }
