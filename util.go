@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	//
+// Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -42,9 +42,21 @@ func MessageT(tptoken uint64, errstr *BufferT, status int) (string, error) {
 		return "", err
 	}
 	// Returned string should be snug in the retval buffer. Pick it out so can return it as a string
-	msgptr, err := msgval.ValStr(tptoken)
+	msgptr, err := msgval.ValStr(tptoken, errstr)
 	if nil != err {
 		panic(fmt.Sprintf("YDB: Unexpected error with GetValStr(): %s", err))
 	}
 	return *msgptr, err
+}
+
+// ReleaseT is a STAPI utility function to return release information for this verison of the Golang wrapper plus
+// info on the release of YottaDB itself.
+func ReleaseT(tptoken uint64, errstr *BufferT) (string, error) {
+	printEntry("ReleaseT()")
+	zyrel, err := ValE(tptoken, errstr, "$ZYRELEASE", []string{})
+	if nil != err {
+		return "", err
+	}
+	retval := fmt.Sprintf("gowr %s %s", WrapperRelease, zyrel)
+	return retval, nil
 }

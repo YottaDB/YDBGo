@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	//
+// Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -158,7 +158,7 @@ func TestIncrST(t *testing.T) {
 	Assertnoerr(err, t)
 	err = dbkey.IncrST(tptoken, nil, &incrval, &dbval2)
 	Assertnoerr(err, t)
-	newval2, err = dbval2.ValStr(tptoken)
+	newval2, err = dbval2.ValStr(tptoken, nil)
 	Assertnoerr(err, t)
 	newval2i, err = strconv.Atoi(*newval2)
 	Assertnoerr(err, t)
@@ -168,7 +168,7 @@ func TestIncrST(t *testing.T) {
 	// Fetch the value and verify same as what we got back from IncrST()
 	err = dbkey.ValST(tptoken, nil, &dbval1)
 	Assertnoerr(err, t)
-	newval1, err = dbval1.ValStr(tptoken)
+	newval1, err = dbval1.ValStr(tptoken, nil)
 	if *newval1 != *newval2 {
 		t.Error("Returned and post-increment fetch values not same - db :", *newval1,
 			"  returned: ", *newval2)
@@ -411,7 +411,7 @@ func TestSubNextST(t *testing.T) {
 			Assertnoerr(err, t) // Unknown error - cause panic
 		}
 		// Validate subname
-		retsub, err := dbsub.ValStr(tptoken)
+		retsub, err := dbsub.ValStr(tptoken, nil)
 		Assertnoerr(err, t)
 		expectsub := "sub" + strconv.Itoa(i)
 		if *retsub != expectsub {
@@ -445,7 +445,7 @@ func TestSubNextST(t *testing.T) {
 			Assertnoerr(err, t) // Unknown error - cause panic
 		}
 		// Validate subname
-		retsub, err := dbsub.ValStr(tptoken)
+		retsub, err := dbsub.ValStr(tptoken, nil)
 		Assertnoerr(err, t)
 		expectsub := "sub" + strconv.Itoa(i)
 		if *retsub != expectsub {
@@ -529,19 +529,19 @@ func TestKeyTGetValueThatWontFitInBuffer(t *testing.T) {
 	assert.Equal(t, yottadb.YDB_ERR_INVSTRLEN, errcode)
 
 	// Verify that getting len on the buffer results in error
-	_, err = buff.LenUsed(tptoken)
+	_, err = buff.LenUsed(tptoken, nil)
 	assert.NotNil(t, err)
 	errcode = yottadb.ErrorCode(err)
 	assert.Equal(t, yottadb.YDB_ERR_INVSTRLEN, errcode)
 
 	// Verify that getting val on the buffer results in error
-	_, err = buff.ValBAry(tptoken)
+	_, err = buff.ValBAry(tptoken, nil)
 	assert.NotNil(t, err)
 	errcode = yottadb.ErrorCode(err)
 	assert.Equal(t, yottadb.YDB_ERR_INVSTRLEN, errcode)
 
 	// Verify that getting len on the buffer results in error
-	_, err = buff.ValStr(tptoken)
+	_, err = buff.ValStr(tptoken, nil)
 	assert.NotNil(t, err)
 	errcode = yottadb.ErrorCode(err)
 	assert.Equal(t, yottadb.YDB_ERR_INVSTRLEN, errcode)

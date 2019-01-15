@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	//
+// Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -40,14 +40,14 @@ func TestStr2ZwrSTAndZwr2StrST(t *testing.T) {
 	Assertnoerr(err, t)
 	err = ovalue.Str2ZwrST(tptoken, nil, &cvalue)
 	Assertnoerr(err, t)
-	outstrp, err = cvalue.ValStr(tptoken)
+	outstrp, err = cvalue.ValStr(tptoken, nil)
 	Assertnoerr(err, t)
 	if DebugFlag {
 		t.Log("Str2ZwrS modified string:    ", *outstrp)
 	}
 	err = cvalue.Zwr2StrST(tptoken, nil, &ovalue)
 	Assertnoerr(err, t)
-	outstrp, err = ovalue.ValStr(tptoken)
+	outstrp, err = ovalue.ValStr(tptoken, nil)
 	Assertnoerr(err, t)
 	if DebugFlag {
 		t.Log("Zwr2StrS re-modified string: ", *outstrp)
@@ -93,7 +93,7 @@ func TestLenAlloc(t *testing.T) {
 	defer value.Free()
 	value.Alloc(128)
 
-	len, err := value.LenAlloc(yottadb.NOTTP)
+	len, err := value.LenAlloc(yottadb.NOTTP, nil)
 	assert.Nil(t, err)
 	assert.Equal(t, len, uint32(128))
 }
@@ -109,7 +109,7 @@ func TestAllocLargeValue(t *testing.T) {
 	value.Alloc(val)
 
 	// Verify that the allocated value is the correct size
-	len, err := value.LenAlloc(yottadb.NOTTP)
+	len, err := value.LenAlloc(yottadb.NOTTP, nil)
 	assert.Nil(t, err)
 	assert.Equal(t, val, len)
 }
@@ -119,7 +119,7 @@ func TestAlloc(t *testing.T) {
 	var tptoken uint64 = yottadb.NOTTP
 	var err error
 
-	_, err = value.LenAlloc(yottadb.NOTTP)
+	_, err = value.LenAlloc(yottadb.NOTTP, nil)
 	assert.NotNil(t, err)
 
 	// Test Free with no Alloc
@@ -151,7 +151,7 @@ func TestAlloc(t *testing.T) {
 	err = ovalue.SetValStrLit(tptoken, nil, "Hello")
 	assert.Nil(t, err)
 	ovalue.Alloc(3)
-	str, err := ovalue.ValStr(tptoken)
+	str, err := ovalue.ValStr(tptoken, nil)
 	assert.Nil(t, err)
 	assert.Equal(t, "", *str)
 }
@@ -160,18 +160,18 @@ func TestLen(t *testing.T) {
 	var value, noalloc_value yottadb.BufferT
 	var length = uint32(128)
 
-	l, err := value.LenUsed(yottadb.NOTTP)
+	l, err := value.LenUsed(yottadb.NOTTP, nil)
 	assert.NotNil(t, err)
 
 	value.Alloc(length)
 
-	l, err = value.LenUsed(yottadb.NOTTP)
+	l, err = value.LenUsed(yottadb.NOTTP, nil)
 	assert.Nil(t, err)
 	assert.Equal(t, l, uint32(0))
 
 	err = value.SetValStrLit(yottadb.NOTTP, nil, "Hello")
 	assert.Nil(t, err)
-	l, err = value.LenUsed(yottadb.NOTTP)
+	l, err = value.LenUsed(yottadb.NOTTP, nil)
 	assert.Nil(t, err)
 	assert.Equal(t, l, uint32(len("Hello")))
 
@@ -207,7 +207,7 @@ func TestValStr(t *testing.T) {
 	var length = uint32(len(global_name))
 
 	// Get value before being init'd
-	str, err := value.ValStr(yottadb.NOTTP)
+	str, err := value.ValStr(yottadb.NOTTP, nil)
 	assert.Nil(t, str)
 	assert.NotNil(t, err)
 
@@ -237,7 +237,7 @@ func TestValBAry(t *testing.T) {
 	err := value.SetValStr(tp, nil, &str)
 	assert.Nil(t, err)
 
-	bytes, err := value.ValBAry(tp)
+	bytes, err := value.ValBAry(tp, nil)
 	assert.Nil(t, err)
 	assert.Equal(t, *bytes, []byte(str))
 
@@ -246,7 +246,7 @@ func TestValBAry(t *testing.T) {
 	assert.NotNil(t, err)
 
 	// Try to get value on non-alloc'd value
-	val, err := noalloc_value.ValBAry(tp)
+	val, err := noalloc_value.ValBAry(tp, nil)
 	assert.NotNil(t, err)
 	assert.Nil(t, val)
 }
@@ -286,10 +286,10 @@ func TestBufferTNilRecievers(t *testing.T) {
 	test_wrapper(func() { value.Dump() })
 	test_wrapper(func() { value.DumpToWriter(nil) })
 	//test_wrapper(func() { value.Free() }) // Free won't panic, it'll just chill
-	test_wrapper(func() { value.LenAlloc(tp) })
-	test_wrapper(func() { value.LenUsed(tp) })
-	test_wrapper(func() { value.ValBAry(tp) })
-	test_wrapper(func() { value.ValStr(tp) })
+	test_wrapper(func() { value.LenAlloc(tp, nil) })
+	test_wrapper(func() { value.LenUsed(tp, nil) })
+	test_wrapper(func() { value.ValBAry(tp, nil) })
+	test_wrapper(func() { value.ValStr(tp, nil) })
 	test_wrapper(func() { value.SetLenUsed(tp, nil, 1000) })
 	test_wrapper(func() { value.SetValBAry(tp, nil, nil) })
 	test_wrapper(func() { value.SetValStr(tp, nil, nil) })

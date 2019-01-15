@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	//
+// Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -124,6 +124,7 @@ func (key *KeyT) DataST(tptoken uint64, errstr *BufferT) (uint32, error) {
 // of C.YDB_DEL_TREE specifying that the node as well as the (sub)tree are to be deleted.
 func (key *KeyT) DeleteST(tptoken uint64, errstr *BufferT, deltype int) error {
 	var cbuft *C.ydb_buffer_t
+
 	printEntry("KeyT.DeleteST()")
 	if nil == key {
 		panic("*KeyT receiver of DeleteST() cannot be nil")
@@ -157,6 +158,7 @@ func (key *KeyT) DeleteST(tptoken uint64, errstr *BufferT, deltype int) error {
 // to the buffer referenced by the retval.buf_addr, and sets retval.lenUsed to its length.
 func (key *KeyT) ValST(tptoken uint64, errstr *BufferT, retval *BufferT) error {
 	var cbuft *C.ydb_buffer_t
+
 	printEntry("KeyT.ValST()")
 	if nil == key {
 		panic("*KeyT receiver of ValST() cannot be nil")
@@ -231,6 +233,7 @@ func (key *KeyT) IncrST(tptoken uint64, errstr *BufferT, incr, retval *BufferT) 
 // referenced, releasing it if the count goes to zero or ignoring the invocation if the process does not hold the lock.
 func (key *KeyT) LockDecrST(tptoken uint64, errstr *BufferT) error {
 	var cbuft *C.ydb_buffer_t
+
 	printEntry("KeyT.LockDecrST()")
 	if nil == key {
 		panic("*KeyT receiver of LockDecrST() cannot be nil")
@@ -263,6 +266,7 @@ func (key *KeyT) LockDecrST(tptoken uint64, errstr *BufferT) error {
 // LOCK_TIMEOUT. If timeoutNsec is zero, the method makes exactly one attempt to acquire the lock.
 func (key *KeyT) LockIncrST(tptoken uint64, errstr *BufferT, timeoutNsec uint64) error {
 	var cbuft *C.ydb_buffer_t
+
 	printEntry("KeyT.LockIncrST()")
 	if nil == key {
 		panic("*KeyT receiver of LockIncrST() cannot be nil")
@@ -395,6 +399,7 @@ func (key *KeyT) NodePrevST(tptoken uint64, errstr *BufferT, prev *BufferTArray)
 // ydb_set_st() to set the value specified by val.
 func (key *KeyT) SetValST(tptoken uint64, errstr *BufferT, value *BufferT) error {
 	var cbuft *C.ydb_buffer_t
+
 	printEntry("KeyT.SetValST()")
 	if nil == key {
 		panic("*KeyT receiver of SetValST() cannot be nil")
@@ -431,6 +436,7 @@ func (key *KeyT) SetValST(tptoken uint64, errstr *BufferT, value *BufferT) error
 // If there is no next node or subtree at that level of the subtree, the method returns the NODEEND error.
 func (key *KeyT) SubNextST(tptoken uint64, errstr *BufferT, retval *BufferT) error {
 	var cbuft *C.ydb_buffer_t
+
 	printEntry("KeyT.SubNextST()")
 	if nil == key {
 		panic("*KeyT receiver of SubNextST() cannot be nil")
@@ -466,6 +472,7 @@ func (key *KeyT) SubNextST(tptoken uint64, errstr *BufferT, retval *BufferT) err
 // If there is no previous node or subtree at that level of the subtree, the method returns the NODEEND error.
 func (key *KeyT) SubPrevST(tptoken uint64, errstr *BufferT, retval *BufferT) error {
 	var cbuft *C.ydb_buffer_t
+
 	printEntry("KeyT.SubPrevST()")
 	if nil == key {
 		panic("*KeyT receiver of SubPrevST() cannot be nil")

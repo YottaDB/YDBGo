@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	//
+// Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -160,7 +160,7 @@ func Example_wordFreq() {
 		}
 
 		// Set this subscript into wordsvar for fetching/previousing.
-		tmp1valp, rce = tmp1.ValStr(tptoken)
+		tmp1valp, rce = tmp1.ValStr(tptoken, nil)
 		assertnoerr(rce)
 		rce = wordsvar.Subary.SetValStr(tptoken, nil, 0, tmp1valp) // Set next subscript back into KeyT for next SubNextST() call
 		assertnoerr(rce)
@@ -170,7 +170,7 @@ func Example_wordFreq() {
 		assertnoerr(rce)
 		rce = wordsvar.ValST(tptoken, nil, &wordsTmp1)
 		assertnoerr(rce)
-		strvalp, rce = wordsTmp1.ValStr(tptoken)
+		strvalp, rce = wordsTmp1.ValStr(tptoken, nil)
 		assertnoerr(rce)
 		rce = indexvar.Subary.SetValStr(tptoken, nil, 0, strvalp)
 		assertnoerr(rce)
@@ -204,7 +204,7 @@ func Example_wordFreq() {
 		}
 		rce = indexvar.Subary.SetElemUsed(tptoken, nil, 2) // Revert to using two subscripts
 		assertnoerr(rce)
-		tmp1valp, rce = tmp1.ValStr(tptoken)
+		tmp1valp, rce = tmp1.ValStr(tptoken, nil)
 		assertnoerr(rce)
 
 		// Now loop through all the vars with this frequency count and print them
@@ -221,13 +221,13 @@ func Example_wordFreq() {
 				}
 				assertnoerr(rce)
 			}
-			tmp2valp, rce = tmp2.ValStr(tptoken)
+			tmp2valp, rce = tmp2.ValStr(tptoken, nil)
 			assertnoerr(rce)
 			rce = indexvar.Subary.SetValStr(tptoken, nil, 1, tmp2valp) // Set value back into key for next SubNextST()
 			assertnoerr(rce)
 
 			// Fetch current indexes as strings and print them
-			freqcnt, rce := tmp1.ValStr(tptoken)
+			freqcnt, rce := tmp1.ValStr(tptoken, nil)
 			assertnoerr(rce)
 
 			linein, rce = readin.ReadString('\n')

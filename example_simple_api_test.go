@@ -1,3 +1,15 @@
+//////////////////////////////////////////////////////////////////
+//								//
+// Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.//
+// All rights reserved.						//
+//								//
+//	This source code contains the intellectual property	//
+//	of its copyright holder(s), and is made available	//
+//	under a license.  If you do not know the terms of	//
+//	the license, please stop and do not read further.	//
+//								//
+//////////////////////////////////////////////////////////////////
+
 package yottadb_test
 
 import (
@@ -64,7 +76,7 @@ func Example_simpleAPI() {
 	// For the sake of demonstration, we will first clear the buffer we used to set the
 	//  value
 	buff1.Alloc(64)
-	val1, err = buff1.ValStr(tptoken)
+	val1, err = buff1.ValStr(tptoken, nil)
 	if err != nil {
 		panic(err)
 	}
@@ -75,7 +87,7 @@ func Example_simpleAPI() {
 	if err != nil {
 		panic(err)
 	}
-	val1, err = buff1.ValStr(tptoken)
+	val1, err = buff1.ValStr(tptoken, nil)
 	if (*val1) != "Go world" {
 		panic("Value not what was expected; did someone else set something?")
 	}
@@ -124,7 +136,7 @@ func Example_simpleAPI() {
 				panic(err)
 			}
 		}
-		val1, err = cur_sub.ValStr(tptoken)
+		val1, err = cur_sub.ValStr(tptoken, nil)
 		if err != nil {
 			panic(err)
 		}

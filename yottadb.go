@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	//
+// Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -20,6 +20,17 @@ import "C"
 
 // NOTTP contains the tptoken value to use when NOT in a TP transaction callback routine.
 const NOTTP uint64 = 0
+
+// Release version constants - be sure to change all of them appropriately
+
+// WrapperRelease - (string) The Golang wrapper release value for YottaDB SimpleAPI
+const WrapperRelease string = "0.89.0-inflight"
+// MinimumYDBReleaseMajor - (int) Minimum major release number required by this wrapper of the linked YottaDB
+const MinimumYDBReleaseMajor int = 1
+// MinimumYDBReleaseMinor - (int) Minimum minor release number required by this wrapper of the linked YottaDB
+const MinimumYDBReleaseMinor int = 24
+// MinimumYDBRelease - (string) Minimum YottaDB release name required by this wrapper
+const MinimumYDBRelease string = "r1.24"
 
 const debugFlag bool = false
 

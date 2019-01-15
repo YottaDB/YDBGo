@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	//
+// Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -143,22 +143,21 @@ func TestBufTAryAlloc(t *testing.T) {
 
 func TestBufTAryLenAlloc(t *testing.T) {
 	var value, noalloc_value yottadb.BufferTArray
-	var tp = yottadb.NOTTP
 
 	// Try getting length of non-alloc'd array
-	r := value.ElemLenAlloc(tp)
+	r := value.ElemLenAlloc()
 	assert.Equal(t, r, uint32(0))
 
-	r = noalloc_value.ElemLenAlloc(tp)
+	r = noalloc_value.ElemLenAlloc()
 	assert.Equal(t, r, uint32(0))
 
 	value.Alloc(10, 64)
-	r = value.ElemLenAlloc(tp)
+	r = value.ElemLenAlloc()
 	assert.Equal(t, r, uint32(64))
 
 	// Alloc a length of 0 and try to get it
 	value.Alloc(0, 64)
-	r = value.ElemLenAlloc(tp)
+	r = value.ElemLenAlloc()
 	assert.Equal(t, r, uint32(0))
 }
 
@@ -309,7 +308,7 @@ func TestBufferTAryNilRecievers(t *testing.T) {
 	test_wrapper(func() { value.DumpToWriter(nil) })
 	//test_wrapper(func() { value.Free() }) // Free doesn't panic as a nil rec.
 	test_wrapper(func() { value.ElemAlloc() })
-	test_wrapper(func() { value.ElemLenAlloc(0) })
+	test_wrapper(func() { value.ElemLenAlloc() })
 	test_wrapper(func() { value.ElemLenUsed(tp, nil, 0) })
 	test_wrapper(func() { value.ElemUsed() })
 	test_wrapper(func() { value.ValBAry(tp, nil, 0) })

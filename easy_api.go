@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2018 YottaDB LLC. and/or its subsidiaries.	//
+// Copyright (c) 2018-2019 YottaDB LLC. and/or its subsidiaries.//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -161,7 +161,7 @@ func ValE(tptoken uint64, errstr *BufferT, varname string, subary []string) (str
 		}
 		break // No error so success and we are done!
 	}
-	retval, err = dbvalue.ValStr(tptoken)
+	retval, err = dbvalue.ValStr(tptoken, errstr)
 	return *retval, err
 }
 
@@ -206,7 +206,7 @@ func IncrE(tptoken uint64, errstr *BufferT, incr, varname string, subary []strin
 		err = NewError(int(rc), errstr)
 		return "", err
 	}
-	retval, err = dbvalue.ValStr(tptoken)
+	retval, err = dbvalue.ValStr(tptoken, errstr)
 	return *retval, err
 }
 
@@ -566,7 +566,7 @@ func SubNextE(tptoken uint64, errstr *BufferT, varname string, subary []string) 
 		}
 		break // No error so success and we are done!
 	}
-	retval, err = dbsub.ValStr(tptoken)
+	retval, err = dbsub.ValStr(tptoken, errstr)
 	return *retval, err
 }
 
@@ -610,7 +610,7 @@ func SubPrevE(tptoken uint64, errstr *BufferT, varname string, subary []string) 
 		}
 		break // No error so success and we are done!
 	}
-	retval, err = dbsub.ValStr(tptoken)
+	retval, err = dbsub.ValStr(tptoken, errstr)
 	return *retval, err
 }
 
