@@ -25,10 +25,13 @@ const NOTTP uint64 = 0
 
 // WrapperRelease - (string) The Golang wrapper release value for YottaDB SimpleAPI
 const WrapperRelease string = "0.89.0-inflight"
+
 // MinimumYDBReleaseMajor - (int) Minimum major release number required by this wrapper of the linked YottaDB
 const MinimumYDBReleaseMajor int = 1
+
 // MinimumYDBReleaseMinor - (int) Minimum minor release number required by this wrapper of the linked YottaDB
 const MinimumYDBReleaseMinor int = 24
+
 // MinimumYDBRelease - (string) Minimum YottaDB release name required by this wrapper
 const MinimumYDBRelease string = "r1.24"
 

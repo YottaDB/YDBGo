@@ -17,6 +17,7 @@ import (
 	"io"
 	"os"
 	"sync"
+	"sync/atomic"
 	"unsafe"
 )
 
@@ -27,9 +28,8 @@ import (
 import "C"
 
 // Variables used by TpST2 to wrap passing in func so the callback can retrieve it without passing pointers to C.
-var tpMutex sync.Mutex
 var tpIndex uint64
-var tpMap map[uint64]func(uint64, *BufferT) int32
+var tpMap sync.Map
 
 // BufferTArray is an array of ydb_buffer_t structures. The reason this is not an array of BufferT structures is because
 // we can't pass a pointer to those Golang structures to a C routine (cgo restriction) so we have to have this separate
@@ -529,23 +529,15 @@ func (buftary *BufferTArray) TpST2(tptoken uint64, errstr *BufferT, tpfn func(ui
 
 	tid := C.CString(transid)
 	defer C.free(unsafe.Pointer(tid))
-	tpMutex.Lock()
-	tpfnparm := tpIndex
-	tpIndex++
-	if tpMap == nil {
-		tpMap = make(map[uint64]func(uint64, *BufferT) int32)
-	}
-	tpMap[tpfnparm] = tpfn
-	tpMutex.Unlock()
+	tpfnparm := atomic.AddUint64(&tpIndex, 1)
+	tpMap.Store(tpfnparm, tpfn)
 	cbuftary := (*C.ydb_buffer_t)(unsafe.Pointer((*buftary).cbuftary))
 	if errstr != nil {
 		cbuft = errstr.cbuft
 	}
 	rc := C.ydb_tp_st(C.uint64_t(tptoken), cbuft, (C.ydb_tpfnptr_t)(C.ydb_tp_st_wrapper_cgo),
 		unsafe.Pointer(&tpfnparm), tid, C.int((*buftary).elemsUsed), cbuftary)
-	tpMutex.Lock()
-	delete(tpMap, tpfnparm)
-	tpMutex.Unlock()
+	tpMap.Delete(tpfnparm)
 	if C.YDB_OK != rc {
 		err := NewError(int(rc), errstr)
 		return err
@@ -556,14 +548,13 @@ func (buftary *BufferTArray) TpST2(tptoken uint64, errstr *BufferT, tpfn func(ui
 // YdbTpStWrapper is a private callback to wrap calls to the Go closure required for TpST2.
 //export ydbTpStWrapper
 func ydbTpStWrapper(tptoken uint64, errstr *C.ydb_buffer_t, tpfnparm unsafe.Pointer) int32 {
-	index := *((*uint64)(tpfnparm))
-	tpMutex.Lock()
-	v, ok := tpMap[index]
-	tpMutex.Unlock()
 	var errbuff BufferT
-	errbuff.BufferTFromPtr((unsafe.Pointer)(errstr))
+
+	index := *((*uint64)(tpfnparm))
+	v, ok := tpMap.Load(index)
 	if !ok {
 		panic("Couldn't find callback routine")
 	}
-	return (v)(tptoken, &errbuff)
+	errbuff.BufferTFromPtr((unsafe.Pointer)(errstr))
+	return (v.(func(uint64, *BufferT) int32))(tptoken, &errbuff)
 }
