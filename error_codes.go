@@ -2,6 +2,7 @@
 package yottadb
 
 const (
+YDB_INT_MAX = 0x7fffffff
 YDB_ERR_ACK = -150372361
 YDB_ERR_BREAKZST = -150372371
 YDB_ERR_BADACCMTHD = -150372379
@@ -1532,6 +1533,15 @@ YDB_ERR_INVLNPAIRLIST = -151027930
 YDB_ERR_INVTPTRANS = -151027938
 YDB_ERR_INVAPIMODE = -151027946
 YDB_ERR_STAPIFORKEXEC = -151027954
+YDB_TP_RESTART = (YDB_INT_MAX - 1) /* 0x7ffffffe */ 
+YDB_TP_ROLLBACK = (YDB_INT_MAX - 2) /* 0x7ffffffd */ 
+YDB_OK = 0 /* Successful return code */ 
+YDB_NOTOK = (YDB_INT_MAX - 3) /* 0x7ffffffc */ 
+YDB_LOCK_TIMEOUT = (YDB_INT_MAX - 4) /* 0x7ffffffb */ 
+YDB_MAX_IDENT = 31 /* Maximum size of global/local name (not including '^') */ 
+YDB_MAX_NAMES = 35 /* Maximum number of variable names can be specified in a single ydb_*_s() call */ 
+YDB_MAX_STR = (1 * 1024 * 1024) /* Maximum YottaDB string length */ 
+YDB_MAX_SUBS = 31 /* Maximum subscripts currently supported */ 
 
  YDB_DEL_TREE = 1 
  YDB_DEL_NODE = 2 
@@ -1540,6 +1550,5 @@ YDB_ERR_STAPIFORKEXEC = -151027954
  YDB_SEVERITY_ERROR = 2 
  YDB_SEVERITY_INFORMATIONAL = 3 
  YDB_SEVERITY_FATAL = 4
-YDB_OK = 0
 )
 
