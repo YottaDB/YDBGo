@@ -118,7 +118,7 @@ func LockST(tptoken uint64, errstr *BufferT, timeoutNsec uint64, lockname ...*Ke
 	}
 	rc := C.ydb_go_lock_st(C.uint64_t(tptoken), cbuft, (C.uintptr_t)(uintptr(unsafe.Pointer(vplist.cvplist))))
 	if C.YDB_OK != rc {
-		err := NewError(int(rc), errstr)
+		err := NewError(tptoken, errstr, int(rc))
 		return err
 	}
 	return nil

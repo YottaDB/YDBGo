@@ -47,7 +47,7 @@ func DataE(tptoken uint64, errstr *BufferT, varname string, subary []string) (ui
 	}
 	rc := C.ydb_data_st(C.uint64_t(tptoken), cbuft, vargobuft, C.int(dbkey.Subary.elemsUsed), subbuftary, &retval)
 	if C.YDB_OK != rc {
-		err = NewError(int(rc), errstr)
+		err = NewError(tptoken, errstr, int(rc))
 		return 0, err
 	}
 	return uint32(retval), nil
@@ -75,7 +75,7 @@ func DeleteE(tptoken uint64, errstr *BufferT, deltype int, varname string, subar
 	rc := C.ydb_delete_st(C.uint64_t(tptoken), cbuft, vargobuft, C.int(dbkey.Subary.elemsUsed), subbuftary,
 		C.int(deltype))
 	if C.YDB_OK != rc {
-		err = NewError(int(rc), errstr)
+		err = NewError(tptoken, errstr, int(rc))
 		return err
 	}
 	return nil
@@ -203,7 +203,7 @@ func IncrE(tptoken uint64, errstr *BufferT, incr, varname string, subary []strin
 	rc := C.ydb_incr_st(C.uint64_t(tptoken), cbuft, vargobuft, C.int(dbkey.Subary.elemsUsed), subbuftary,
 		incrval.cbuft, dbvalue.cbuft)
 	if C.YDB_OK != rc {
-		err = NewError(int(rc), errstr)
+		err = NewError(tptoken, errstr, int(rc))
 		return "", err
 	}
 	retval, err = dbvalue.ValStr(tptoken, errstr)
@@ -311,7 +311,7 @@ func LockDecrE(tptoken uint64, errstr *BufferT, varname string, subary []string)
 	}
 	rc := C.ydb_lock_decr_st(C.uint64_t(tptoken), cbuft, vargobuft, C.int(dbkey.Subary.elemsUsed), subbuftary)
 	if C.YDB_OK != rc {
-		err = NewError(int(rc), errstr)
+		err = NewError(tptoken, errstr, int(rc))
 		return err
 	}
 	return nil
@@ -343,7 +343,7 @@ func LockIncrE(tptoken uint64, errstr *BufferT, timeoutNsec uint64, varname stri
 	rc := C.ydb_lock_incr_st(C.uint64_t(tptoken), cbuft, C.ulonglong(timeoutNsec), vargobuft,
 		C.int(dbkey.Subary.elemsUsed), subbuftary)
 	if C.YDB_OK != rc {
-		err = NewError(int(rc), errstr)
+		err = NewError(tptoken, errstr, int(rc))
 		return err
 	}
 	return nil
@@ -520,7 +520,7 @@ func SetValE(tptoken uint64, errstr *BufferT, value, varname string, subary []st
 	rc := C.ydb_set_st(C.uint64_t(tptoken), cbuft, vargobuft, C.int(dbkey.Subary.elemsUsed), subbuftary,
 		dbvalue.cbuft)
 	if C.YDB_OK != rc {
-		err := NewError(int(rc), errstr)
+		err := NewError(tptoken, errstr, int(rc))
 		return err
 	}
 	return nil

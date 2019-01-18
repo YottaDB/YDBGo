@@ -420,7 +420,7 @@ func (buft *BufferT) Str2ZwrST(tptoken uint64, errstr *BufferT, zwr *BufferT) er
 	}
 	rc := C.ydb_str2zwr_st(C.uint64_t(tptoken), cbuft, buft.cbuft, zwr.cbuft)
 	if C.YDB_OK != rc {
-		err := NewError(int(rc), errstr)
+		err := NewError(tptoken, errstr, int(rc))
 		return err
 	}
 	// Returned string should be snug in the zwr buffer
@@ -458,7 +458,7 @@ func (buft *BufferT) Zwr2StrST(tptoken uint64, errstr *BufferT, str *BufferT) er
 	}
 	rc := C.ydb_zwr2str_st(C.uint64_t(tptoken), cbuft, buft.cbuft, str.cbuft)
 	if C.YDB_OK != rc {
-		err := NewError(int(rc), errstr)
+		err := NewError(tptoken, errstr, int(rc))
 		return err
 	}
 	// Returned string should be snug in the str buffer

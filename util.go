@@ -38,7 +38,7 @@ func MessageT(tptoken uint64, errstr *BufferT, status int) (string, error) {
 	}
 	rc := C.ydb_message_t(C.uint64_t(tptoken), cbuft, C.int(status), msgval.cbuft)
 	if C.YDB_OK != rc {
-		err := NewError(int(rc), errstr)
+		err := NewError(tptoken, errstr, int(rc))
 		return "", err
 	}
 	// Returned string should be snug in the retval buffer. Pick it out so can return it as a string

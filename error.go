@@ -13,6 +13,7 @@
 package yottadb
 
 import (
+	"fmt"
 	"unsafe"
 )
 
@@ -52,21 +53,40 @@ func ErrorCode(err error) int {
 // using (for example) GetE() to fetch $ZSTATUS because ydb_zstatus does not require a tptoken. This means
 // that we don't need to pass tptoken to all the data access methods (For example, GetValStr()).
 //
-func NewError(errnum int, errstr *BufferT) error {
+func NewError(tptoken uint64, errstr *BufferT, errnum int) error {
 	var msgptr *C.char
+	var errmsg string
+	var err error
 
 	if (int)(C.YDB_ERR_TPRESTART) == errnum {
 		// Shortcut for this performance sensitive error - not a user error
 		return &YDBError{errnum, "TPRESTART"}
 	}
+	if (int)(C.YDB_ERR_NODEEND) == errnum {
+		// Another common "error" that needs no message
+		return &YDBError{errnum, "NODEEND"}
+	}
+	if (int)(C.YDB_TP_ROLLBACK) == errnum {
+		// Our 3rd and final quickie-check that needs no message
+		return &YDBError{errnum, "ROLLBACK"}
+	}
 	if (nil != errstr) && (nil != errstr.cbuft) {
-		errmsg := C.GoString((*C.char)(errstr.cbuft.buf_addr))
+		errmsg = C.GoString((*C.char)(errstr.cbuft.buf_addr))
+		if 0 == len(errmsg) {
+			// No message was supplied for the error - see if we can find one via MessageT(). We use MessageT()
+			// here and not $ZSTATUS because all of the errors that this might happen to have simple text with
+			// no substitution parms that MessageT() can fetch without overlay concerns like can happen with $ZSTATUS.
+			errmsg, err = MessageT(tptoken, errstr, errnum)
+			if nil != err {
+				panic(fmt.Sprintf("Unable to find error text for error code %d with error %s", errnum, err))
+			}
+		}
 		return &YDBError{errnum, errmsg}
 	}
 	// Fetch $ZSTATUS to return as the error string
 	msgptr = (*C.char)(C.malloc(C.size_t(C.YDB_MAX_ERRORMSG)))
 	C.ydb_zstatus(msgptr, C.int(C.YDB_MAX_ERRORMSG))
-	errmsg := C.GoString((*C.char)(msgptr))
+	errmsg = C.GoString((*C.char)(msgptr))
 	C.free(unsafe.Pointer(msgptr))
 	return &YDBError{errnum, errmsg}
 }
