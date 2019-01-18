@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"lang.yottadb.com/go/yottadb"
 	. "lang.yottadb.com/go/yottadb/internal/test_helpers"
+	"strconv"
 	"testing"
 )
 
@@ -101,6 +102,11 @@ func TestLenAlloc(t *testing.T) {
 func TestAllocLargeValue(t *testing.T) {
 	var value yottadb.BufferT
 	var val uint32
+
+	// Skip this test on 32-bit platforms
+	if strconv.IntSize == 32 {
+		t.Skipf("This test runs out of memory on 32 bit machines; skip")
+	}
 
 	val = 1 << 31
 
