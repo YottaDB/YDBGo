@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"lang.yottadb.com/go/yottadb"
 	. "lang.yottadb.com/go/yottadb/internal/test_helpers"
+	"os"
 	"testing"
 )
 
@@ -356,9 +357,13 @@ func TestBufTAryTpSt2(t *testing.T) {
 
 func TestBufTAryTpNest(t *testing.T) {
 	var tproutine func(uint64, *yottadb.BufferT) int32
+	nest_limit := 130
+	if os.Getenv("real_mach_type") == "armv7l" {
+		nest_limit = 20
+	}
 	nest := 0
 	tproutine = func(tptoken uint64, errstr *yottadb.BufferT) int32 {
-		if nest < 130 {
+		if nest < nest_limit {
 			nest++
 			e := yottadb.TpE2(tptoken, nil, tproutine, "BATCH", []string{})
 			if e == nil {
@@ -369,5 +374,8 @@ func TestBufTAryTpNest(t *testing.T) {
 		return 0
 	}
 	e := tproutine(yottadb.NOTTP, nil)
-	assert.Equal(t, int32(yottadb.YDB_ERR_TPTOODEEP), e)
+	// Only expect the ERR_TPTOODEEP if we went all the way down, which we don't on armv7l
+	if os.Getenv("real_mach_type") != "armv7l" {
+		assert.Equal(t, int32(yottadb.YDB_ERR_TPTOODEEP), e)
+	}
 }
