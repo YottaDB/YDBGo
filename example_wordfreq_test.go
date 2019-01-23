@@ -45,15 +45,41 @@ func assert_good(good bool) {
 	}
 }
 
-// Define assertnoerr function to check error code and give panic along with location if no ok
-func assertnoerr(err error) {
-	if nil != err {
-		_, file, line, ok := runtime.Caller(1)
-		if ok {
-			panic(fmt.Sprintf("Assertion failure in %v at line %v with error: %v", file, line, err))
-		} else {
-			panic(fmt.Sprintf("Assertion failure: %v", err))
+// Given that a handful of valid errors codes are possible, this function returns true if we hit an error code and should "restart"
+// For TP, this means returning from the TP callback and letting the engine call it again, for a subscript/node next operation, exit the loop
+//
+// Any other error types are problems that we can't reasonably recover from without knowledge of the calling application
+func checkErrorReturn(err error) bool {
+	if err == nil {
+		return false
+	}
+	if ydb_err, ok := err.(*yottadb.YDBError); ok {
+		switch yottadb.ErrorCode(ydb_err) {
+		case yottadb.YDB_TP_RESTART:
+			// A transaction must be restarted; this can happen if some other process modifies a value
+			//  we read before we commit the transaction
+			return true
+		case yottadb.YDB_TP_ROLLBACK:
+			// The transaction should be aborted; this can happen if a subtransaction return YDB_TP_ROLLBACK
+			//  This return will be a bit more situational
+			return true
+		case yottadb.YDB_ERR_CALLINAFTERXIT:
+			// The database engines was told to close, yet we tried to perform an operation. Either reopen the database,
+			//  or exit the program
+			return true
+		case yottadb.YDB_ERR_NODEEND:
+			// This should probably be detected seperately, and handled by the looping function
+			return false
+		default:
+			_, file, line, ok := runtime.Caller(1)
+			if ok {
+				panic(fmt.Sprintf("Assertion failure in %v at line %v with error (%d): %v", file, line, yottadb.ErrorCode(err), err))
+			} else {
+				panic(fmt.Sprintf("Assertion failure (%d): %v", yottadb.ErrorCode(err), err))
+			}
 		}
+	} else {
+		panic(err)
 	}
 }
 
@@ -79,27 +105,27 @@ func Example_wordFreq() {
 	if 0 != (os.Getpid() & 1) {
 		//fmt.Printf("Using local vars (PID=%d)\n", os.Getpid())
 		rce = wordsvar.Varnm.SetValStrLit(tptoken, nil, "words")
-		assertnoerr(rce)
+		if checkErrorReturn(rce) { return }
 		rce = indexvar.Varnm.SetValStrLit(tptoken, nil, "index")
-		assertnoerr(rce)
+		if checkErrorReturn(rce) { return }
 	} else {
 		//fmt.Printf("Using global vars (PID=%d)\n", os.Getpid())
 		rce = wordsvar.Varnm.SetValStrLit(tptoken, nil, "^words")
-		assertnoerr(rce)
+		if checkErrorReturn(rce) { return }
 		rce = indexvar.Varnm.SetValStrLit(tptoken, nil, "^index")
-		assertnoerr(rce)
+		if checkErrorReturn(rce) { return }
 		// Global vars get cleaned out first
 		rce = wordsvar.DeleteST(tptoken, nil, yottadb.YDB_DEL_TREE)
-		assertnoerr(rce)
+		if checkErrorReturn(rce) { return }
 		rce = indexvar.DeleteST(tptoken, nil, yottadb.YDB_DEL_TREE)
-		assertnoerr(rce)
+		if checkErrorReturn(rce) { return }
 	}
 
 	// Set the number of subscripts typically used for our two keys
 	rce = wordsvar.Subary.SetElemUsed(tptoken, nil, maxwordssubs)
-	assertnoerr(rce)
+	if checkErrorReturn(rce) { return }
 	rce = indexvar.Subary.SetElemUsed(tptoken, nil, maxindexsubs) // Reverts to single index temporarily later
-	assertnoerr(rce)
+	if checkErrorReturn(rce) { return }
 
 	// Some structure setup for our word loop below - allocation, and subscript usage
 	value.Alloc(maxwordlen)
@@ -113,7 +139,7 @@ func Example_wordFreq() {
 
 	// Read the source data from an input file
 	reader, err := os.Open("wordfreq_input.txt")
-	assertnoerr(err)
+	if checkErrorReturn(err) { return }
 	readin := bufio.NewReader(reader)
 
 	// Loop through each line in the input file (via stdin) breaking the line into space delimited words
@@ -135,15 +161,15 @@ func Example_wordFreq() {
 		for _, word = range words {
 			assert_good(0 < len(word))
 			rce = wordsvar.Subary.SetValStr(tptoken, nil, 0, &word)
-			assertnoerr(rce)
+			if checkErrorReturn(rce) { return }
 			rce = wordsvar.IncrST(tptoken, nil, nil, &value) // Returned 'value' is ignored
-			assertnoerr(rce)
+			if checkErrorReturn(rce) { return }
 		}
 	}
 
 	// Init starting subscript to null string so find first element in the array
 	rce = wordsvar.Subary.SetValStrLit(tptoken, nil, 0, "")
-	assertnoerr(rce)
+	if checkErrorReturn(rce) { return }
 
 	// Loop through each word and create the index glvn with the frequency count as the first subscript to sort them into
 	// least frequent to most frequent order (typical numeric order). Note even though we pass these subscripts as strings,
@@ -156,62 +182,62 @@ func Example_wordFreq() {
 			if int(yottadb.YDB_ERR_NODEEND) == yottadb.ErrorCode(rce) {
 				break
 			}
-			assertnoerr(rce)
+			if checkErrorReturn(rce) { return }
 		}
 
 		// Set this subscript into wordsvar for fetching/previousing.
 		tmp1valp, rce = tmp1.ValStr(tptoken, nil)
-		assertnoerr(rce)
+		if checkErrorReturn(rce) { return }
 		rce = wordsvar.Subary.SetValStr(tptoken, nil, 0, tmp1valp) // Set next subscript back into KeyT for next SubNextST() call
-		assertnoerr(rce)
+		if checkErrorReturn(rce) { return }
 
 		// Fetch the count for this word and set into index (set [^]index(count,var)="")
 		strvalp, rce = wordsvar.Subary.ValStr(tptoken, nil, 0)
-		assertnoerr(rce)
+		if checkErrorReturn(rce) { return }
 		rce = wordsvar.ValST(tptoken, nil, &wordsTmp1)
-		assertnoerr(rce)
+		if checkErrorReturn(rce) { return }
 		strvalp, rce = wordsTmp1.ValStr(tptoken, nil)
-		assertnoerr(rce)
+		if checkErrorReturn(rce) { return }
 		rce = indexvar.Subary.SetValStr(tptoken, nil, 0, strvalp)
-		assertnoerr(rce)
+		if checkErrorReturn(rce) { return }
 		rce = indexvar.Subary.SetValStr(tptoken, nil, 1, tmp1valp)
-		assertnoerr(rce)
+		if checkErrorReturn(rce) { return }
 		rce = indexvar.SetValST(tptoken, nil, &nullval)
-		assertnoerr(rce)
+		if checkErrorReturn(rce) { return }
 	}
 
 	// Init first subscript to null string so find first non-null subscript
 	rce = indexvar.Subary.SetValStrLit(tptoken, nil, 0, "")
-	assertnoerr(rce)
+	if checkErrorReturn(rce) { return }
 
 	// Compare the output we get to the expected output to verify
 	//  everything works as expected
 	reader, err = os.Open("wordfreq_output.txt")
-	assertnoerr(err)
+	if checkErrorReturn(err) { return }
 	readin = bufio.NewReader(reader)
 
 	//  Loop through [^]indexvar array in reverse to print most common words and their counts first.
 	for {
 		// We only use 1 subscript for this first subscript loop so temporarily set back to 1 sub
 		rce = indexvar.Subary.SetElemUsed(tptoken, nil, 1)
-		assertnoerr(rce)
+		if checkErrorReturn(rce) { return }
 		rce = indexvar.SubPrevST(tptoken, nil, &tmp1)
 		if nil != rce {
 			if int(yottadb.YDB_ERR_NODEEND) == yottadb.ErrorCode(rce) {
 				break
 			}
-			assertnoerr(rce)
+			if checkErrorReturn(rce) { return }
 		}
 		rce = indexvar.Subary.SetElemUsed(tptoken, nil, 2) // Revert to using two subscripts
-		assertnoerr(rce)
+		if checkErrorReturn(rce) { return }
 		tmp1valp, rce = tmp1.ValStr(tptoken, nil)
-		assertnoerr(rce)
+		if checkErrorReturn(rce) { return }
 
 		// Now loop through all the vars with this frequency count and print them
 		rce = indexvar.Subary.SetValStr(tptoken, nil, 0, tmp1valp)
-		assertnoerr(rce)
+		if checkErrorReturn(rce) { return }
 		rce = indexvar.Subary.SetValStrLit(tptoken, nil, 1, "") // Init first subscr at this level to run list
-		assertnoerr(rce)
+		if checkErrorReturn(rce) { return }
 
 		for {
 			rce = indexvar.SubNextST(tptoken, nil, &tmp2)
@@ -219,16 +245,16 @@ func Example_wordFreq() {
 				if int(yottadb.YDB_ERR_NODEEND) == yottadb.ErrorCode(rce) {
 					break
 				}
-				assertnoerr(rce)
+				if checkErrorReturn(rce) { return }
 			}
 			tmp2valp, rce = tmp2.ValStr(tptoken, nil)
-			assertnoerr(rce)
+			if checkErrorReturn(rce) { return }
 			rce = indexvar.Subary.SetValStr(tptoken, nil, 1, tmp2valp) // Set value back into key for next SubNextST()
-			assertnoerr(rce)
+			if checkErrorReturn(rce) { return }
 
 			// Fetch current indexes as strings and print them
 			freqcnt, rce := tmp1.ValStr(tptoken, nil)
-			assertnoerr(rce)
+			if checkErrorReturn(rce) { return }
 
 			linein, rce = readin.ReadString('\n')
 			if nil != rce {

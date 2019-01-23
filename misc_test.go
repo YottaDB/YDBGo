@@ -36,7 +36,7 @@ func TestMiscAssertnoerror(t *testing.T) {
 		assert.NotNil(t, r)
 	}()
 
-	yottadb.Assertnoerror(err)
+	panic(err)
 	t.Errorf("We should have never gotten here")
 }
 
@@ -45,7 +45,8 @@ func TestYDBCi(t *testing.T) {
 	if !Available("ydb_ci") {
 		t.Skipf("Skipping call-in tests as ydb_ci is not configured")
 	}
-	r := YDBCi(yottadb.NOTTP, nil, true, "hello^helloM", "World")
+	r, err := YDBCi(yottadb.NOTTP, nil, true, "hello^helloM", "World")
+	assert.Nil(t, err)
 	assert.Equal(t, r, "World")
 }
 
@@ -54,7 +55,8 @@ func miscGoTimersHelper(t *testing.T, wg *sync.WaitGroup, loops int) {
 	go func() {
 		for i := 0; i < loops; i++ {
 			start := time.Now()
-			r := YDBCi(yottadb.NOTTP, nil, false, "run^TestMiscGoTimers")
+			r, err := YDBCi(yottadb.NOTTP, nil, false, "run^TestMiscGoTimers")
+			assert.Nil(t, err)
 			elapsed := time.Since(start)
 			// This test failed on a loaded system with a 11% insteasd
 			//  of the allowed 10 % on 2019-01-01, if it continues to fail

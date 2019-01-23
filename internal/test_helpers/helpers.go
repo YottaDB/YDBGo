@@ -243,15 +243,15 @@ func YDBCi(tptoken uint64,
 	errstr *yottadb.BufferT,
 	expect_return bool,
 	funcname string,
-	args ...string) string {
+	args ...string) (string, error) {
 
 	ydb_ci_mutex.Lock()
 	defer ydb_ci_mutex.Unlock()
 	localname := "^YDBTestYDBCiTemporaryVariable"
 	err := yottadb.DeleteE(tptoken, nil, C.YDB_DEL_TREE, localname, nil)
-	yottadb.Assertnoerror(err)
+	if err != nil { return "", err }
 	err = yottadb.SetValE(tptoken, nil, funcname, localname, []string{"rtn"})
-	yottadb.Assertnoerror(err)
+	if err != nil { return "", err }
 	expect := "0"
 	if expect_return {
 		expect = "1"
@@ -274,10 +274,9 @@ func YDBCi(tptoken uint64,
 	C.free(unsafe.Pointer(callname))
 	if expect_return {
 		r, err := yottadb.ValE(tptoken, nil, localname, []string{"retval"})
-		yottadb.Assertnoerror(err)
-		return r
+		return r, err
 	}
-	return ""
+	return "", nil
 
 }
 

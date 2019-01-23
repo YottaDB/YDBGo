@@ -94,16 +94,3 @@ func IsLittleEndian() bool {
 func Exit() {
 	C.ydb_exit()
 }
-
-// Assertnoerror function checks provided error code and gives a panic along with location if is an error.
-// Useful for test code especially - not particularly useful or proper for production code.
-func Assertnoerror(err error) {
-	if nil != err {
-		_, file, line, ok := runtime.Caller(1)
-		if ok {
-			panic(fmt.Sprintf("Assertion failure in %v at line %v with error: %v", file, line, err))
-		} else {
-			panic(fmt.Sprintf("Assertion failure: %v", err))
-		}
-	}
-}
