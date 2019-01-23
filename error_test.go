@@ -32,11 +32,29 @@ func TestErrorErrorCode(t *testing.T) {
 	assert.Equal(t, r, yottadb.YDB_ERR_INVLNPAIRLIST)
 }
 
-func TestErrorNewError(t *testing.T) {
-	err_tprestart := yottadb.YDB_ERR_TPRESTART
+func verifyErrorCode(t *testing.T, errcode int) {
+	var errstr yottadb.BufferT
 
-	// Attempt to get a TPRESTART error, which has special handling
-	err := yottadb.NewError(yottadb.NOTTP, nil, err_tprestart)
+	err := yottadb.NewError(yottadb.NOTTP, nil, errcode)
+	assert.NotNil(t, err)
 	r := yottadb.ErrorCode(err)
-	assert.Equal(t, r, err_tprestart)
+	assert.Equal(t, r, errcode)
+
+	// Try this with a errstr passed in
+	defer errstr.Free()
+	errstr.Alloc(64)
+	err = yottadb.NewError(yottadb.NOTTP, &errstr, errcode)
+	assert.NotNil(t, err)
+	r = yottadb.ErrorCode(err)
+	assert.Equal(t, r, errcode)
+}
+
+func TestErrorNewError(t *testing.T) {
+	verifyErrorCode(t, yottadb.YDB_ERR_TPRESTART)
+}
+
+func TestErrorVerifyFastPathErrorCodes(t *testing.T) {
+	verifyErrorCode(t, yottadb.YDB_TP_RESTART)
+	verifyErrorCode(t, yottadb.YDB_TP_ROLLBACK)
+	verifyErrorCode(t, yottadb.YDB_ERR_NODEEND)
 }

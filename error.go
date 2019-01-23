@@ -58,15 +58,15 @@ func NewError(tptoken uint64, errstr *BufferT, errnum int) error {
 	var errmsg string
 	var err error
 
-	if (int)(C.YDB_ERR_TPRESTART) == errnum {
+	if YDB_TP_RESTART == errnum {
 		// Shortcut for this performance sensitive error - not a user error
 		return &YDBError{errnum, "TPRESTART"}
 	}
-	if (int)(C.YDB_ERR_NODEEND) == errnum {
+	if YDB_ERR_NODEEND == errnum {
 		// Another common "error" that needs no message
 		return &YDBError{errnum, "NODEEND"}
 	}
-	if (int)(C.YDB_TP_ROLLBACK) == errnum {
+	if YDB_TP_ROLLBACK == errnum {
 		// Our 3rd and final quickie-check that needs no message
 		return &YDBError{errnum, "ROLLBACK"}
 	}
