@@ -97,7 +97,7 @@ func LockST(tptoken uint64, errstr *BufferT, timeoutNsec uint64, lockname ...*Ke
 			vplist.setVPlistParam(tptoken, errstr, parmindx, uintptr((*lockname[lockindx]).Subary.elemsUsed))
 			parmindx++
 			parmsleft--
-			subgobuftary := &((*lockname[lockindx]).Subary)
+			subgobuftary := (*lockname[lockindx]).Subary
 			subbuftary := unsafe.Pointer(subgobuftary.cbuftary)
 			vplist.setVPlistParam(tptoken, errstr, parmindx, uintptr(subbuftary))
 			parmindx++

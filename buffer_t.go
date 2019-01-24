@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
 	"unsafe"
 )
 
@@ -92,6 +93,11 @@ func (buft *BufferT) Alloc(nBytes uint32) {
 	}
 	cbuftptr.len_alloc = C.uint(nBytes)
 	buft.ownsBuff = true
+	// Set a finalizer
+	runtime.SetFinalizer(buft, nil)
+	runtime.SetFinalizer(buft, func(o *BufferT) {
+		o.Free()
+	})
 }
 
 // Dump is a method to dump the contents of a BufferT block for debugging purposes.

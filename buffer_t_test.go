@@ -18,8 +18,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"lang.yottadb.com/go/yottadb"
 	. "lang.yottadb.com/go/yottadb/internal/test_helpers"
+	"runtime"
 	"strconv"
 	"testing"
+	"time"
 )
 
 // TestStr2ZwrSTAndZwr2StrST tests the Str2ZwrST() and Zwr2StrST() methods
@@ -302,4 +304,61 @@ func TestBufferTNilRecievers(t *testing.T) {
 	test_wrapper(func() { value.SetValStrLit(tp, nil, "ok") })
 	test_wrapper(func() { value.Str2ZwrST(tp, nil, nil) })
 	test_wrapper(func() { value.Zwr2StrST(tp, nil, nil) })
+}
+
+func TestBufferTFree(t *testing.T) {
+	var mem_before, mem_after int
+	var allocation_size uint32 = 1024 * 1024 * 512
+	var buffer [1024 * 1024 * 512]byte
+	for i := uint32(0); i < allocation_size; i++ {
+		buffer[uint(i)] = byte(i)
+	}
+
+	// Note starting memory
+	mem_before = GetHeapUsage(t)
+
+	func() {
+		var buft yottadb.BufferT
+		defer buft.Free()
+		buft.Alloc(allocation_size)
+		tt := buffer[:]
+		err := buft.SetValBAry(yottadb.NOTTP, nil, &tt)
+		Assertnoerr(err, t)
+	}()
+	// Trigger a garbage collection
+	runtime.GC()
+
+	// Verify that the difference between start and end is much less than 500MB
+	mem_after = GetHeapUsage(t)
+	assert.InEpsilon(t, mem_before, mem_after, .2)
+	fmt.Printf("start: %v end: %v\n", mem_before, mem_after)
+}
+
+func TestBufferTFinalizerCleansCAlloc(t *testing.T) {
+	var mem_before, mem_after int
+	var allocation_size uint32 = 1024 * 1024 * 512
+	var buffer [1024 * 1024 * 512]byte
+	for i := uint32(0); i < allocation_size; i++ {
+		buffer[uint(i)] = byte(i)
+	}
+
+	// Note starting memory
+	mem_before = GetHeapUsage(t)
+
+	func() {
+		var buft yottadb.BufferT
+		buft.Alloc(allocation_size)
+		tt := buffer[:]
+		err := buft.SetValBAry(yottadb.NOTTP, nil, &tt)
+		Assertnoerr(err, t)
+	}()
+	// Trigger a garbage collection
+	runtime.GC()
+
+	// It may take a moment for the finalizer to run; sleep for a smidgen
+	time.Sleep(time.Millisecond * 100)
+
+	// Verify that the difference between start and end is much less than 500MB
+	mem_after = GetHeapUsage(t)
+	assert.InEpsilon(t, mem_before, mem_after, .2)
 }

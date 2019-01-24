@@ -24,6 +24,9 @@ import (
 	"testing"
 	"time"
 	"unsafe"
+	"regexp"
+	"bufio"
+	"strings"
 )
 
 // #cgo pkg-config: yottadb
@@ -65,7 +68,7 @@ func Dbdeleteall(tptoken uint64, errstr *yottadb.BufferT, errors *int, t *testin
 	err := dbkey.Varnm.SetValStrLit(tptoken, nil, "^%") // Start with first possible key
 	Assertnoerr(err, t)
 	for {
-		err = dbkey.SubNextST(tptoken, nil, &dbkey.Varnm) // Find the 'next' global name
+		err = dbkey.SubNextST(tptoken, nil, dbkey.Varnm) // Find the 'next' global name
 		if nil != err {
 			if int(C.YDB_ERR_NODEEND) == yottadb.ErrorCode(err) {
 				break
@@ -285,4 +288,28 @@ func Available(name string) bool {
 		return os.Getenv("ydb_ci") != ""
 	}
 	return false
+}
+
+
+func GetHeapUsage(t *testing.T) int {
+	file, err := os.Open("/proc/self/status")
+	Assertnoerr(err, t)
+	// Skip through lines in file until we one that says "VmSize"
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		matched, err := regexp.Match("VmSize", []byte(scanner.Text()))
+		Assertnoerr(err, t)
+		if matched {
+			break
+		}
+	}
+	Assertnoerr(scanner.Err(), t)
+	// Finally, read the value
+	fields := strings.Fields(scanner.Text())
+	if len(fields) < 2 {
+		return 0
+	}
+	i, err := strconv.Atoi(fields[1])
+	Assertnoerr(err, t)
+	return i
 }

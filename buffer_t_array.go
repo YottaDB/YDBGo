@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"unsafe"
@@ -74,6 +75,10 @@ func (buftary *BufferTArray) Alloc(numBufs, nBytes uint32) {
 			(*elemptr).len_alloc = C.uint(nBytes)
 			(*elemptr).len_used = 0
 		}
+		runtime.SetFinalizer(buftary, nil)
+		runtime.SetFinalizer(buftary, func(o *BufferTArray) {
+			o.Free()
+		})
 	} else {
 		// Make sure our potentially de-allocated array has a proper uninitialized state
 		buftary.elemsAlloc = 0

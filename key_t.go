@@ -23,8 +23,8 @@ import "C"
 
 // KeyT defines a database key including varname and optional subscripts.
 type KeyT struct {
-	Varnm  BufferT
-	Subary BufferTArray
+	Varnm  *BufferT
+	Subary *BufferTArray
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -46,8 +46,12 @@ func (key *KeyT) Alloc(varSiz, numSubs, subSiz uint32) {
 	if nil == key {
 		panic("*KeyT receiver of Alloc() cannot be nil")
 	}
-	(&(key.Varnm)).Alloc(varSiz)
-	(&(key.Subary)).Alloc(numSubs, subSiz)
+	var buffertary BufferTArray
+	var buffer BufferT
+	key.Varnm = &buffer
+	key.Varnm.Alloc(varSiz)
+	key.Subary = &buffertary
+	key.Subary.Alloc(numSubs, subSiz)
 }
 
 // Dump is a STAPI method to dump the contents of the KeyT structure.
@@ -66,8 +70,12 @@ func (key *KeyT) DumpToWriter(writer io.Writer) {
 	if nil == key {
 		panic("*KeyT receiver of DumpWriter() cannot be nil")
 	}
-	(&(key.Varnm)).DumpToWriter(writer)
-	(&(key.Subary)).DumpToWriter(writer)
+	if key.Varnm != nil {
+		key.Varnm.DumpToWriter(writer)
+	}
+	if key.Subary != nil {
+		key.Subary.DumpToWriter(writer)
+	}
 }
 
 // Free is a STAPI method to free both pieces of the KeyT structure.
@@ -76,8 +84,8 @@ func (key *KeyT) DumpToWriter(writer io.Writer) {
 func (key *KeyT) Free() {
 	printEntry("KeyT.Free()")
 	if nil != key { // Ignore if no struct passed
-		(&(key.Varnm)).Free()
-		(&(key.Subary)).Free()
+		key.Varnm.Free()
+		key.Subary.Free()
 	}
 }
 
@@ -103,7 +111,7 @@ func (key *KeyT) DataST(tptoken uint64, errstr *BufferT) (uint32, error) {
 	if (nil == vargobuft) || (nil == vargobuft.buf_addr) || (0 == vargobuft.len_used) {
 		panic("KeyT varname is not allocated, is nil, or has a 0 length")
 	}
-	subgobuftary := &(key.Subary)
+	subgobuftary := key.Subary
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(subgobuftary.cbuftary))
 	if errstr != nil {
 		cbuft = errstr.cbuft
@@ -133,7 +141,7 @@ func (key *KeyT) DeleteST(tptoken uint64, errstr *BufferT, deltype int) error {
 	if (nil == vargobuft) || (nil == vargobuft.buf_addr) || (0 == vargobuft.len_used) {
 		panic("KeyT varname is not allocated, is nil, or has a 0 length")
 	}
-	subgobuftary := &(key.Subary)
+	subgobuftary := key.Subary
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(subgobuftary.cbuftary))
 	if errstr != nil {
 		cbuft = errstr.cbuft
@@ -167,7 +175,7 @@ func (key *KeyT) ValST(tptoken uint64, errstr *BufferT, retval *BufferT) error {
 	if (nil == vargobuft) || (nil == vargobuft.buf_addr) || (0 == vargobuft.len_used) {
 		panic("KeyT varname is not allocated, is nil, or has a 0 length")
 	}
-	subgobuftary := &(key.Subary)
+	subgobuftary := key.Subary
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(subgobuftary.cbuftary))
 	if errstr != nil {
 		cbuft = errstr.cbuft
@@ -206,7 +214,7 @@ func (key *KeyT) IncrST(tptoken uint64, errstr *BufferT, incr, retval *BufferT) 
 	if (nil == vargobuft) || (nil == vargobuft.buf_addr) || (0 == vargobuft.len_used) {
 		panic("KeyT varname is not allocated, is nil, or has a 0 length")
 	}
-	subgobuftary := &(key.Subary)
+	subgobuftary := key.Subary
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(subgobuftary.cbuftary))
 	if nil == incr {
 		incrcbuft = nil
@@ -242,7 +250,7 @@ func (key *KeyT) LockDecrST(tptoken uint64, errstr *BufferT) error {
 	if (nil == vargobuft) || (nil == vargobuft.buf_addr) || (0 == vargobuft.len_used) {
 		panic("KeyT varname is not allocated, is nil, or has a 0 length")
 	}
-	subgobuftary := &(key.Subary)
+	subgobuftary := key.Subary
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(subgobuftary.cbuftary))
 	if errstr != nil {
 		cbuft = errstr.cbuft
@@ -275,7 +283,7 @@ func (key *KeyT) LockIncrST(tptoken uint64, errstr *BufferT, timeoutNsec uint64)
 	if (nil == vargobuft) || (nil == vargobuft.buf_addr) || (0 == vargobuft.len_used) {
 		panic("KeyT varname is not allocated, is nil, or has a 0 length")
 	}
-	subgobuftary := &(key.Subary)
+	subgobuftary := key.Subary
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(subgobuftary.cbuftary))
 	if errstr != nil {
 		cbuft = errstr.cbuft
@@ -327,7 +335,7 @@ func (key *KeyT) NodeNextST(tptoken uint64, errstr *BufferT, next *BufferTArray)
 		nextElemsPtr = &dummyElemUsed
 		nextSubaryPtr = nil
 	}
-	subgobuftary := &(key.Subary)
+	subgobuftary := key.Subary
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(subgobuftary.cbuftary))
 	if errstr != nil {
 		cbuft = errstr.cbuft
@@ -379,7 +387,7 @@ func (key *KeyT) NodePrevST(tptoken uint64, errstr *BufferT, prev *BufferTArray)
 		prevElemsPtr = &dummyElemUsed
 		prevSubaryPtr = nil
 	}
-	subgobuftary := &(key.Subary)
+	subgobuftary := key.Subary
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(subgobuftary.cbuftary))
 	if errstr != nil {
 		cbuft = errstr.cbuft
@@ -445,7 +453,7 @@ func (key *KeyT) SubNextST(tptoken uint64, errstr *BufferT, retval *BufferT) err
 	if (nil == vargobuft) || (nil == vargobuft.buf_addr) || (0 == vargobuft.len_used) {
 		panic("KeyT varname is not allocated, is nil, or has a 0 length")
 	}
-	subgobuftary := &(key.Subary)
+	subgobuftary := key.Subary
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(subgobuftary.cbuftary))
 	if errstr != nil {
 		cbuft = errstr.cbuft
@@ -481,7 +489,7 @@ func (key *KeyT) SubPrevST(tptoken uint64, errstr *BufferT, retval *BufferT) err
 	if (nil == vargobuft) || (nil == vargobuft.buf_addr) || (0 == vargobuft.len_used) {
 		panic("KeyT varname is not allocated, is nil, or has a 0 length")
 	}
-	subgobuftary := &(key.Subary)
+	subgobuftary := key.Subary
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(subgobuftary.cbuftary))
 	if errstr != nil {
 		cbuft = errstr.cbuft
