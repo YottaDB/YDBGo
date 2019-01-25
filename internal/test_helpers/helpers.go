@@ -307,10 +307,40 @@ func SkipCITests(t *testing.T) {
 	}
 }
 
-func SkipHeavyTests(t *testing.T) {
+func SkipARMV7LTests(t *testing.T) {
 	if os.Getenv("real_mach_type") == "armv7l" {
 		t.Skipf("Some issue with arm7l processors causes this test to panic")
 	}
+}
+
+func SkipMemIntensiveTests(t *testing.T) {
+	// We read this as kB, so convert to MB then GB
+	if GetSystemMemory(t) < (1024*1024) {
+		t.Skipf("Machine appears to have less then 1 GB memory, skipping test")
+	}
+}
+
+func GetSystemMemory(t *testing.T) int {
+	file, err := os.Open("/proc/meminfo")
+	Assertnoerr(err, t)
+	// Skip through lines in file until we one that says "MemTotal"
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		matched, err := regexp.Match("MemTotal", []byte(scanner.Text()))
+		Assertnoerr(err, t)
+		if matched {
+			break
+		}
+	}
+	Assertnoerr(scanner.Err(), t)
+	// Finally, read the value
+	fields := strings.Fields(scanner.Text())
+	if len(fields) < 2 {
+		return 0
+	}
+	i, err := strconv.Atoi(fields[1])
+	Assertnoerr(err, t)
+	return i
 }
 
 func GetHeapUsage(t *testing.T) int {

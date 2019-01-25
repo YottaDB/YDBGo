@@ -66,7 +66,7 @@ func TestSimpleAPILockManyParms(t *testing.T) {
 func TestSimpleAPITpFullNesting(t *testing.T) {
 	var wg sync.WaitGroup
 
-	SkipHeavyTests(t)
+	SkipARMV7LTests(t)
 
 	hit_tp_too_deep := 0
 	var fn func(string, uint64) error

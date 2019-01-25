@@ -383,65 +383,71 @@ func TestBufTAryTpNest(t *testing.T) {
 }
 
 func TestBufferTArrayFree(t *testing.T) {
-	var mem_before, mem_after int
-	var allocation_size uint32 = 1024 * 1024 * 512
-	var buffer [1024 * 1024 * 512]byte
 
 	SkipTimedTests(t)
-	SkipHeavyTests(t)
-
-	for i := uint32(0); i < allocation_size; i++ {
-		buffer[uint(i)] = byte(i)
-	}
-
-	// Note starting memory
-	mem_before = GetHeapUsage(t)
+	SkipMemIntensiveTests(t)
 
 	func() {
-		var buft yottadb.BufferTArray
-		defer buft.Free()
-		buft.Alloc(1, allocation_size)
-		tt := buffer[:]
-		err := buft.SetValBAry(yottadb.NOTTP, nil, 0, &tt)
-		Assertnoerr(err, t)
-	}()
-	// Trigger a garbage collection
-	runtime.GC()
+		var mem_before, mem_after int
+		var allocation_size uint32 = 1024 * 1024 * 512
+		var buffer [1024 * 1024 * 512]byte
 
-	// Verify that the difference between start and end is much less than 500MB
-	mem_after = GetHeapUsage(t)
-	assert.InEpsilon(t, mem_before, mem_after, .2)
+		for i := uint32(0); i < allocation_size; i++ {
+			buffer[uint(i)] = byte(i)
+		}
+
+		// Note starting memory
+		mem_before = GetHeapUsage(t)
+
+		func() {
+			var buft yottadb.BufferTArray
+			defer buft.Free()
+			buft.Alloc(1, allocation_size)
+			tt := buffer[:]
+			err := buft.SetValBAry(yottadb.NOTTP, nil, 0, &tt)
+			Assertnoerr(err, t)
+		}()
+		// Trigger a garbage collection
+		runtime.GC()
+
+		// Verify that the difference between start and end is much less than 500MB
+		mem_after = GetHeapUsage(t)
+		assert.InEpsilon(t, mem_before, mem_after, .2)
+	}()
 }
 
 func TestBufferTArrayFinalizerCleansCAlloc(t *testing.T) {
-	var mem_before, mem_after int
-	var allocation_size uint32 = 1024 * 1024 * 512
-	var buffer [1024 * 1024 * 512]byte
 
 	SkipTimedTests(t)
-	SkipHeavyTests(t)
-
-	for i := uint32(0); i < allocation_size; i++ {
-		buffer[uint(i)] = byte(i)
-	}
-
-	// Note starting memory
-	mem_before = GetHeapUsage(t)
+	SkipMemIntensiveTests(t)
 
 	func() {
-		var buft yottadb.BufferTArray
-		buft.Alloc(1, allocation_size)
-		tt := buffer[:]
-		err := buft.SetValBAry(yottadb.NOTTP, nil, 0, &tt)
-		Assertnoerr(err, t)
+		var mem_before, mem_after int
+		var allocation_size uint32 = 1024 * 1024 * 512
+		var buffer [1024 * 1024 * 512]byte
+
+		for i := uint32(0); i < allocation_size; i++ {
+			buffer[uint(i)] = byte(i)
+		}
+
+		// Note starting memory
+		mem_before = GetHeapUsage(t)
+
+		func() {
+			var buft yottadb.BufferTArray
+			buft.Alloc(1, allocation_size)
+			tt := buffer[:]
+			err := buft.SetValBAry(yottadb.NOTTP, nil, 0, &tt)
+			Assertnoerr(err, t)
+		}()
+		// Trigger a garbage collection
+		runtime.GC()
+
+		// It may take a moment for the finalizer to run; sleep for a smidgen
+		time.Sleep(time.Millisecond * 100)
+
+		// Verify that the difference between start and end is much less than 500MB
+		mem_after = GetHeapUsage(t)
+		assert.InEpsilon(t, mem_before, mem_after, .2)
 	}()
-	// Trigger a garbage collection
-	runtime.GC()
-
-	// It may take a moment for the finalizer to run; sleep for a smidgen
-	time.Sleep(time.Millisecond * 100)
-
-	// Verify that the difference between start and end is much less than 500MB
-	mem_after = GetHeapUsage(t)
-	assert.InEpsilon(t, mem_before, mem_after, .2)
 }
