@@ -386,6 +386,10 @@ func TestBufferTArrayFree(t *testing.T) {
 	var mem_before, mem_after int
 	var allocation_size uint32 = 1024 * 1024 * 512
 	var buffer [1024 * 1024 * 512]byte
+
+	SkipTimedTests(t)
+	SkipHeavyTests(t)
+
 	for i := uint32(0); i < allocation_size; i++ {
 		buffer[uint(i)] = byte(i)
 	}
@@ -413,6 +417,10 @@ func TestBufferTArrayFinalizerCleansCAlloc(t *testing.T) {
 	var mem_before, mem_after int
 	var allocation_size uint32 = 1024 * 1024 * 512
 	var buffer [1024 * 1024 * 512]byte
+
+	SkipTimedTests(t)
+	SkipHeavyTests(t)
+
 	for i := uint32(0); i < allocation_size; i++ {
 		buffer[uint(i)] = byte(i)
 	}

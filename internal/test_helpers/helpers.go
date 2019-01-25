@@ -284,12 +284,34 @@ func YDBCi(tptoken uint64,
 }
 
 func Available(name string) bool {
-	if name == "ydb_ci" {
-		return os.Getenv("ydb_ci") != ""
-	}
-	return false
+	return os.Getenv(name) != ""
 }
 
+// By default, we run timed tests; if we are running in a place
+//  where we expect the system will be loaded, we might skip them
+func RunTimedTests() bool {
+	return !Available("YDB_GO_SKIP_TIMED_TESTS")
+}
+
+func SkipTimedTests(t *testing.T) {
+	if RunTimedTests() {
+		t.Logf("Running a timed test which may fail on a loaded system")
+		return
+	}
+	t.Skipf("Skipping timed test which may fail on a loaded system")
+}
+
+func SkipCITests(t *testing.T) {
+	if !Available("ydb_ci") {
+		t.Skipf("Skipping call-in tests as ydb_ci is not configured")
+	}
+}
+
+func SkipHeavyTests(t *testing.T) {
+	if os.Getenv("real_mach_type") == "armv7l" {
+		t.Skipf("Some issue with arm7l processors causes this test to panic")
+	}
+}
 
 func GetHeapUsage(t *testing.T) int {
 	file, err := os.Open("/proc/self/status")

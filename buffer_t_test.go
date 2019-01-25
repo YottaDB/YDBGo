@@ -310,6 +310,10 @@ func TestBufferTFree(t *testing.T) {
 	var mem_before, mem_after int
 	var allocation_size uint32 = 1024 * 1024 * 512
 	var buffer [1024 * 1024 * 512]byte
+
+	SkipTimedTests(t)
+	SkipHeavyTests(t)
+
 	for i := uint32(0); i < allocation_size; i++ {
 		buffer[uint(i)] = byte(i)
 	}
@@ -331,13 +335,16 @@ func TestBufferTFree(t *testing.T) {
 	// Verify that the difference between start and end is much less than 500MB
 	mem_after = GetHeapUsage(t)
 	assert.InEpsilon(t, mem_before, mem_after, .2)
-	fmt.Printf("start: %v end: %v\n", mem_before, mem_after)
 }
 
 func TestBufferTFinalizerCleansCAlloc(t *testing.T) {
 	var mem_before, mem_after int
 	var allocation_size uint32 = 1024 * 1024 * 512
 	var buffer [1024 * 1024 * 512]byte
+
+	SkipTimedTests(t)
+	SkipHeavyTests(t)
+
 	for i := uint32(0); i < allocation_size; i++ {
 		buffer[uint(i)] = byte(i)
 	}

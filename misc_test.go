@@ -42,9 +42,7 @@ func TestMiscAssertnoerror(t *testing.T) {
 
 // This is actually testing an internal test-helper feature
 func TestYDBCi(t *testing.T) {
-	if !Available("ydb_ci") {
-		t.Skipf("Skipping call-in tests as ydb_ci is not configured")
-	}
+	SkipCITests(t)
 	r, err := YDBCi(yottadb.NOTTP, nil, true, "hello^helloM", "World")
 	assert.Nil(t, err)
 	assert.Equal(t, r, "World")
@@ -77,9 +75,8 @@ func TestMiscGoTimers(t *testing.T) {
 	//  which invokes a M routine that sleeps 100ms 10 times, kick off 10 go routines
 	//  which sleep for 100ms
 	var wg sync.WaitGroup
-	if !Available("ydb_ci") {
-		t.Skipf("Skipping call-in tests as ydb_ci is not configured")
-	}
+	SkipTimedTests(t)
+	SkipCITests(t)
 	miscGoTimersHelper(t, &wg, 2)
 	sleepDuration, e := time.ParseDuration("100ms")
 	assert.Nil(t, e)
@@ -101,9 +98,8 @@ func TestMiscGoTimers(t *testing.T) {
 func TestMiscGoSelectWithYdbTimers(t *testing.T) {
 	// Verify Go channels do not interfere with YDB timers
 	var wg sync.WaitGroup
-	if !Available("ydb_ci") {
-		t.Skipf("Skipping call-in tests as ydb_ci is not configured")
-	}
+	SkipTimedTests(t)
+	SkipCITests(t)
 	miscGoTimersHelper(t, &wg, 10)
 	// Spawn off consume-producer routines, sending 100 messages at 10ms intervals (10s test)
 	sleepDuration, e := time.ParseDuration("10ms")
@@ -133,9 +129,8 @@ func TestMiscGoSelectWithYdbTimers(t *testing.T) {
 func TestMiscGoSelectWithYdbTimers2(t *testing.T) {
 	// Verify Go select/channels do not interfere with YDB timers
 	var wg sync.WaitGroup
-	if !Available("ydb_ci") {
-		t.Skipf("Skipping call-in tests as ydb_ci is not configured")
-	}
+	SkipTimedTests(t)
+	SkipCITests(t)
 	miscGoTimersHelper(t, &wg, 10)
 	// Spawn off consume-producer routines, sending 100 messages at 10ms intervals (10s test)
 	sleepDuration, e := time.ParseDuration("10ms")
@@ -179,9 +174,8 @@ func TestMiscGoSelectWithYdbTimers2(t *testing.T) {
 func TestMiscGoSelectWithYdbTimers3(t *testing.T) {
 	// Verify Go select/channels/time.After does not interfere with YDB timers
 	var wg sync.WaitGroup
-	if !Available("ydb_ci") {
-		t.Skipf("Skipping call-in tests as ydb_ci is not configured")
-	}
+	SkipTimedTests(t)
+	SkipCITests(t)
 	miscGoTimersHelper(t, &wg, 10)
 	// Spawn off consume-producer routines, sending 100 messages at 10ms intervals (10s test)
 	sleepDuration, e := time.ParseDuration("10ms")

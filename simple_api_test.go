@@ -17,7 +17,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"lang.yottadb.com/go/yottadb"
 	. "lang.yottadb.com/go/yottadb/internal/test_helpers"
-	"os"
 	"sync"
 	"testing"
 )
@@ -67,9 +66,7 @@ func TestSimpleAPILockManyParms(t *testing.T) {
 func TestSimpleAPITpFullNesting(t *testing.T) {
 	var wg sync.WaitGroup
 
-	if os.Getenv("real_mach_type") == "armv7l" {
-		t.Skipf("Some issue with arm7l processors causes this test to panic")
-	}
+	SkipHeavyTests(t)
 
 	hit_tp_too_deep := 0
 	var fn func(string, uint64) error
