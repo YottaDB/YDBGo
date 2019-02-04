@@ -315,7 +315,6 @@ func TestBufferTFree(t *testing.T) {
 		var allocation_size uint32 = 1024 * 1024 * 512
 		var buffer [1024 * 1024 * 512]byte
 
-
 		for i := uint32(0); i < allocation_size; i++ {
 			buffer[uint(i)] = byte(i)
 		}

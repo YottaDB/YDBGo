@@ -34,9 +34,9 @@ func MessageT(tptoken uint64, errstr *BufferT, status int) (string, error) {
 	msgval.Alloc(uint32(C.YDB_MAX_ERRORMSG))
 	var cbuft *C.ydb_buffer_t
 	if errstr != nil {
-		cbuft = errstr.cbuft
+		cbuft = errstr.getCPtr()
 	}
-	rc := C.ydb_message_t(C.uint64_t(tptoken), cbuft, C.int(status), msgval.cbuft)
+	rc := C.ydb_message_t(C.uint64_t(tptoken), cbuft, C.int(status), msgval.getCPtr())
 	if C.YDB_OK != rc {
 		err := NewError(tptoken, errstr, int(rc))
 		return "", err

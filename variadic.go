@@ -62,7 +62,7 @@ func (vplist *variadicPlist) callVariadicPlistFuncST(tptoken uint64, errstr *Buf
 	}
 	var cbuft *C.ydb_buffer_t
 	if errstr != nil {
-		cbuft = errstr.cbuft
+		cbuft = errstr.getCPtr()
 	}
 	return int(C.ydb_call_variadic_plist_func_st(C.uint64_t(tptoken), cbuft, (C.ydb_vplist_func)(vpfunc),
 		(C.uintptr_t)(uintptr(unsafe.Pointer(vplist.cvplist)))))

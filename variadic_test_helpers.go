@@ -57,8 +57,8 @@ func TestVariadicPlistHelper(debugFlag bool, errors *int) error {
 	expectedstr = C.expectedbuf2
 	v2.SetValStr(NOTTP, nil, &expectedstr)
 	// Place items in variable length parm list non-serially
-	vplist.setVPlistParam(NOTTP, nil, 3, uintptr(unsafe.Pointer(v2.cbuft)))
-	vplist.setVPlistParam(NOTTP, nil, 2, uintptr(unsafe.Pointer(v1.cbuft)))
+	vplist.setVPlistParam(NOTTP, nil, 3, uintptr(unsafe.Pointer(v2.cbuft.cbuft)))
+	vplist.setVPlistParam(NOTTP, nil, 2, uintptr(unsafe.Pointer(v1.cbuft.cbuft)))
 	vplist.setVPlistParam(NOTTP, nil, 0, uintptr(3)) // The count of parms passed in
 	vplist.setVPlistParam(NOTTP, nil, 1, uintptr(42))
 	vplist.setUsed(NOTTP, nil, 4)

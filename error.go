@@ -70,8 +70,8 @@ func NewError(tptoken uint64, errstr *BufferT, errnum int) error {
 		// Our 3rd and final quickie-check that needs no message
 		return &YDBError{errnum, "ROLLBACK"}
 	}
-	if (nil != errstr) && (nil != errstr.cbuft) {
-		errmsg = C.GoString((*C.char)(errstr.cbuft.buf_addr))
+	if (nil != errstr) && (nil != errstr.getCPtr()) {
+		errmsg = C.GoString((*C.char)(errstr.getCPtr().buf_addr))
 		if 0 == len(errmsg) {
 			// No message was supplied for the error - see if we can find one via MessageT(). We use MessageT()
 			// here and not $ZSTATUS because all of the errors that this might happen to have simple text with

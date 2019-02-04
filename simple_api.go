@@ -91,14 +91,14 @@ func LockST(tptoken uint64, errstr *BufferT, timeoutNsec uint64, lockname ...*Ke
 				return &YDBError{(int)(C.YDB_ERR_NAMECOUNT2HI), errmsg}
 			}
 			// Set the 3 parameters for this lockname
-			vplist.setVPlistParam(tptoken, errstr, parmindx, uintptr(unsafe.Pointer((*lockname[lockindx]).Varnm.cbuft)))
+			vplist.setVPlistParam(tptoken, errstr, parmindx, uintptr(unsafe.Pointer((*lockname[lockindx]).Varnm.getCPtr())))
 			parmindx++
 			parmsleft--
-			vplist.setVPlistParam(tptoken, errstr, parmindx, uintptr((*lockname[lockindx]).Subary.elemsUsed))
+			vplist.setVPlistParam(tptoken, errstr, parmindx, uintptr((*lockname[lockindx]).Subary.ElemUsed()))
 			parmindx++
 			parmsleft--
 			subgobuftary := (*lockname[lockindx]).Subary
-			subbuftary := unsafe.Pointer(subgobuftary.cbuftary)
+			subbuftary := unsafe.Pointer(subgobuftary.getCPtr())
 			vplist.setVPlistParam(tptoken, errstr, parmindx, uintptr(subbuftary))
 			parmindx++
 			parmsleft--
@@ -114,7 +114,7 @@ func LockST(tptoken uint64, errstr *BufferT, timeoutNsec uint64, lockname ...*Ke
 	// top of this routine) to do the call that callVariadicPlistFuncST() would have done.
 	var cbuft *C.ydb_buffer_t
 	if errstr != nil {
-		cbuft = errstr.cbuft
+		cbuft = errstr.getCPtr()
 	}
 	rc := C.ydb_go_lock_st(C.uint64_t(tptoken), cbuft, (C.uintptr_t)(uintptr(unsafe.Pointer(vplist.cvplist))))
 	if C.YDB_OK != rc {

@@ -27,9 +27,13 @@ import "C"
 
 // BufferT is a golang structure that serves as an anchor point for a C allocated ydb_buffer_t structure used
 // to call the YottaDB C Simple APIs.
-type BufferT struct { // Contains a single ydb_buffer_t struct
-	cbuft    *C.ydb_buffer_t // C flavor of the ydb_buffer_t struct
-	ownsBuff bool            // If true, we should clean the cbuft when Free'd
+type BufferT struct { // Contains a pointer to single ydb_buffer_t struct
+	cbuft    *internalBufferT
+	ownsBuff bool // If true, we should clean the cbuft when Free'd
+}
+
+type internalBufferT struct {
+	cbuft *C.ydb_buffer_t // C flavor of the ydb_buffer_t struct
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -51,7 +55,10 @@ func (buft *BufferT) BufferTFromPtr(pointer unsafe.Pointer) {
 	if nil != buft.cbuft {
 		buft.Free()
 	}
-	buft.cbuft = (*C.ydb_buffer_t)(pointer)
+	// Note that we don't set a Finalizer here because another process has already done
+	//  so under a different BufferT; the lifespan of this object must be a subset of that
+	//  object
+	buft.cbuft = &internalBufferT{(*C.ydb_buffer_t)(pointer)}
 	buft.ownsBuff = false
 }
 
@@ -70,7 +77,7 @@ func (buft *BufferT) Alloc(nBytes uint32) {
 	}
 	if nil != buft.cbuft {
 		// We already have a ydb_buffer_t, just get rid of current buffer for re-allocate
-		cbuftptr = buft.cbuft
+		cbuftptr = buft.getCPtr()
 		cbufptr := cbuftptr.buf_addr
 		if buft.ownsBuff {
 			C.free(unsafe.Pointer(cbufptr))
@@ -79,8 +86,8 @@ func (buft *BufferT) Alloc(nBytes uint32) {
 
 	} else {
 		// Allocate a C flavor ydb_buffer_t struct to pass to simpleAPI
-		buft.cbuft = (*C.ydb_buffer_t)(C.malloc(C.size_t(C.sizeof_ydb_buffer_t)))
-		cbuftptr = buft.cbuft
+		buft.cbuft = &internalBufferT{(*C.ydb_buffer_t)(C.malloc(C.size_t(C.sizeof_ydb_buffer_t)))}
+		cbuftptr = buft.getCPtr()
 		cbuftptr.len_alloc = 0 // Setting these now incase have failure or interrupt before we finish
 		cbuftptr.buf_addr = nil
 	}
@@ -94,8 +101,8 @@ func (buft *BufferT) Alloc(nBytes uint32) {
 	cbuftptr.len_alloc = C.uint(nBytes)
 	buft.ownsBuff = true
 	// Set a finalizer
-	runtime.SetFinalizer(buft, nil)
-	runtime.SetFinalizer(buft, func(o *BufferT) {
+	runtime.SetFinalizer(buft.cbuft, nil)
+	runtime.SetFinalizer(buft.cbuft, func(o *internalBufferT) {
 		o.Free()
 	})
 }
@@ -122,7 +129,7 @@ func (buft *BufferT) DumpToWriter(writer io.Writer) {
 	if nil == buft {
 		panic("*BufferT receiver of DumpToWriter() cannot be nil")
 	}
-	cbuftptr := buft.cbuft
+	cbuftptr := buft.getCPtr()
 	fmt.Fprintf(writer, "BufferT.Dump(): cbuftptr: %p", cbuftptr)
 	if nil != cbuftptr {
 		fmt.Fprintf(writer, ", buf_addr: %v, len_alloc: %v, len_used: %v", cbuftptr.buf_addr,
@@ -140,21 +147,27 @@ func (buft *BufferT) DumpToWriter(writer io.Writer) {
 // The inverse of the Alloc() method: release the buffer in YottaDB heap space referenced by the C.ydb_buffer_t structure,
 // release the C.ydb_buffer_t, and set cbuft in the BufferT structure to nil.
 func (buft *BufferT) Free() {
-	printEntry("BufferT.Free()")
-	if nil != buft { // Ignore if buft is null already
-		if buft.ownsBuff {
-			cbuftptr := buft.cbuft
-			if nil != cbuftptr {
-				// ydb_buffer_t block exists - free its buffer first if it exists
-				if nil != cbuftptr.buf_addr {
-					C.free(unsafe.Pointer(cbuftptr.buf_addr))
-				}
-				C.free(unsafe.Pointer(cbuftptr))
-				buft.cbuft = nil
-			}
-		} else {
-			buft.cbuft = nil
+	if nil == buft {
+		return
+	}
+	buft.cbuft.Free()
+	buft.cbuft = nil
+}
+
+// Calls C.free on any C memory owned by this internalBuffer
+func (buft *internalBufferT) Free() {
+	printEntry("internalBufferT.Free()")
+	if buft == nil {
+		return
+	}
+	cbuftptr := buft.cbuft
+	if nil != cbuftptr {
+		// ydb_buffer_t block exists - free its buffer first if it exists
+		if nil != cbuftptr.buf_addr {
+			C.free(unsafe.Pointer(cbuftptr.buf_addr))
 		}
+		C.free(unsafe.Pointer(cbuftptr))
+		buft.cbuft = nil
 	}
 }
 
@@ -167,7 +180,7 @@ func (buft *BufferT) LenAlloc(tptoken uint64, errstr *BufferT) (uint32, error) {
 	if nil == buft {
 		panic("*BufferT receiver of LenAlloc() cannot be nil")
 	}
-	cbuftptr := buft.cbuft
+	cbuftptr := buft.getCPtr()
 	if nil == cbuftptr {
 		// Create an error to return
 		errmsg, err := MessageT(tptoken, errstr, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
@@ -191,7 +204,7 @@ func (buft *BufferT) LenUsed(tptoken uint64, errstr *BufferT) (uint32, error) {
 	if nil == buft {
 		panic("*BufferT receiver of LenUsed() cannot be nil")
 	}
-	cbuftptr := buft.cbuft
+	cbuftptr := buft.getCPtr()
 	if nil == cbuftptr {
 		// Create an error to return
 		errmsg, err := MessageT(tptoken, errstr, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
@@ -224,7 +237,7 @@ func (buft *BufferT) ValBAry(tptoken uint64, errstr *BufferT) (*[]byte, error) {
 	if nil == buft {
 		panic("*BufferT receiver of ValBAry() cannot be nil")
 	}
-	cbuftptr := buft.cbuft
+	cbuftptr := buft.getCPtr()
 	if nil == cbuftptr {
 		// Create an error to return
 		errmsg, err := MessageT(tptoken, errstr, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
@@ -261,7 +274,7 @@ func (buft *BufferT) ValStr(tptoken uint64, errstr *BufferT) (*string, error) {
 	if nil == buft {
 		panic("*BufferT receiver of ValStr() cannot be nil")
 	}
-	cbuftptr := buft.cbuft
+	cbuftptr := buft.getCPtr()
 	if nil == cbuftptr {
 		// Create an error to return
 		errmsg, err := MessageT(tptoken, errstr, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
@@ -302,7 +315,7 @@ func (buft *BufferT) SetLenUsed(tptoken uint64, errstr *BufferT, newLen uint32) 
 	if nil == buft {
 		panic("*BufferT receiver of SetLenUsed() cannot be nil")
 	}
-	cbuftptr := buft.cbuft
+	cbuftptr := buft.getCPtr()
 	if nil == cbuftptr {
 		// Create an error to return
 		errmsg, err := MessageT(tptoken, errstr, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
@@ -334,7 +347,7 @@ func (buft *BufferT) SetValBAry(tptoken uint64, errstr *BufferT, value *[]byte) 
 	if nil == buft {
 		panic("*BufferT receiver of SetValBAry() cannot be nil")
 	}
-	cbuftptr := buft.cbuft
+	cbuftptr := buft.getCPtr()
 	if nil == cbuftptr {
 		// Create an error to return
 		errmsg, err := MessageT(tptoken, errstr, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
@@ -412,7 +425,7 @@ func (buft *BufferT) Str2ZwrST(tptoken uint64, errstr *BufferT, zwr *BufferT) er
 	if nil == zwr {
 		panic("*BufferT 'zwr' parameter to Str2ZwrST() cannot be nil")
 	}
-	if nil == buft.cbuft || nil == zwr.cbuft {
+	if nil == buft.getCPtr() || nil == zwr.getCPtr() {
 		// Create an error to return
 		errmsg, err := MessageT(tptoken, errstr, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
 		if nil != err {
@@ -422,9 +435,9 @@ func (buft *BufferT) Str2ZwrST(tptoken uint64, errstr *BufferT, zwr *BufferT) er
 	}
 	var cbuft *C.ydb_buffer_t
 	if errstr != nil {
-		cbuft = errstr.cbuft
+		cbuft = errstr.getCPtr()
 	}
-	rc := C.ydb_str2zwr_st(C.uint64_t(tptoken), cbuft, buft.cbuft, zwr.cbuft)
+	rc := C.ydb_str2zwr_st(C.uint64_t(tptoken), cbuft, buft.getCPtr(), zwr.getCPtr())
 	if C.YDB_OK != rc {
 		err := NewError(tptoken, errstr, int(rc))
 		return err
@@ -450,7 +463,7 @@ func (buft *BufferT) Zwr2StrST(tptoken uint64, errstr *BufferT, str *BufferT) er
 	if nil == str {
 		panic("*BufferT 'str' parameter to Zwr2StrST() cannot be nil")
 	}
-	if nil == buft.cbuft || nil == str.cbuft {
+	if nil == buft.getCPtr() || nil == str.getCPtr() {
 		// Create an error to return
 		errmsg, err := MessageT(tptoken, errstr, (int)(C.YDB_ERR_STRUCTNOTALLOCD))
 		if nil != err {
@@ -460,13 +473,22 @@ func (buft *BufferT) Zwr2StrST(tptoken uint64, errstr *BufferT, str *BufferT) er
 	}
 	var cbuft *C.ydb_buffer_t
 	if errstr != nil {
-		cbuft = errstr.cbuft
+		cbuft = errstr.getCPtr()
 	}
-	rc := C.ydb_zwr2str_st(C.uint64_t(tptoken), cbuft, buft.cbuft, str.cbuft)
+	rc := C.ydb_zwr2str_st(C.uint64_t(tptoken), cbuft, buft.getCPtr(), str.getCPtr())
 	if C.YDB_OK != rc {
 		err := NewError(tptoken, errstr, int(rc))
 		return err
 	}
 	// Returned string should be snug in the str buffer
 	return nil
+}
+
+// getCPtr returns a pointer to the internal ydb_buffer_t
+func (buft *BufferT) getCPtr() *C.ydb_buffer_t {
+	ptr := (*C.ydb_buffer_t)(nil)
+	if buft.cbuft != nil {
+		ptr = buft.cbuft.cbuft
+	}
+	return ptr
 }
