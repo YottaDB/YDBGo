@@ -105,7 +105,13 @@ func (buftary *BufferTArray) DumpToWriter(writer io.Writer) {
 		for i := 0; int(buftary.ElemUsed()) > i; i++ {
 			elemptr := (*C.ydb_buffer_t)(unsafe.Pointer((uintptr(unsafe.Pointer(cbuftary)) +
 				uintptr(C.sizeof_ydb_buffer_t*i))))
-			valstr := C.GoStringN((*elemptr).buf_addr, C.int((*elemptr).len_used))
+			// It is possible len_used is greater than len_alloc (if this buffer was populated by SimpleAPI C code)
+			// Ensure we do not overrun the allocated buffer while dumping this object in that case.
+			min := (*elemptr).len_used
+			if (min > (*elemptr).len_alloc) {
+				min = (*elemptr).len_alloc
+			}
+			valstr := C.GoStringN((*elemptr).buf_addr, C.int(min))
 			fmt.Fprintf(writer, "  %d: %s\n", i, valstr)
 		}
 	}

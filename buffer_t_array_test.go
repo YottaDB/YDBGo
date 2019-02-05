@@ -84,6 +84,11 @@ func TestBufTAryDump(t *testing.T) {
 	//  that; it really only mentions used/available buffers
 	assert.Contains(t, buf1.String(), "10")
 	assert.Contains(t, buf1.String(), "Hello")
+
+	// Dump from a nil BufferTArray with an INVSTRLEN error
+	value.Alloc(1, 0)
+	value.SetValStrLit(tp, nil, 0, "Hello")	// this should return an INVSTRLEN error
+	value.DumpToWriter(&buf1)
 }
 
 func TestBufTAryAlloc(t *testing.T) {

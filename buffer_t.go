@@ -117,8 +117,14 @@ func (buft *BufferT) DumpToWriter(writer io.Writer) {
 	if nil != cbuftptr {
 		fmt.Fprintf(writer, ", buf_addr: %v, len_alloc: %v, len_used: %v", cbuftptr.buf_addr,
 			cbuftptr.len_alloc, cbuftptr.len_used)
-		if 0 < cbuftptr.len_used {
-			strval := C.GoStringN(cbuftptr.buf_addr, C.int(cbuftptr.len_used))
+		// It is possible len_used is greater than len_alloc (if this buffer was populated by SimpleAPI C code)
+		// Ensure we do not overrun the allocated buffer while dumping this object in that case.
+		min := cbuftptr.len_used
+		if (min > cbuftptr.len_alloc) {
+			min = cbuftptr.len_alloc
+		}
+		if 0 < min {
+			strval := C.GoStringN(cbuftptr.buf_addr, C.int(min))
 			fmt.Fprintf(writer, ", value: %s", strval)
 		}
 	}
@@ -347,7 +353,6 @@ func (buft *BufferT) SetValBAry(tptoken uint64, errstr *BufferT, value *[]byte) 
 		if nil != err {
 			panic(fmt.Sprintf("YDB: Error fetching INVSTRLEN: %s", err))
 		}
-		cbuftptr.len_used = vallen // Set so caller knows what alloc length SHOULD have been (minimum)
 		return &YDBError{(int)(C.YDB_ERR_INVSTRLEN), errmsg}
 	}
 	// Copy the Golang buffer to the C buffer

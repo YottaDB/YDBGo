@@ -292,6 +292,13 @@ func TestDump(t *testing.T) {
 	value.DumpToWriter(&buf1)
 	assert.Contains(t, buf1.String(), "Hello")
 	assert.Contains(t, buf1.String(), "64")
+	value.Free()
+
+	// Dump from a nil buffer with an INVSTRLEN error
+	value.Alloc(0)
+	err := value.SetValStrLit(tp, nil, "Hello")	// this should return an INVSTRLEN error
+	assert.Equal(t, yottadb.ErrorCode(err), yottadb.YDB_ERR_INVSTRLEN)
+	value.DumpToWriter(&buf1)
 }
 
 func TestBufferTNilRecievers(t *testing.T) {
