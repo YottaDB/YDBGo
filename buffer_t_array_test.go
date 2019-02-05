@@ -269,7 +269,7 @@ func TestBufTAryElemUsed(t *testing.T) {
 
 	// Test before Alloc
 	r := value.ElemUsed()
-	assert.Equal(t, r, uint32(0))
+	assert.Equal(t, uint32(0), r)
 
 	// Test set
 	err := value.SetElemUsed(tp, nil, 0)
@@ -279,7 +279,7 @@ func TestBufTAryElemUsed(t *testing.T) {
 	value.Alloc(10, 50)
 
 	r = value.ElemUsed()
-	assert.Equal(t, r, uint32(0))
+	assert.Equal(t, uint32(0), r)
 
 	err = value.SetElemUsed(tp, nil, 100)
 	assert.NotNil(t, err)
@@ -288,7 +288,15 @@ func TestBufTAryElemUsed(t *testing.T) {
 	assert.Nil(t, err)
 
 	r = value.ElemUsed()
-	assert.Equal(t, r, uint32(5))
+	assert.Equal(t, uint32(5), r)
+
+	// Ensure that we can set the elems used back to 0 after
+	//  they had been set to a different value
+	err = value.SetElemUsed(tp, nil, 0)
+	assert.Nil(t, err)
+
+	r = value.ElemUsed()
+	assert.Equal(t, uint32(0), r)
 }
 
 func TestBufferTAryNilRecievers(t *testing.T) {

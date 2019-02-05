@@ -347,9 +347,6 @@ func (buftary *BufferTArray) SetElemUsed(tptoken uint64, errstr *BufferT, newUse
 	if nil == buftary {
 		panic("*BufferTArray receiver of SetElemUsed() cannot be nil")
 	}
-	if newUsed == 0 {
-		return nil
-	}
 	elemcnt := buftary.ElemAlloc()
 	if newUsed > elemcnt {
 		// Create an error to return
@@ -360,7 +357,9 @@ func (buftary *BufferTArray) SetElemUsed(tptoken uint64, errstr *BufferT, newUse
 		return &YDBError{(int)(C.YDB_ERR_INSUFFSUBS), errmsg}
 	}
 	// Set the number of used buffers
-	buftary.cbuftary.elemsUsed = newUsed
+	if nil != buftary.cbuftary {
+		buftary.cbuftary.elemsUsed = newUsed
+	}
 	return nil
 }
 
