@@ -61,6 +61,8 @@ func (buftary *BufferTArray) Alloc(numBufs, nBytes uint32) {
 	if nil == buftary {
 		panic("*BufferTArray receiver of Alloc() cannot be nil")
 	}
+	// Forget the previous structure, then allocate a new one if needed
+	buftary.cbuftary = nil
 	if 0 != numBufs {
 		// Allocate new ydb_buffer_t array and initialize
 		len := C.size_t(uint32(C.sizeof_ydb_buffer_t) * numBufs)
@@ -74,13 +76,9 @@ func (buftary *BufferTArray) Alloc(numBufs, nBytes uint32) {
 			(*elemptr).len_alloc = C.uint(nBytes)
 			(*elemptr).len_used = 0
 		}
-		runtime.SetFinalizer(buftary.cbuftary, nil)
 		runtime.SetFinalizer(buftary.cbuftary, func(o *internalBufferTArray) {
 			o.Free()
 		})
-	} else {
-		// Make sure our potentially de-allocated array has a proper uninitialized state
-		buftary.cbuftary = nil
 	}
 }
 
@@ -117,32 +115,34 @@ func (buftary *BufferTArray) DumpToWriter(writer io.Writer) {
 // and the ydb_buffer_t array. Set cbuftary to nil, and elemsAlloc and elemsUsed to zero.
 func (buftary *BufferTArray) Free() {
 	printEntry("BufferTArray.Free()")
-	if nil != buftary {
-		buftary.cbuftary.Free()
-		buftary.cbuftary = nil
+	if nil == buftary {
+		return
 	}
+	buftary.cbuftary.Free()
+	buftary.cbuftary = nil
 }
 
 // Free cleans up C memory for the internal BufferTArray object
-func (buftary *internalBufferTArray) Free() {
+func (ibuftary *internalBufferTArray) Free() {
 	printEntry("internalBufferTArray.Free()")
-	if nil != buftary {
-		// Deallocate the buffers in each ydb_buffer_t
-		cbuftary := buftary.cbuftary
-		if nil == cbuftary {
-			return // Nothing to do
-		}
-		for i := 0; int(buftary.elemsAlloc) > i; i++ {
-			elemptr := (*C.ydb_buffer_t)(unsafe.Pointer(uintptr(unsafe.Pointer(cbuftary)) +
-				uintptr(C.sizeof_ydb_buffer_t*i)))
-			if 0 != (*elemptr).len_alloc {
-				C.free(unsafe.Pointer((*elemptr).buf_addr))
-			}
-		}
-		// Array buffers are freed, now free the array of ydb_buffer_t structs if it exists
-		C.free(unsafe.Pointer(cbuftary))
-		buftary.cbuftary = nil
+	if nil == ibuftary {
+		return
 	}
+	// Deallocate the buffers in each ydb_buffer_t
+	cbuftary := ibuftary.cbuftary
+	if nil == cbuftary {
+		return // Nothing to do
+	}
+	for i := 0; int(ibuftary.elemsAlloc) > i; i++ {
+		elemptr := (*C.ydb_buffer_t)(unsafe.Pointer(uintptr(unsafe.Pointer(cbuftary)) +
+			uintptr(C.sizeof_ydb_buffer_t*i)))
+		if 0 != (*elemptr).len_alloc {
+			C.free(unsafe.Pointer((*elemptr).buf_addr))
+		}
+	}
+	// Array buffers are freed, now free the array of ydb_buffer_t structs if it exists
+	C.free(unsafe.Pointer(cbuftary))
+	ibuftary.cbuftary = nil
 }
 
 // ElemAlloc is a method to return elemsAlloc from a BufferTArray.

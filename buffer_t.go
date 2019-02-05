@@ -47,13 +47,10 @@ type internalBufferT struct {
 // Intended for use by functions implementing transaction logic, the method sets cbuft in the BufferT structure to errstr.
 //
 // Note: Modifying errstr, or accessing memory it references may lead to code that behaves unpredictably and is hard to debug. Always
-// “wrap” it using BufferTFromPtr() and use the methods for the BufferT structure.
+// "wrap" it using BufferTFromPtr() and use the methods for the BufferT structure.
 func (buft *BufferT) BufferTFromPtr(pointer unsafe.Pointer) {
 	if nil == buft {
 		panic("*BufferT receiver of FromPtr() cannot be nil")
-	}
-	if nil != buft.cbuft {
-		buft.Free()
 	}
 	// Note that we don't set a Finalizer here because another process has already done
 	//  so under a different BufferT; the lifespan of this object must be a subset of that
@@ -75,33 +72,19 @@ func (buft *BufferT) Alloc(nBytes uint32) {
 	if nil == buft {
 		panic("*BufferT receiver of Alloc() cannot be nil")
 	}
-	if nil != buft.cbuft {
-		// We already have a ydb_buffer_t, just get rid of current buffer for re-allocate
-		cbuftptr = buft.getCPtr()
-		cbufptr := cbuftptr.buf_addr
-		if buft.ownsBuff {
-			C.free(unsafe.Pointer(cbufptr))
-		}
-		cbuftptr.buf_addr = nil
 
-	} else {
-		// Allocate a C flavor ydb_buffer_t struct to pass to simpleAPI
-		buft.cbuft = &internalBufferT{(*C.ydb_buffer_t)(C.malloc(C.size_t(C.sizeof_ydb_buffer_t)))}
-		cbuftptr = buft.getCPtr()
-		cbuftptr.len_alloc = 0 // Setting these now incase have failure or interrupt before we finish
-		cbuftptr.buf_addr = nil
-	}
+	// Allocate a C flavor ydb_buffer_t struct to pass to simpleAPI
+	buft.cbuft = &internalBufferT{(*C.ydb_buffer_t)(C.malloc(C.size_t(C.sizeof_ydb_buffer_t)))}
+	cbuftptr = buft.getCPtr()
 	cbuftptr.len_used = 0
-	// Allocate a new buffer of the given size
+	cbuftptr.len_alloc = C.uint(nBytes)
+	cbuftptr.buf_addr = nil
+	// Allocate a new buffer of the given size; if size is 0, we just leave it as nil
 	if 0 < nBytes {
 		cbuftptr.buf_addr = (*C.char)(C.malloc(C.size_t(nBytes)))
-	} else {
-		cbuftptr.buf_addr = nil // Making sure a potentially de-allocated buffer is not pointed to
 	}
-	cbuftptr.len_alloc = C.uint(nBytes)
 	buft.ownsBuff = true
 	// Set a finalizer
-	runtime.SetFinalizer(buft.cbuft, nil)
 	runtime.SetFinalizer(buft.cbuft, func(o *internalBufferT) {
 		o.Free()
 	})
@@ -150,24 +133,26 @@ func (buft *BufferT) Free() {
 	if nil == buft {
 		return
 	}
-	buft.cbuft.Free()
+	if true == buft.ownsBuff {
+		buft.cbuft.Free()
+	}
 	buft.cbuft = nil
 }
 
 // Calls C.free on any C memory owned by this internalBuffer
-func (buft *internalBufferT) Free() {
+func (ibuft *internalBufferT) Free() {
 	printEntry("internalBufferT.Free()")
-	if buft == nil {
+	if nil == ibuft {
 		return
 	}
-	cbuftptr := buft.cbuft
+	cbuftptr := ibuft.cbuft
 	if nil != cbuftptr {
 		// ydb_buffer_t block exists - free its buffer first if it exists
 		if nil != cbuftptr.buf_addr {
 			C.free(unsafe.Pointer(cbuftptr.buf_addr))
 		}
 		C.free(unsafe.Pointer(cbuftptr))
-		buft.cbuft = nil
+		ibuft.cbuft = nil
 	}
 }
 

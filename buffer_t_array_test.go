@@ -376,7 +376,7 @@ func TestBufTAryTpNest(t *testing.T) {
 		if nest < nest_limit {
 			nest++
 			e := yottadb.TpE2(tptoken, nil, tproutine, "BATCH", []string{})
-			if e == nil {
+			if nil == e {
 				return 0
 			}
 			return int32(yottadb.ErrorCode(e))

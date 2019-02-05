@@ -86,7 +86,7 @@ func TestMain(m *testing.M) {
 
 	// Cleanup the temp directory; we leave it if we are in verbose mode
 	//  or the test failed
-	if retCode == 0 && verbose == false {
+	if 0 == retCode && false == verbose {
 		log.Printf("Cleaning up test directory")
 		f.Close()
 		os.RemoveAll(test_dir)

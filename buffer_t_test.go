@@ -373,3 +373,37 @@ func TestBufferTFinalizerCleansCAlloc(t *testing.T) {
 		assert.InEpsilon(t, mem_before, mem_after, .2)
 	}()
 }
+
+func TestBufferTCopyAndFree(t *testing.T) {
+	var buff, buff2 yottadb.BufferT
+	var buffp *yottadb.BufferT
+
+	buff.Alloc(1024)
+	buff2 = buff
+	buff2.Free()
+	buff.Free()
+
+	buffp = new(yottadb.BufferT)
+	buffp.Alloc(1024)
+	buff = *buffp
+	buff.Free()
+	buffp.Free()
+}
+
+func TestBufferTInStruct(t *testing.T) {
+	// If this fails, it will fail with a panic
+	tptoken := yottadb.NOTTP
+	new_buf := func() yottadb.BufferT {
+		type myStruct struct {
+			buff1, buff2, buff3 yottadb.BufferT
+		}
+		var s myStruct
+		s.buff1.Alloc(1024)
+		s.buff2.Alloc(1024)
+		s.buff3.Alloc(1024)
+		return s.buff1
+	}()
+	val, err := new_buf.ValStr(tptoken, nil)
+	assert.Nil(t, err)
+	assert.Equal(t, *val, "")
+}
