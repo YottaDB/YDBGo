@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"testing"
 	"time"
+	"math/rand"
 )
 
 // TestStr2ZwrSTAndZwr2StrST tests the Str2ZwrST() and Zwr2StrST() methods
@@ -162,6 +163,24 @@ func TestAlloc(t *testing.T) {
 	str, err := ovalue.ValStr(tptoken, nil)
 	assert.Nil(t, err)
 	assert.Equal(t, "", *str)
+
+	// Alloc BufferT var1; Copy to another BufferT var2; Free copy var2; Alloc new BufferT var1
+	for i := 0; i < 10; i++ {
+		var prev yottadb.BufferT
+
+		value.Alloc(uint32(i))
+		// Randomly choose to set a string literal value to the allocated buffer
+		if (0 != rand.Intn(2)) {
+			err = value.SetValStrLit(tptoken, nil, "Hello")
+			if (i < 5) {
+				assert.Equal(t, yottadb.ErrorCode(err), yottadb.YDB_ERR_INVSTRLEN)
+			} else {
+				assert.Nil(t, err)
+			}
+		}
+		prev = value
+		prev.Free()
+	}
 }
 
 func TestLen(t *testing.T) {
