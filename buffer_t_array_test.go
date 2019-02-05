@@ -67,36 +67,6 @@ func TestBufTAryDeleteExclST(t *testing.T) {
 	}
 }
 
-// TestBufTAryTpSt tests the TpST() method by driving a transaction that sets a couple nodes and then verifies that they exist after the commit.
-func TestBufTAryTpSt(t *testing.T) {
-	var novars yottadb.BufferTArray
-	var namelst yottadb.BufferTArray
-	var tptoken uint64 = yottadb.NOTTP
-	var err error
-	var errors int
-
-	namelst.Alloc(2, 10) // Need an array of two names not more than 10 bytes
-	// Start with clean slate then drive TP transaction
-	Dbdeleteall(tptoken, nil, &errors, t)
-	err = novars.TpST(tptoken, nil, TpRtn_cgo(), nil, "BATCH")
-	Assertnoerr(err, t)
-	// Fetch the two nodes to make sure they are there and have correct values
-	val1, err := yottadb.ValE(tptoken, nil, "^Variable1A", []string{"Index0", "Index1", "Index2"})
-	Assertnoerr(err, t)
-	if "The value of Variable1A" != val1 {
-		t.Logf("FAIL - The fetched value of ^Variable1A(\"Index0\",\"Index1\",\"Index2\") was not correct\n")
-		t.Logf("       Expected: 'The value of Variable1A', Received: '%s'\n", val1)
-		t.Fail()
-	}
-	val2, err := yottadb.ValE(tptoken, nil, "^Variable2B", []string{"Idx0", "Idx1"})
-	Assertnoerr(err, t)
-	if "The value of Variable2B" != val2 {
-		t.Logf("FAIL - The fetched value of ^Variable2B(\"Idx0\",\"Idx1\") was not correct\n")
-		t.Logf("       Expected: 'The value of Variable2B', Received: '%s'\n", val2)
-		t.Fail()
-	}
-}
-
 func TestBufTAryDump(t *testing.T) {
 	var value, noalloc_value yottadb.BufferTArray
 	var tp = yottadb.NOTTP
@@ -330,10 +300,10 @@ func TestBufferTAryNilRecievers(t *testing.T) {
 	test_wrapper(func() { value.SetValStr(tp, nil, 0, nil) })
 	test_wrapper(func() { value.SetValStrLit(tp, nil, 0, "ok") })
 	test_wrapper(func() { value.DeleteExclST(tp, nil) })
-	test_wrapper(func() { value.TpST(tp, nil, nil, nil, "OK") })
+	test_wrapper(func() { value.TpST(tp, nil, nil, "OK") })
 }
 
-func TestBufTAryTpSt2(t *testing.T) {
+func TestBufTAryTpSt(t *testing.T) {
 	var novars yottadb.BufferTArray
 	var namelst yottadb.BufferTArray
 	var tptoken uint64 = yottadb.NOTTP
@@ -343,8 +313,7 @@ func TestBufTAryTpSt2(t *testing.T) {
 	namelst.Alloc(2, 10) // Need an array of two names not more than 10 bytes
 	// Start with clean slate then drive TP transaction
 	Dbdeleteall(tptoken, nil, &errors, t)
-	//err = novars.TpST(tptoken, nil, TpRtn_cgo(), nil, "BATCH")
-	err = novars.TpST2(tptoken, nil, func(tp uint64, errstr *yottadb.BufferT) int32 {
+	err = novars.TpST(tptoken, nil, func(tp uint64, errstr *yottadb.BufferT) int32 {
 		return int32(TestTpRtn(tp, nil, nil))
 	}, "BATCH")
 	Assertnoerr(err, t)
@@ -375,7 +344,7 @@ func TestBufTAryTpNest(t *testing.T) {
 	tproutine = func(tptoken uint64, errstr *yottadb.BufferT) int32 {
 		if nest < nest_limit {
 			nest++
-			e := yottadb.TpE2(tptoken, nil, tproutine, "BATCH", []string{})
+			e := yottadb.TpE(tptoken, nil, tproutine, "BATCH", []string{})
 			if nil == e {
 				return 0
 			}

@@ -35,9 +35,7 @@ func TestMiscAssertnoerror(t *testing.T) {
 		r := recover()
 		assert.NotNil(t, r)
 	}()
-
 	panic(err)
-	t.Errorf("We should have never gotten here")
 }
 
 // This is actually testing an internal test-helper feature

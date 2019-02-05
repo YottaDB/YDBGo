@@ -25,7 +25,6 @@ func TestDataE(t *testing.T) {
 	var dval uint32
 	var errstr yottadb.BufferT
 
-	defer errstr.Free()
 	errstr.Alloc(128)
 
 	// Create a few nodes so we can check DataE() on them
@@ -67,7 +66,6 @@ func TestDeleteE(t *testing.T) {
 	var dval uint32
 	var errstr yottadb.BufferT
 
-	defer errstr.Free()
 	errstr.Alloc(128)
 
 	// Create a few nodes so we can check DataE() on them
@@ -91,7 +89,6 @@ func TestDeleteExclE(t *testing.T) {
 	var err error
 	var errstr yottadb.BufferT
 
-	defer errstr.Free()
 	errstr.Alloc(128)
 
 	// We need to create 4 local variables to test this so do that first (thus also testing KeyT.SetValE()
@@ -137,7 +134,6 @@ func TestIncrE(t *testing.T) {
 	var newvalBi int
 	var errstr yottadb.BufferT
 
-	defer errstr.Free()
 	errstr.Alloc(128)
 
 	// Create a simple subscripted node, then increment it, then fetch it and compare to returned value
@@ -166,7 +162,6 @@ func TestLockE(t *testing.T) {
 	var errors int
 	var errstr yottadb.BufferT
 
-	defer errstr.Free()
 	errstr.Alloc(128)
 
 	// Take out 3 locks (2 global, 1 local) with one call and verify they are held. Note more than two subscripts breaks verifyLockExists()
@@ -184,7 +179,6 @@ func TestLockIncrE(t *testing.T) {
 	var errors int
 	var errstr yottadb.BufferT
 
-	defer errstr.Free()
 	errstr.Alloc(128)
 
 	// Increment a given lock 3 times then start decrementing it and after each check, the lock
@@ -228,10 +222,7 @@ func TestNodeNextE(t *testing.T) {
 	var sublst yottadb.BufferTArray
 	var errstr yottadb.BufferT
 
-	defer errstr.Free()
 	errstr.Alloc(128)
-
-	defer sublst.Free()
 	sublst.Alloc(AryDim, SubSiz)
 
 	// Need to start with a clean slate (empty database) so do that first
@@ -329,10 +320,7 @@ func TestSubNextE(t *testing.T) {
 	var sublst yottadb.BufferTArray
 	var errstr yottadb.BufferT
 
-	defer errstr.Free()
 	errstr.Alloc(128)
-
-	defer sublst.Free()
 	sublst.Alloc(AryDim, SubSiz)
 
 	// Start with a clean slate
@@ -416,44 +404,12 @@ func TestTpE(t *testing.T) {
 	var val1, val2 string
 	var errstr yottadb.BufferT
 
-	defer errstr.Free()
 	errstr.Alloc(128)
 
 	// Start with a clean slate
 	Dbdeleteall(tptoken, &errstr, &errors, t)
 	// Invoke TP transaction
-	err = yottadb.TpE(tptoken, &errstr, TpRtn_cgo(), nil, "BATCH", []string{"*"})
-	Assertnoerr(err, t)
-	// Fetch the two nodes to make sure they are there and have correct values
-	val1, err = yottadb.ValE(tptoken, &errstr, "^Variable1A", []string{"Index0", "Index1", "Index2"})
-	Assertnoerr(err, t)
-	if "The value of Variable1A" != val1 {
-		t.Errorf("The fetched value of ^Variable1A(\"Index0\",\"Index1\",\"Index2\") was not correct\n")
-		t.Logf("       Expected: 'The value of Variable1A', Received: '%s'\n", val1)
-	}
-	val2, err = yottadb.ValE(tptoken, &errstr, "^Variable2B", []string{"Idx0", "Idx1"})
-	Assertnoerr(err, t)
-	if "The value of Variable2B" != val2 {
-		t.Error("The fetched value of ^Variable2B(\"Idx0\",\"Idx1\") was not correct\n")
-		t.Logf("       Expected: 'The value of Variable2B', Received: '%s'\n", val2)
-	}
-
-}
-
-func TestTpE2(t *testing.T) {
-	var tptoken uint64 = yottadb.NOTTP
-	var err error
-	var errors int
-	var val1, val2 string
-	var errstr yottadb.BufferT
-
-	defer errstr.Free()
-	errstr.Alloc(128)
-
-	// Start with a clean slate
-	Dbdeleteall(tptoken, &errstr, &errors, t)
-	// Invoke TP transaction
-	err = yottadb.TpE2(tptoken, &errstr, func(tptoken uint64, errstr *yottadb.BufferT) int32 {
+	err = yottadb.TpE(tptoken, &errstr, func(tptoken uint64, errstr *yottadb.BufferT) int32 {
 		return int32(TestTpRtn(tptoken, nil, nil))
 	}, "BATCH", []string{"*"})
 	Assertnoerr(err, t)

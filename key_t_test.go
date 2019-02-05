@@ -688,7 +688,7 @@ func TestKeyTSimpleAPITPDeadlock(t *testing.T) {
 		assert.Equal(t, "", err.Error())
 		return 0
 	}
-	err := yottadb.TpE2(yottadb.NOTTP, nil, fn, "BATCH", []string{})
+	err := yottadb.TpE(yottadb.NOTTP, nil, fn, "BATCH", []string{})
 	assert.NotNil(t, err)
 	assert.Equal(t, "", err.Error())
 }

@@ -28,7 +28,7 @@ import (
 // int ydb_tp_st_wrapper_cgo(uint64_t tptoken, void *tpfnparm);
 import "C"
 
-// Variables used by TpST2 to wrap passing in func so the callback can retrieve it without passing pointers to C.
+// Variables used by TpST to wrap passing in func so the callback can retrieve it without passing pointers to C.
 var tpIndex uint64
 var tpMap sync.Map
 
@@ -460,13 +460,7 @@ func (buftary *BufferTArray) DeleteExclST(tptoken uint64, errstr *BufferT) error
 	return nil
 }
 
-// TpST wraps ydb_tp_st() to implement transaction processing. tpfn is a pointer to a C function with two
-// parameters, the first of which is a tptoken and the second of which is tpfnparm, a pointer to an arbitrary
-// data structure in YottaDB heap space.
-//
-// Since Go does not permit a pointer to a Go function to be passed as a parameter to a C function, tpfn is required to be a pointer to
-// a C function. For a pure Go application, the C function is a glue routine that in turn calls the Go function. The shell script
-// GenYDBGlueRoutine.sh generates glue routine functions.
+// TpST wraps ydb_tp_st() to implement transaction processing.
 //
 // Any function implementing logic for a transaction should return an error code with one of the following:
 //
@@ -478,10 +472,6 @@ func (buftary *BufferTArray) DeleteExclST(tptoken uint64, errstr *BufferT) error
 //
 // - ROLLBACK to indicate that TpST() should not commit the transaction, and should return ROLLBACK to the caller.
 //
-// In order to provide the function implementing the transaction logic with a parameter or parameters, tpfnparm is passed to the glue
-// routine, in turn be passed to the Go function called by the glue routine. As tpfnparm is passed from Go to YottaDB and back to
-// Go, the memory it references should be allocated using Go Malloc() to protect it from the Go garbage collector.
-//
 // The BufferTArray receiving the TpST() method is a list of local variables whose values should be saved, and restored to their
 // original values when the transaction restarts. If the cbuftary structures have not been allocated or elemsUsed is zero, no
 // local variables are saved and restored; and if elemsUsed is 1, and that sole element references the string "*" all local variables
@@ -490,60 +480,21 @@ func (buftary *BufferTArray) DeleteExclST(tptoken uint64, errstr *BufferT) error
 // A case-insensitive value of "BA" or "BATCH" for transid indicates to YottaDB that it need not ensure Durability for this
 // transaction (it continues to ensure Atomicity, Consistency, and Isolation)
 //
-// A special note: as the definition and implementation of Go protect against dangling pointers in pure Go code, Go application code may not
-// be designed and coded with the same level of defensiveness against dangling pointers that C applications are. In the case of
-// TpST(), owing to the need to use unsafe.Pointer parameters, please take additional care in designing and coding your
-// application to ensure the validity of the pointers passed to TpST().
+// Parameters:
 //
-// Parameters
-//
-// tpfn - C function pointer routine that either performs the transaction or immediately calls a Golang routine to
-// perform the transaction. On return from that routine, the transaction is committed.
-//
-// tpfnparm - A single parameter that can be a pointer to a structure to provide parameters to the transaction routine.
-//              Note these parameters MUST LIVE in C allocated memory or the call is likely to fail.
-//
-// transid  - See docs for ydb_tp_s() in the MLPG.
-func (buftary *BufferTArray) TpST(tptoken uint64, errstr *BufferT, tpfn unsafe.Pointer, tpfnparm unsafe.Pointer, transid string) error {
+// tptoken - the token used to identify nested transaction; start with yottadb.NOTTP
+// errstr  - Buffer to hold error string that is used to report errors and avoid race conditions with setting $ZSTATUS.
+// tpfn    - the closure function which will be run during the transaction. This closure function may get invoked multiple times
+//           if a transaction fails for some reason (concurrent changes, for example), so should not change any data outside of
+//           the database.
+// transid - See docs for ydb_tp_s() in the MLPG.
+func (buftary *BufferTArray) TpST(tptoken uint64, errstr *BufferT, tpfn func(uint64, *BufferT) int32, transid string) error {
 	var cbuft *C.ydb_buffer_t
 
-	printEntry("BufferTArray.TpST()")
+	printEntry("TpST()")
 	if nil == buftary {
 		panic("*BufferTArray receiver of TpST() cannot be nil")
 	}
-	tid := C.CString(transid)
-	defer C.free(unsafe.Pointer(tid))
-	cbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(buftary.getCPtr()))
-	if errstr != nil {
-		cbuft = errstr.getCPtr()
-	}
-	rc := C.ydb_tp_st(C.uint64_t(tptoken), cbuft, (C.ydb_tpfnptr_t)(tpfn), tpfnparm, tid,
-		C.int(buftary.ElemUsed()), cbuftary)
-	if C.YDB_OK != rc {
-		err := NewError(tptoken, errstr, int(rc))
-		return err
-	}
-	return nil
-}
-
-// TpST2 wraps ydb_tp_st() to implement transaction processing. The difference between
-// TpST() and TpST2() is that the former uses C glue code to pass a parameter to the function implementing transaction logic,
-// whereas the latter is a pure Go function call (which may be a closure).
-//
-// Refer to TpST() for a more detailed discussion of transaction processing.
-//
-// Parameters
-//
-// tptoken - the token used to identify nested transaction; start with yottadb.NOTTP
-//
-// tpfn - the closure which will be run during the transaction. This closure may get
-//  invoked multiple times if a transaction fails for some reason (concurrent changes,
-//  for example), so should not change any data outside of the database
-//
-// transid  - See docs for ydb_tp_s() in the MLPG.
-func (buftary *BufferTArray) TpST2(tptoken uint64, errstr *BufferT, tpfn func(uint64, *BufferT) int32, transid string) error {
-	var cbuft *C.ydb_buffer_t
-
 	tid := C.CString(transid)
 	defer C.free(unsafe.Pointer(tid))
 	tpfnparm := atomic.AddUint64(&tpIndex, 1)
@@ -562,7 +513,7 @@ func (buftary *BufferTArray) TpST2(tptoken uint64, errstr *BufferT, tpfn func(ui
 	return nil
 }
 
-// YdbTpStWrapper is a private callback to wrap calls to the Go closure required for TpST2.
+// YdbTpStWrapper is a private callback to wrap calls to the Go closure required for TpST.
 //export ydbTpStWrapper
 func ydbTpStWrapper(tptoken uint64, errstr *C.ydb_buffer_t, tpfnparm unsafe.Pointer) int32 {
 	var errbuff BufferT
@@ -576,6 +527,7 @@ func ydbTpStWrapper(tptoken uint64, errstr *C.ydb_buffer_t, tpfnparm unsafe.Poin
 	return (v.(func(uint64, *BufferT) int32))(tptoken, &errbuff)
 }
 
+// getCPtr returns a pointer to the internal C.ydb_buffer_t
 func (buftary *BufferTArray) getCPtr() *C.ydb_buffer_t {
 	ptr := (*C.ydb_buffer_t)(nil)
 	if buftary.cbuftary != nil {
