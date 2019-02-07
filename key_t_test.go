@@ -692,3 +692,54 @@ func TestKeyTSimpleAPITPDeadlock(t *testing.T) {
 	assert.NotNil(t, err)
 	assert.Equal(t, "", err.Error())
 }
+
+func TestKeyTWithNil(t *testing.T) {
+	var value yottadb.KeyT
+	var buf1 bytes.Buffer
+	var tp = yottadb.NOTTP
+
+	total_panics := 0
+	var expected_panic string
+
+	var safe = func() {
+		r := recover()
+		if r != nil {
+			total_panics += 1
+			assert.Equal(t, expected_panic, r)
+		}
+	}
+
+	wrapper_functions := []func(func()){func(f func()) {
+		defer safe()
+		value.Alloc(64, 10, 64)
+		value.Varnm = nil
+		expected_panic = "KeyT varname is not allocated, is nil, or has a 0 length"
+		f()
+	}, func(f func()) {
+		defer safe()
+		value.Alloc(64, 10 , 64)
+		value.Varnm.SetValStrLit(tp, nil, "my_variable")
+		value.Subary = nil
+		expected_panic = "KeyT Subary is nil"
+		f()
+	}}
+
+	for _, test_wrapper := range wrapper_functions {
+		total_panics = 0
+		test_wrapper(func() { value.Alloc(64, 10, 64) } )
+		test_wrapper(func() { value.DataST(tp, nil) } )
+		test_wrapper(func() { value.DeleteST(tp, nil, yottadb.YDB_DEL_TREE) } )
+		test_wrapper(func() { value.DumpToWriter(&buf1) } )
+		test_wrapper(func() { value.Free() } )
+		test_wrapper(func() { value.IncrST(tp, nil, nil, nil) })
+		test_wrapper(func() { value.LockDecrST(tp, nil) } )
+		test_wrapper(func() { value.LockIncrST(tp, nil, 0) } )
+		test_wrapper(func() { value.NodeNextST(tp, nil, nil) } )
+		test_wrapper(func() { value.NodePrevST(tp, nil, nil) } )
+		test_wrapper(func() { value.SetValST(tp, nil, nil) } )
+		test_wrapper(func() { value.SubNextST(tp, nil, nil) } )
+		test_wrapper(func() { value.SubPrevST(tp, nil, nil) } )
+		test_wrapper(func() { value.ValST(tp, nil, nil) } )
+		assert.NotEqual(t, 0, total_panics)
+	}
+}

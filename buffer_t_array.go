@@ -536,7 +536,7 @@ func ydbTpStWrapper(tptoken uint64, errstr *C.ydb_buffer_t, tpfnparm unsafe.Poin
 // getCPtr returns a pointer to the internal C.ydb_buffer_t
 func (buftary *BufferTArray) getCPtr() *C.ydb_buffer_t {
 	ptr := (*C.ydb_buffer_t)(nil)
-	if buftary.cbuftary != nil {
+	if nil != buftary && nil != buftary.cbuftary {
 		ptr = (*C.ydb_buffer_t)(unsafe.Pointer(buftary.cbuftary.cbuftary))
 	}
 	return ptr

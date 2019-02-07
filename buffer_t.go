@@ -477,7 +477,7 @@ func (buft *BufferT) Zwr2StrST(tptoken uint64, errstr *BufferT, str *BufferT) er
 // getCPtr returns a pointer to the internal ydb_buffer_t
 func (buft *BufferT) getCPtr() *C.ydb_buffer_t {
 	ptr := (*C.ydb_buffer_t)(nil)
-	if buft.cbuft != nil {
+	if nil != buft && nil != buft.cbuft {
 		ptr = buft.cbuft.cbuft
 	}
 	return ptr

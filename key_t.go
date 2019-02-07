@@ -112,6 +112,9 @@ func (key *KeyT) DataST(tptoken uint64, errstr *BufferT) (uint32, error) {
 		panic("KeyT varname is not allocated, is nil, or has a 0 length")
 	}
 	subgobuftary := key.Subary
+	if nil == subgobuftary {
+		panic("KeyT Subary is nil")
+	}
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(subgobuftary.getCPtr()))
 	if errstr != nil {
 		cbuft = errstr.getCPtr()
@@ -142,6 +145,9 @@ func (key *KeyT) DeleteST(tptoken uint64, errstr *BufferT, deltype int) error {
 		panic("KeyT varname is not allocated, is nil, or has a 0 length")
 	}
 	subgobuftary := key.Subary
+	if nil == subgobuftary {
+		panic("KeyT Subary is nil")
+	}
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(subgobuftary.getCPtr()))
 	if errstr != nil {
 		cbuft = errstr.getCPtr()
@@ -176,6 +182,9 @@ func (key *KeyT) ValST(tptoken uint64, errstr *BufferT, retval *BufferT) error {
 		panic("KeyT varname is not allocated, is nil, or has a 0 length")
 	}
 	subgobuftary := key.Subary
+	if nil == subgobuftary {
+		panic("KeyT Subary is nil")
+	}
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(subgobuftary.getCPtr()))
 	if errstr != nil {
 		cbuft = errstr.getCPtr()
@@ -215,6 +224,9 @@ func (key *KeyT) IncrST(tptoken uint64, errstr *BufferT, incr, retval *BufferT) 
 		panic("KeyT varname is not allocated, is nil, or has a 0 length")
 	}
 	subgobuftary := key.Subary
+	if nil == subgobuftary {
+		panic("KeyT Subary is nil")
+	}
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(subgobuftary.getCPtr()))
 	if nil == incr {
 		incrcbuft = nil
@@ -251,6 +263,9 @@ func (key *KeyT) LockDecrST(tptoken uint64, errstr *BufferT) error {
 		panic("KeyT varname is not allocated, is nil, or has a 0 length")
 	}
 	subgobuftary := key.Subary
+	if nil == subgobuftary {
+		panic("KeyT Subary is nil")
+	}
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(subgobuftary.getCPtr()))
 	if errstr != nil {
 		cbuft = errstr.getCPtr()
@@ -284,6 +299,9 @@ func (key *KeyT) LockIncrST(tptoken uint64, errstr *BufferT, timeoutNsec uint64)
 		panic("KeyT varname is not allocated, is nil, or has a 0 length")
 	}
 	subgobuftary := key.Subary
+	if nil == subgobuftary {
+		panic("KeyT Subary is nil")
+	}
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(subgobuftary.getCPtr()))
 	if errstr != nil {
 		cbuft = errstr.getCPtr()
@@ -326,6 +344,10 @@ func (key *KeyT) NodeNextST(tptoken uint64, errstr *BufferT, next *BufferTArray)
 	if (nil == vargobuft) || (nil == vargobuft.buf_addr) || (0 == vargobuft.len_used) {
 		panic("KeyT varname is not allocated, is nil, or has a 0 length")
 	}
+	subgobuftary := key.Subary
+	if nil == subgobuftary {
+		panic("KeyT Subary is nil")
+	}
 	// The output buffer does not need to be allocated at this point though it may error in ydb_node_next_s() if not.
 	if nil != next {
 		next.cbuftary.elemsUsed = next.ElemAlloc() // Set all elements of output array available for output
@@ -335,7 +357,6 @@ func (key *KeyT) NodeNextST(tptoken uint64, errstr *BufferT, next *BufferTArray)
 		nextElemsPtr = &dummyElemUsed
 		nextSubaryPtr = nil
 	}
-	subgobuftary := key.Subary
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(subgobuftary.getCPtr()))
 	if errstr != nil {
 		cbuft = errstr.getCPtr()
@@ -378,6 +399,10 @@ func (key *KeyT) NodePrevST(tptoken uint64, errstr *BufferT, prev *BufferTArray)
 	if (nil == vargobuft) || (nil == vargobuft.buf_addr) || (0 == vargobuft.len_used) {
 		panic("KeyT varname is not allocated, is nil, or has a 0 length")
 	}
+	subgobuftary := key.Subary
+	if nil == subgobuftary {
+		panic("KeyT Subary is nil")
+	}
 	// The output buffer does not need to be allocated at this point though it may error in ydb_node_previous_s() if not.
 	if nil != prev {
 		prev.cbuftary.elemsUsed = prev.ElemAlloc() // Set all elements of output array available for output
@@ -387,7 +412,6 @@ func (key *KeyT) NodePrevST(tptoken uint64, errstr *BufferT, prev *BufferTArray)
 		prevElemsPtr = &dummyElemUsed
 		prevSubaryPtr = nil
 	}
-	subgobuftary := key.Subary
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(subgobuftary.getCPtr()))
 	if errstr != nil {
 		cbuft = errstr.getCPtr()
@@ -416,11 +440,15 @@ func (key *KeyT) SetValST(tptoken uint64, errstr *BufferT, value *BufferT) error
 	if (nil == vargobuft) || (nil == vargobuft.buf_addr) || (0 == vargobuft.len_used) {
 		panic("KeyT varname is not allocated, is nil, or has a 0 length")
 	}
-	cbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(key.Subary.getCPtr()))
+	subgobuftary := key.Subary
+	if nil == subgobuftary {
+		panic("KeyT Subary is nil")
+	}
+	cbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(subgobuftary.getCPtr()))
 	if errstr != nil {
 		cbuft = errstr.getCPtr()
 	}
-	rc := C.ydb_set_st(C.uint64_t(tptoken), cbuft, vargobuft, C.int(key.Subary.ElemUsed()), cbuftary,
+	rc := C.ydb_set_st(C.uint64_t(tptoken), cbuft, vargobuft, C.int(subgobuftary.ElemUsed()), cbuftary,
 		value.getCPtr())
 	if C.YDB_OK != rc {
 		err := NewError(tptoken, errstr, int(rc))
@@ -454,6 +482,9 @@ func (key *KeyT) SubNextST(tptoken uint64, errstr *BufferT, retval *BufferT) err
 		panic("KeyT varname is not allocated, is nil, or has a 0 length")
 	}
 	subgobuftary := key.Subary
+	if nil == subgobuftary {
+		panic("KeyT Subary is nil")
+	}
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(subgobuftary.getCPtr()))
 	if errstr != nil {
 		cbuft = errstr.getCPtr()
@@ -490,6 +521,9 @@ func (key *KeyT) SubPrevST(tptoken uint64, errstr *BufferT, retval *BufferT) err
 		panic("KeyT varname is not allocated, is nil, or has a 0 length")
 	}
 	subgobuftary := key.Subary
+	if nil == subgobuftary {
+		panic("KeyT Subary is nil")
+	}
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(subgobuftary.getCPtr()))
 	if errstr != nil {
 		cbuft = errstr.getCPtr()
