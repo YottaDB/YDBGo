@@ -36,7 +36,11 @@ func setupLogger(test_dir string, verbose bool) (*log.Logger, *os.File) {
 	return logger, f
 }
 
-func TestMain(m *testing.M) {
+func createDatabase() (string, bool, *log.Logger, *os.File) {
+	// "tst_working_dir" env var is not defined. This means an outside the test system invocation.
+	// So create temporary database. We do this to avoid "go test" invocation from polluting any existing
+	// database of user.
+
 	// Get a temporary directory to put the database in
 	test_dir, err := ioutil.TempDir("", "ydbgo")
 	if err != nil {
@@ -80,16 +84,36 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		log.Fatal(err)
 	}
+	return test_dir, verbose, log, f
+}
 
-	// Run the tests
-	retCode := m.Run()
-
+func cleanupDatabase(retCode int, verbose bool, log *log.Logger, f *os.File, test_dir string) {
 	// Cleanup the temp directory; we leave it if we are in verbose mode
 	//  or the test failed
 	if 0 == retCode && false == verbose {
 		log.Printf("Cleaning up test directory")
 		f.Close()
 		os.RemoveAll(test_dir)
+	}
+}
+
+func TestMain(m *testing.M) {
+	var verbose bool
+	var test_dir string
+	var f *os.File
+	var log *log.Logger
+	// Determine if this is an invocation of "go test" from the YDBTest repo (YottaDB test system).
+	// If so, skip temporary database setup as test system sets up databases with random parameters
+	// (qdbrundown, replication etc.) and will get more coverage using that database than this on-the-fly database.
+	_, is_ydbtest_invocation := os.LookupEnv("tst_working_dir")
+	if false == is_ydbtest_invocation {
+		test_dir, verbose, log, f = createDatabase()
+	}
+	// Run the tests
+	retCode := m.Run()
+	// Cleanup database if needed
+	if false == is_ydbtest_invocation {
+		cleanupDatabase(retCode, verbose, log, f, test_dir)
 	}
 	os.Exit(retCode)
 }
