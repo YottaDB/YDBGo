@@ -88,6 +88,7 @@ func LockST(tptoken uint64, errstr *BufferT, timeoutNsec uint64, lockname ...*Ke
 				}
 				// Do some error message substitution
 				errmsg = strings.Replace(errmsg, "!AD", "LockST()", 1)
+				errmsg = strings.Replace(errmsg, "!UL", fmt.Sprintf("%d", namecnt), 1)
 				errmsg = strings.Replace(errmsg, "!UL", fmt.Sprintf("%d", parmsleftorig/3), 1)
 				return &YDBError{(int)(C.YDB_ERR_NAMECOUNT2HI), errmsg}
 			}

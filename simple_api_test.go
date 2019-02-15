@@ -59,8 +59,8 @@ func TestSimpleAPILockManyParms(t *testing.T) {
 	err := yottadb.LockST(yottadb.NOTTP, nil, 0, locks...)
 	assert.NotNil(t, err)
 	errmsg = err.Error()
-	expectederrmsg := "%YDB-E-NAMECOUNT2HI, Number of varnames (namecount parameter in a LockST() call) exceeds maximum (11)"
-	assert.Equal(t, errmsg, expectederrmsg)
+	expectederrmsg := "%YDB-E-NAMECOUNT2HI, Number of varnames specified as the namecount parameter in a LockST() call (37) exceeds the maximum (11)"
+	assert.Equal(t, expectederrmsg, errmsg)
 }
 
 func TestSimpleAPITpFullNesting(t *testing.T) {
