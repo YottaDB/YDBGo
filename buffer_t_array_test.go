@@ -87,7 +87,7 @@ func TestBufTAryDump(t *testing.T) {
 
 	// Dump from a nil BufferTArray with an INVSTRLEN error
 	value.Alloc(1, 0)
-	value.SetValStrLit(tp, nil, 0, "Hello")	// this should return an INVSTRLEN error
+	value.SetValStrLit(tp, nil, 0, "Hello") // this should return an INVSTRLEN error
 	value.DumpToWriter(&buf1)
 }
 

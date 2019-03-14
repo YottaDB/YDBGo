@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	//
+// Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -20,7 +20,6 @@ import (
 	"os/exec"
 	"runtime"
 	"strconv"
-	"sync"
 	"testing"
 	"time"
 	"unsafe"
@@ -33,7 +32,6 @@ import (
 // #include "libyottadb.h"
 // #include "libydberrors.h"
 // int TestTpRtn_cgo(uint64_t tptoken, uintptr_t in); // Forward declaration
-// void ydb_ci_t_wrapper(unsigned long tptoken, ydb_buffer_t *errstr, char *name, ydb_string_t *arg);
 import "C"
 
 const VarSiz uint32 = 15                        // Max size of varname including '^'
@@ -236,51 +234,6 @@ func MyGoCallBack(tptoken uint64, tpfnarg unsafe.Pointer) int {
 	// This violates TP transactions, but useful for demonstration
 	fmt.Printf("Hello from MyGoCallBack!\n")
 	return 0
-}
-
-// Only one thing can do call-ins at a time, as we don't want to overwrite vars
-var ydb_ci_mutex sync.Mutex
-
-// YDBCi calls a M routine and returns the result (if any; else, returns an empty string)
-func YDBCi(tptoken uint64,
-	errstr *yottadb.BufferT,
-	expect_return bool,
-	funcname string,
-	args ...string) (string, error) {
-
-	ydb_ci_mutex.Lock()
-	defer ydb_ci_mutex.Unlock()
-	localname := "^YDBTestYDBCiTemporaryVariable"
-	err := yottadb.DeleteE(tptoken, nil, C.YDB_DEL_TREE, localname, nil)
-	if err != nil { return "", err }
-	err = yottadb.SetValE(tptoken, nil, funcname, localname, []string{"rtn"})
-	if err != nil { return "", err }
-	expect := "0"
-	if expect_return {
-		expect = "1"
-	}
-	err = yottadb.SetValE(tptoken, nil, expect, localname, []string{"return"})
-	if args != nil {
-		for i := 0; i < len(args); i++ {
-			err = yottadb.SetValE(tptoken, nil, args[i], localname, []string{"args",
-				strconv.Itoa(i)})
-		}
-	}
-	callname := (*C.ydb_string_t)(C.malloc(C.size_t(C.sizeof_ydb_string_t)))
-	callname.length = C.ulong(len(localname))
-	callname.address = C.CString(localname)
-	/// TODO: we can't currently get a the C struct in errstr to pass here, so pass
-	///  null instead. When/if this is moved into the yottadb package, we should
-	///  pass in errstr.cbuft like in other simple API methods
-	C.ydb_ci_t_wrapper(C.ulong(tptoken), nil, C.CString("ydbmcallback"), callname)
-	C.free(unsafe.Pointer(callname.address))
-	C.free(unsafe.Pointer(callname))
-	if expect_return {
-		r, err := yottadb.ValE(tptoken, nil, localname, []string{"retval"})
-		return r, err
-	}
-	return "", nil
-
 }
 
 func Available(name string) bool {

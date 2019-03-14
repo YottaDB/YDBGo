@@ -23,10 +23,10 @@ import (
 // /* Equivalent of gparam_list in callg.h (not available to us) */
 // #define MAXVPARMS 36
 // /* C routine to get around the cgo issue and its lack of support for variadic plist routines */
-// int ydb_go_lock_st(uint64_t tptoken, ydb_buffer_t *errstr, uintptr_t cvplist);
-// int ydb_go_lock_st(uint64_t tptoken, ydb_buffer_t *errstr, uintptr_t cvplist)
+// void *ydb_get_lockst_funcvp(void);
+// void *ydb_get_lockst_funcvp(void)
 // {
-// 	return ydb_call_variadic_plist_func_st(tptoken, errstr, (ydb_vplist_func)&ydb_lock_s, cvplist);
+// 	return (void *)&ydb_lock_st;
 // }
 import "C"
 
@@ -45,37 +45,70 @@ import "C"
 func LockST(tptoken uint64, errstr *BufferT, timeoutNsec uint64, lockname ...*KeyT) error {
 	var vplist variadicPlist
 	var lockcnt, namecnt int
-	var parmindx int
+	var parmIndx int
+	var err error
 	var cbuft *C.ydb_buffer_t
 
 	printEntry("KeyT.SubNextST()")
 	defer vplist.free()
 	vplist.alloc()
+	// First two parms are the tptoken and the contents of the BufferT (not the BufferT itself).
+	err = vplist.setVPlistParam(tptoken, errstr, parmIndx, uintptr(tptoken))
+	if nil != err {
+		panic(fmt.Sprintf("YDB: Unknown error with varidicPlist.setVPlistParam(): %s", err))
+	}
+	parmIndx++
+	if errstr != nil {
+		cbuft = errstr.getCPtr()
+	}
+	err = vplist.setVPlistParam(tptoken, errstr, parmIndx, uintptr(unsafe.Pointer(cbuft)))
+	if nil != err {
+		panic(fmt.Sprintf("YDB: Unknown error with varidicPlist.setVPlistParam(): %s", err))
+	}
+	parmIndx++
 	// Before we put the timeout parameter into the plist, we need to check our architecture. If this is 64 bit,
 	// we're fine and can proceed but if we are 32 bit, then the 64 bit timeoutNsec parameter needs to be split
 	// in half across two parms which will be reassembled in ydb_lock_s().
 	if 64 == strconv.IntSize {
-		vplist.setVPlistParam(tptoken, errstr, parmindx, uintptr(timeoutNsec))
-		parmindx++
+		err = vplist.setVPlistParam(tptoken, errstr, parmIndx, uintptr(timeoutNsec))
+		if nil != err {
+			panic(fmt.Sprintf("YDB: Unknown error with varidicPlist.setVPlistParam(): %s", err))
+		}
+		parmIndx++
 	} else {
 		if IsLittleEndian() {
-			vplist.setVPlistParam(tptoken, errstr, parmindx, uintptr(timeoutNsec&0xffffffff))
-			parmindx++
-			vplist.setVPlistParam(tptoken, errstr, parmindx, uintptr(timeoutNsec>>32))
-			parmindx++
+			err = vplist.setVPlistParam(tptoken, errstr, parmIndx, uintptr(timeoutNsec&0xffffffff))
+			if nil != err {
+				panic(fmt.Sprintf("YDB: Unknown error with varidicPlist.setVPlistParam(): %s", err))
+			}
+			parmIndx++
+			err = vplist.setVPlistParam(tptoken, errstr, parmIndx, uintptr(timeoutNsec>>32))
+			if nil != err {
+				panic(fmt.Sprintf("YDB: Unknown error with varidicPlist.setVPlistParam(): %s", err))
+			}
+			parmIndx++
 		} else {
-			vplist.setVPlistParam(tptoken, errstr, parmindx, uintptr(timeoutNsec>>32))
-			parmindx++
-			vplist.setVPlistParam(tptoken, errstr, parmindx, uintptr(timeoutNsec&0xffffffff))
-			parmindx++
+			err = vplist.setVPlistParam(tptoken, errstr, parmIndx, uintptr(timeoutNsec>>32))
+			if nil != err {
+				panic(fmt.Sprintf("YDB: Unknown error with varidicPlist.setVPlistParam(): %s", err))
+			}
+			parmIndx++
+			err = vplist.setVPlistParam(tptoken, errstr, parmIndx, uintptr(timeoutNsec&0xffffffff))
+			if nil != err {
+				panic(fmt.Sprintf("YDB: Unknown error with varidicPlist.setVPlistParam(): %s", err))
+			}
+			parmIndx++
 		}
 	}
 	lockcnt = len(lockname)
 	namecnt = lockcnt
-	vplist.setVPlistParam(tptoken, errstr, parmindx, uintptr(namecnt))
-	parmindx++
+	err = vplist.setVPlistParam(tptoken, errstr, parmIndx, uintptr(namecnt))
+	if nil != err {
+		panic(fmt.Sprintf("YDB: Unknown error with varidicPlist.setVPlistParam(): %s", err))
+	}
+	parmIndx++
 	if 0 != lockcnt {
-		parmsleft := C.MAXVPARMS - parmindx // We've already used two parms (timeout and namecount)
+		parmsleft := C.MAXVPARMS - parmIndx // We've already used two parms (timeout and namecount)
 		parmsleftorig := parmsleft          // Save for error below just-in-case
 		lockindx := 0                       // The next lockname index to be read
 		// Load the lockname parameters into the plist
@@ -93,31 +126,40 @@ func LockST(tptoken uint64, errstr *BufferT, timeoutNsec uint64, lockname ...*Ke
 				return &YDBError{(int)(C.YDB_ERR_NAMECOUNT2HI), errmsg}
 			}
 			// Set the 3 parameters for this lockname
-			vplist.setVPlistParam(tptoken, errstr, parmindx, uintptr(unsafe.Pointer((*lockname[lockindx]).Varnm.getCPtr())))
-			parmindx++
+			err = vplist.setVPlistParam(tptoken, errstr, parmIndx, uintptr(unsafe.Pointer((*lockname[lockindx]).Varnm.getCPtr())))
+			if nil != err {
+				panic(fmt.Sprintf("YDB: Unknown error with varidicPlist.setVPlistParam(): %s", err))
+			}
+			parmIndx++
 			parmsleft--
-			vplist.setVPlistParam(tptoken, errstr, parmindx, uintptr((*lockname[lockindx]).Subary.ElemUsed()))
-			parmindx++
+			err = vplist.setVPlistParam(tptoken, errstr, parmIndx, uintptr((*lockname[lockindx]).Subary.ElemUsed()))
+			if nil != err {
+				panic(fmt.Sprintf("YDB: Unknown error with varidicPlist.setVPlistParam(): %s", err))
+			}
+			parmIndx++
 			parmsleft--
 			subgobuftary := (*lockname[lockindx]).Subary
 			subbuftary := unsafe.Pointer(subgobuftary.getCPtr())
-			vplist.setVPlistParam(tptoken, errstr, parmindx, uintptr(subbuftary))
-			parmindx++
+			err = vplist.setVPlistParam(tptoken, errstr, parmIndx, uintptr(subbuftary))
+			if nil != err {
+				panic(fmt.Sprintf("YDB: Unknown error with varidicPlist.setVPlistParam(): %s", err))
+			}
+			parmIndx++
 			parmsleft--
 			// Housekeeping
 			lockindx++
 			lockcnt--
 		}
 	}
-	vplist.setUsed(tptoken, errstr, uint32(parmindx))
+	err = vplist.setUsed(tptoken, errstr, uint32(parmIndx))
+	if nil != err {
+		panic(fmt.Sprintf("YDB: Unknown error with varidicPlist.setUsed(): %s", err))
+	}
 	// At this point, vplist now contains the plist we want to send to ydb_lock_s(). However, Golang/cgo does not permit
 	// either the call or even creating a function pointer to ydb_lock_s(). So instead of driving vplist.CallVariadicPlistFuncST()
 	// which is what we would normally do here, we're going to call a C helper function (defined in the cgo preamble at the
 	// top of this routine) to do the call that callVariadicPlistFuncST() would have done.
-	if errstr != nil {
-		cbuft = errstr.getCPtr()
-	}
-	rc := C.ydb_go_lock_st(C.uint64_t(tptoken), cbuft, (C.uintptr_t)(uintptr(unsafe.Pointer(vplist.cvplist))))
+	rc := vplist.callVariadicPlistFunc(C.ydb_get_lockst_funcvp()) // Drive ydb_lock_st()
 	if C.YDB_OK != rc {
 		err := NewError(tptoken, errstr, int(rc))
 		return err

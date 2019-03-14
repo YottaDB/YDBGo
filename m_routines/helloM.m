@@ -1,2 +1,0 @@
-hello(thing)
-    QUIT thing

@@ -35,7 +35,8 @@ var tpMap sync.Map
 // BufferTArray is an array of ydb_buffer_t structures. The reason this is not an array of BufferT structures is because
 // we can't pass a pointer to those Golang structures to a C routine (cgo restriction) so we have to have this separate
 // array of the C structures instead. Also, cgo doesn't support indexing of C structures so we have to do that ourselves
-// as well.
+// as well. Because this structure's contents contain pointers to C allocated storage, this structure is NOT safe for
+// concurrent access unless those accesses are to different array elements and do not affect the overall structure.
 type BufferTArray struct {
 	cbuftary *internalBufferTArray
 }
@@ -59,7 +60,7 @@ func (buftary *BufferTArray) Alloc(numBufs, nBytes uint32) {
 
 	printEntry("BufferTArray.Alloc()")
 	if nil == buftary {
-		panic("*BufferTArray receiver of Alloc() cannot be nil")
+		panic("YDB: *BufferTArray receiver of Alloc() cannot be nil")
 	}
 	// Forget the previous structure, then allocate a new one if needed
 	buftary.cbuftary = nil
@@ -96,7 +97,7 @@ func (buftary *BufferTArray) Dump() {
 func (buftary *BufferTArray) DumpToWriter(writer io.Writer) {
 	printEntry("BufferTArray.Dump()")
 	if nil == buftary {
-		panic("*BufferTArray receiver of Dump() cannot be nil")
+		panic("YDB: *BufferTArray receiver of Dump() cannot be nil")
 	}
 	cbuftary := buftary.getCPtr()
 	if nil != cbuftary {
@@ -108,7 +109,7 @@ func (buftary *BufferTArray) DumpToWriter(writer io.Writer) {
 			// It is possible len_used is greater than len_alloc (if this buffer was populated by SimpleAPI C code)
 			// Ensure we do not overrun the allocated buffer while dumping this object in that case.
 			min := (*elemptr).len_used
-			if (min > (*elemptr).len_alloc) {
+			if min > (*elemptr).len_alloc {
 				min = (*elemptr).len_alloc
 			}
 			valstr := C.GoStringN((*elemptr).buf_addr, C.int(min))
@@ -155,7 +156,7 @@ func (ibuftary *internalBufferTArray) Free() {
 func (buftary *BufferTArray) ElemAlloc() uint32 {
 	printEntry("BufferTArray.ElemAlloc()")
 	if nil == buftary {
-		panic("*BufferTArray receiver of ElemAlloc() cannot be nil")
+		panic("YDB: *BufferTArray receiver of ElemAlloc() cannot be nil")
 	}
 	if nil == buftary.cbuftary {
 		return 0
@@ -171,7 +172,7 @@ func (buftary *BufferTArray) ElemLenAlloc() uint32 {
 
 	printEntry("BufferTArray.ElemLenAlloc()")
 	if nil == buftary {
-		panic("*BufferTArray receiver of ElemLenAlloc() cannot be nil")
+		panic("YDB: *BufferTArray receiver of ElemLenAlloc() cannot be nil")
 	}
 	cbuftary := buftary.getCPtr()
 	if nil != cbuftary {
@@ -187,7 +188,7 @@ func (buftary *BufferTArray) ElemLenAlloc() uint32 {
 func (buftary *BufferTArray) ElemLenUsed(tptoken uint64, errstr *BufferT, idx uint32) (uint32, error) {
 	printEntry("BufferTArray.ElemLenUsed()")
 	if nil == buftary {
-		panic("*BufferTArray receiver of ElemLenUsed() cannot be nil")
+		panic("YDB: *BufferTArray receiver of ElemLenUsed() cannot be nil")
 	}
 	cbuftary := buftary.getCPtr()
 	if nil == cbuftary {
@@ -215,7 +216,7 @@ func (buftary *BufferTArray) ElemLenUsed(tptoken uint64, errstr *BufferT, idx ui
 func (buftary *BufferTArray) ElemUsed() uint32 {
 	printEntry("BufferTArray.ElemUsed()")
 	if nil == buftary {
-		panic("*BufferTArray receiver of ElemUsed() cannot be nil")
+		panic("YDB: *BufferTArray receiver of ElemUsed() cannot be nil")
 	}
 	if nil == buftary.cbuftary {
 		return 0
@@ -229,7 +230,7 @@ func (buftary *BufferTArray) ValBAry(tptoken uint64, errstr *BufferT, idx uint32
 
 	printEntry("BufferTArray.ValBAry()")
 	if nil == buftary {
-		panic("*BufferTArray receiver of ValBAry() cannot be nil")
+		panic("YDB: *BufferTArray receiver of ValBAry() cannot be nil")
 	}
 	elemcnt := buftary.ElemAlloc()
 	if !(idx < elemcnt) {
@@ -272,7 +273,7 @@ func (buftary *BufferTArray) ValStr(tptoken uint64, errstr *BufferT, idx uint32)
 
 	printEntry("BufferTArray.ValStr()")
 	if nil == buftary {
-		panic("*BufferTArray receiver of ValStr() cannot be nil")
+		panic("YDB: *BufferTArray receiver of ValStr() cannot be nil")
 	}
 	elemcnt := buftary.ElemAlloc()
 	if !(idx < elemcnt) {
@@ -313,7 +314,7 @@ func (buftary *BufferTArray) ValStr(tptoken uint64, errstr *BufferT, idx uint32)
 func (buftary *BufferTArray) SetElemLenUsed(tptoken uint64, errstr *BufferT, idx, newLen uint32) error {
 	printEntry("BufferTArray.SetElemLenUsed()")
 	if nil == buftary {
-		panic("*BufferTArray receiver of SetElemLenUsed() cannot be nil")
+		panic("YDB: *BufferTArray receiver of SetElemLenUsed() cannot be nil")
 	}
 	elemcnt := buftary.ElemAlloc()
 	if !(idx < elemcnt) {
@@ -351,7 +352,7 @@ func (buftary *BufferTArray) SetElemLenUsed(tptoken uint64, errstr *BufferT, idx
 func (buftary *BufferTArray) SetElemUsed(tptoken uint64, errstr *BufferT, newUsed uint32) error {
 	printEntry("BufferTArray.SetElemUsed()")
 	if nil == buftary {
-		panic("*BufferTArray receiver of SetElemUsed() cannot be nil")
+		panic("YDB: *BufferTArray receiver of SetElemUsed() cannot be nil")
 	}
 	elemcnt := buftary.ElemAlloc()
 	if newUsed > elemcnt {
@@ -373,7 +374,7 @@ func (buftary *BufferTArray) SetElemUsed(tptoken uint64, errstr *BufferT, newUse
 func (buftary *BufferTArray) SetValBAry(tptoken uint64, errstr *BufferT, idx uint32, value *[]byte) error {
 	printEntry("BufferTArray.SetValBAry()")
 	if nil == buftary {
-		panic("*BufferTArray receiver of SetValBAry() cannot be nil")
+		panic("YDB: *BufferTArray receiver of SetValBAry() cannot be nil")
 	}
 	elemcnt := buftary.ElemAlloc()
 	if !(idx < elemcnt) {
@@ -417,7 +418,7 @@ func (buftary *BufferTArray) SetValBAry(tptoken uint64, errstr *BufferT, idx uin
 func (buftary *BufferTArray) SetValStr(tptoken uint64, errstr *BufferT, idx uint32, value *string) error {
 	printEntry("BufferTArray.SetValStr()")
 	if nil == buftary {
-		panic("*BufferTArray receiver of SetValBAry() cannot be nil")
+		panic("YDB: *BufferTArray receiver of SetValBAry() cannot be nil")
 	}
 	valuebary := []byte(*value)
 	return buftary.SetValBAry(tptoken, errstr, idx, &valuebary)
@@ -427,7 +428,7 @@ func (buftary *BufferTArray) SetValStr(tptoken uint64, errstr *BufferT, idx uint
 func (buftary *BufferTArray) SetValStrLit(tptoken uint64, errstr *BufferT, idx uint32, value string) error {
 	printEntry("BufferTArray.SetValStrLit()")
 	if nil == buftary {
-		panic("*BufferTArray receiver of SetValBAry() cannot be nil")
+		panic("YDB: *BufferTArray receiver of SetValBAry() cannot be nil")
 	}
 	valuebary := []byte(value)
 	return buftary.SetValBAry(tptoken, errstr, idx, &valuebary)
@@ -452,7 +453,7 @@ func (buftary *BufferTArray) DeleteExclST(tptoken uint64, errstr *BufferT) error
 
 	printEntry("BufferTArray.DeleteExclST()")
 	if nil == buftary {
-		panic("*BufferTArray receiver of DeleteExclST() cannot be nil")
+		panic("YDB: *BufferTArray receiver of DeleteExclST() cannot be nil")
 	}
 	if errstr != nil {
 		cbuft = errstr.getCPtr()
@@ -499,7 +500,7 @@ func (buftary *BufferTArray) TpST(tptoken uint64, errstr *BufferT, tpfn func(uin
 
 	printEntry("TpST()")
 	if nil == buftary {
-		panic("*BufferTArray receiver of TpST() cannot be nil")
+		panic("YDB: *BufferTArray receiver of TpST() cannot be nil")
 	}
 	tid := C.CString(transid)
 	defer C.free(unsafe.Pointer(tid))
@@ -527,7 +528,7 @@ func ydbTpStWrapper(tptoken uint64, errstr *C.ydb_buffer_t, tpfnparm unsafe.Poin
 	index := *((*uint64)(tpfnparm))
 	v, ok := tpMap.Load(index)
 	if !ok {
-		panic("Couldn't find callback routine")
+		panic("YDB: Could not find callback routine")
 	}
 	errbuff.BufferTFromPtr((unsafe.Pointer)(errstr))
 	return (v.(func(uint64, *BufferT) int32))(tptoken, &errbuff)

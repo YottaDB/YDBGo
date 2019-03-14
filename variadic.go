@@ -34,7 +34,9 @@ import "C"
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // variadicPlist structure is used to anchor the C parameter list used to call callg_nc() via
-// ydb_call_variadic_list_func_st().
+// ydb_call_variadic_list_func_st(). Because this structure's contents contain pointers to C
+// allocated storage, this structure is NOT safe for concurrent access unless those accesses are
+// setting different array elements and not affecting the overall structure.
 type variadicPlist struct { // Variadic plist support (not exported) needed by LockS() function
 	cvplist *C.gparam_list
 }
@@ -50,6 +52,20 @@ func (vplist *variadicPlist) alloc() {
 		return
 	}
 	vplist.cvplist = (*C.gparam_list)(C.malloc(C.size_t(C.sizeof_gparam_list)))
+}
+
+// callVariadicPlistFunc is a variadicPlist method to drive a variadic plist function with the given
+// plist. The function pointer must be to a C routine as cgo does not allow golang function pointers to
+// be passed to C. Note that cgo also prohibits passing pointers to variadic routines so some "stealth"
+// to get around that is required - this is done by calling a C routine that creates the needed pointer
+// and returns it as an unsafe pointer that can then be used as the parameter for this routine.
+func (vplist *variadicPlist) callVariadicPlistFunc(vpfunc unsafe.Pointer) int {
+	printEntry("variadicPlist.callVariadicPlistFunc()")
+	if nil == vplist {
+		panic("*variadicPlist receiver of callVariadicPlistFunc() cannot be nil")
+	}
+	return int(C.ydb_call_variadic_plist_func((C.ydb_vplist_func)(vpfunc),
+		(C.uintptr_t)(uintptr(unsafe.Pointer(vplist.cvplist)))))
 }
 
 // free is a variadicPlist method to release the allocated C buffer in this structure.
@@ -78,7 +94,7 @@ func (vplist *variadicPlist) dump(tptoken uint64) {
 		return
 	}
 	elemcnt := cvplist.n
-	fmt.Printf("   Total of %d (%x) elements in this variadic plist\n", elemcnt, elemcnt)
+	fmt.Printf("   Total of %d (0x%x) elements in this variadic plist\n", elemcnt, elemcnt)
 	if C.MAXVPARMS < elemcnt {
 		// Reset elemcnt to max we support. Value is probably trash but what the lower loop displays
 		// might be interesting
@@ -89,7 +105,7 @@ func (vplist *variadicPlist) dump(tptoken uint64) {
 	for i := 0; i < int(elemcnt); i++ {
 		elemptr := (*uintptr)(unsafe.Pointer(uintptr(argbase) + (uintptr(i) * uintptr(unsafe.Sizeof(cvplist)))))
 		elemu64 := *elemptr
-		fmt.Printf("   Elem %d: %d / %x\n", i, elemu64, elemu64)
+		fmt.Printf("   Elem %d: %d / 0x%x\n", i, elemu64, elemu64)
 	}
 }
 

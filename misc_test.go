@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	//
+// Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -38,20 +38,12 @@ func TestMiscAssertnoerror(t *testing.T) {
 	panic(err)
 }
 
-// This is actually testing an internal test-helper feature
-func TestYDBCi(t *testing.T) {
-	SkipCITests(t)
-	r, err := YDBCi(yottadb.NOTTP, nil, true, "hello^helloM", "World")
-	assert.Nil(t, err)
-	assert.Equal(t, r, "World")
-}
-
 func miscGoTimersHelper(t *testing.T, wg *sync.WaitGroup, loops int) {
 	wg.Add(1)
 	go func() {
 		for i := 0; i < loops; i++ {
 			start := time.Now()
-			r, err := YDBCi(yottadb.NOTTP, nil, false, "run^TestMiscGoTimers")
+			r, err := yottadb.CallMT(yottadb.NOTTP, nil, "TestMGoTimers", 0, []string{})
 			assert.Nil(t, err)
 			elapsed := time.Since(start)
 			// This test failed on a loaded system with a 11% insteasd

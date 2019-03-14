@@ -26,10 +26,11 @@ import (
 import "C"
 
 // BufferT is a golang structure that serves as an anchor point for a C allocated ydb_buffer_t structure used
-// to call the YottaDB C Simple APIs.
-type BufferT struct { // Contains a pointer to single ydb_buffer_t struct
-	cbuft    *internalBufferT
-	ownsBuff bool // If true, we should clean the cbuft when Free'd
+// to call the YottaDB C Simple APIs. Because this structure's contents contain pointers to C allocated storage,
+// this structure is NOT safe for concurrent access.
+type BufferT struct {
+	cbuft    *internalBufferT // Allows BufferT to be copied via assignment without causing double free problems
+	ownsBuff bool             // If true, we should clean the cbuft when Free'd
 }
 
 type internalBufferT struct {
@@ -50,7 +51,7 @@ type internalBufferT struct {
 // "wrap" it using BufferTFromPtr() and use the methods for the BufferT structure.
 func (buft *BufferT) BufferTFromPtr(pointer unsafe.Pointer) {
 	if nil == buft {
-		panic("*BufferT receiver of FromPtr() cannot be nil")
+		panic("YDB: *BufferT receiver of BufferTFromPtr() cannot be nil")
 	}
 	// Note that we don't set a Finalizer here because another process has already done
 	//  so under a different BufferT; the lifespan of this object must be a subset of that
@@ -70,7 +71,7 @@ func (buft *BufferT) Alloc(nBytes uint32) {
 
 	printEntry("BufferT.Alloc()")
 	if nil == buft {
-		panic("*BufferT receiver of Alloc() cannot be nil")
+		panic("YDB: *BufferT receiver of Alloc() cannot be nil")
 	}
 
 	// Allocate a C flavor ydb_buffer_t struct to pass to simpleAPI
@@ -101,7 +102,7 @@ func (buft *BufferT) Alloc(nBytes uint32) {
 // - at the address buf_addr, the lower of len_used or len_alloc bytes in zwrite format.
 func (buft *BufferT) Dump() {
 	if nil == buft {
-		panic("*BufferT receiver of Dump() cannot be nil")
+		panic("YDB: *BufferT receiver of Dump() cannot be nil")
 	}
 	buft.DumpToWriter(os.Stdout)
 }
@@ -110,7 +111,7 @@ func (buft *BufferT) Dump() {
 func (buft *BufferT) DumpToWriter(writer io.Writer) {
 	printEntry("BufferT.Dump()")
 	if nil == buft {
-		panic("*BufferT receiver of DumpToWriter() cannot be nil")
+		panic("YDB: *BufferT receiver of DumpToWriter() cannot be nil")
 	}
 	cbuftptr := buft.getCPtr()
 	fmt.Fprintf(writer, "BufferT.Dump(): cbuftptr: %p", cbuftptr)
@@ -120,7 +121,7 @@ func (buft *BufferT) DumpToWriter(writer io.Writer) {
 		// It is possible len_used is greater than len_alloc (if this buffer was populated by SimpleAPI C code)
 		// Ensure we do not overrun the allocated buffer while dumping this object in that case.
 		min := cbuftptr.len_used
-		if (min > cbuftptr.len_alloc) {
+		if min > cbuftptr.len_alloc {
 			min = cbuftptr.len_alloc
 		}
 		if 0 < min {
@@ -131,7 +132,7 @@ func (buft *BufferT) DumpToWriter(writer io.Writer) {
 	fmt.Fprintf(writer, "\n")
 }
 
-// Free is a method to release both the buffer and ydb_buffer_t block associate with the BufferT block.
+// Free is a method to release both the buffer and ydb_buffer_t block associated with the BufferT block.
 //
 // The inverse of the Alloc() method: release the buffer in YottaDB heap space referenced by the C.ydb_buffer_t structure,
 // release the C.ydb_buffer_t, and set cbuft in the BufferT structure to nil.
@@ -169,7 +170,7 @@ func (ibuft *internalBufferT) Free() {
 func (buft *BufferT) LenAlloc(tptoken uint64, errstr *BufferT) (uint32, error) {
 	printEntry("BufferT.LenAlloc()")
 	if nil == buft {
-		panic("*BufferT receiver of LenAlloc() cannot be nil")
+		panic("YDB: *BufferT receiver of LenAlloc() cannot be nil")
 	}
 	cbuftptr := buft.getCPtr()
 	if nil == cbuftptr {
@@ -193,7 +194,7 @@ func (buft *BufferT) LenAlloc(tptoken uint64, errstr *BufferT) (uint32, error) {
 func (buft *BufferT) LenUsed(tptoken uint64, errstr *BufferT) (uint32, error) {
 	printEntry("BufferT.LenUsed()")
 	if nil == buft {
-		panic("*BufferT receiver of LenUsed() cannot be nil")
+		panic("YDB: *BufferT receiver of LenUsed() cannot be nil")
 	}
 	cbuftptr := buft.getCPtr()
 	if nil == cbuftptr {
@@ -226,7 +227,7 @@ func (buft *BufferT) ValBAry(tptoken uint64, errstr *BufferT) (*[]byte, error) {
 
 	printEntry("BufferT.ValBAry()")
 	if nil == buft {
-		panic("*BufferT receiver of ValBAry() cannot be nil")
+		panic("YDB: *BufferT receiver of ValBAry() cannot be nil")
 	}
 	cbuftptr := buft.getCPtr()
 	if nil == cbuftptr {
@@ -263,7 +264,7 @@ func (buft *BufferT) ValStr(tptoken uint64, errstr *BufferT) (*string, error) {
 
 	printEntry("BufferT.ValStr()")
 	if nil == buft {
-		panic("*BufferT receiver of ValStr() cannot be nil")
+		panic("YDB: *BufferT receiver of ValStr() cannot be nil")
 	}
 	cbuftptr := buft.getCPtr()
 	if nil == cbuftptr {
@@ -304,7 +305,7 @@ func (buft *BufferT) ValStr(tptoken uint64, errstr *BufferT) (*string, error) {
 func (buft *BufferT) SetLenUsed(tptoken uint64, errstr *BufferT, newLen uint32) error {
 	printEntry("BufferT.SetLenUsed()")
 	if nil == buft {
-		panic("*BufferT receiver of SetLenUsed() cannot be nil")
+		panic("YDB: *BufferT receiver of SetLenUsed() cannot be nil")
 	}
 	cbuftptr := buft.getCPtr()
 	if nil == cbuftptr {
@@ -336,7 +337,7 @@ func (buft *BufferT) SetLenUsed(tptoken uint64, errstr *BufferT, newLen uint32) 
 func (buft *BufferT) SetValBAry(tptoken uint64, errstr *BufferT, value *[]byte) error {
 	printEntry("BufferT.SetValBAry()")
 	if nil == buft {
-		panic("*BufferT receiver of SetValBAry() cannot be nil")
+		panic("YDB: *BufferT receiver of SetValBAry() cannot be nil")
 	}
 	cbuftptr := buft.getCPtr()
 	if nil == cbuftptr {
@@ -374,7 +375,7 @@ func (buft *BufferT) SetValBAry(tptoken uint64, errstr *BufferT, value *[]byte) 
 func (buft *BufferT) SetValStr(tptoken uint64, errstr *BufferT, value *string) error {
 	printEntry("BufferT.SetValStr()")
 	if nil == buft {
-		panic("*BufferT receiver of SetValStr() cannot be nil")
+		panic("YDB: *BufferT receiver of SetValStr() cannot be nil")
 	}
 	valuebary := []byte(*value)
 	return buft.SetValBAry(tptoken, errstr, &valuebary)
@@ -389,7 +390,7 @@ func (buft *BufferT) SetValStr(tptoken uint64, errstr *BufferT, value *string) e
 func (buft *BufferT) SetValStrLit(tptoken uint64, errstr *BufferT, value string) error {
 	printEntry("BufferT.SetValStrLit()")
 	if nil == buft {
-		panic("*BufferT receiver of SetValStrLit() cannot be nil")
+		panic("YDB: *BufferT receiver of SetValStrLit() cannot be nil")
 	}
 	valuebary := []byte(value)
 	return buft.SetValBAry(tptoken, errstr, &valuebary)
@@ -410,10 +411,10 @@ func (buft *BufferT) SetValStrLit(tptoken uint64, errstr *BufferT, value string)
 func (buft *BufferT) Str2ZwrST(tptoken uint64, errstr *BufferT, zwr *BufferT) error {
 	printEntry("BufferT.Str2ZwrST()")
 	if nil == buft {
-		panic("*BufferT receiver of Str2ZwrST() cannot be nil")
+		panic("YDB: *BufferT receiver of Str2ZwrST() cannot be nil")
 	}
 	if nil == zwr {
-		panic("*BufferT 'zwr' parameter to Str2ZwrST() cannot be nil")
+		panic("YDB: *BufferT 'zwr' parameter to Str2ZwrST() cannot be nil")
 	}
 	if nil == buft.getCPtr() || nil == zwr.getCPtr() {
 		// Create an error to return
@@ -448,10 +449,10 @@ func (buft *BufferT) Str2ZwrST(tptoken uint64, errstr *BufferT, zwr *BufferT) er
 func (buft *BufferT) Zwr2StrST(tptoken uint64, errstr *BufferT, str *BufferT) error {
 	printEntry("BufferT.Zwr2StrST()")
 	if nil == buft {
-		panic("*BufferT receiver of Zwr2StrST() cannot be nil")
+		panic("YDB: *BufferT receiver of Zwr2StrST() cannot be nil")
 	}
 	if nil == str {
-		panic("*BufferT 'str' parameter to Zwr2StrST() cannot be nil")
+		panic("YDB: *BufferT 'str' parameter to Zwr2StrST() cannot be nil")
 	}
 	if nil == buft.getCPtr() || nil == str.getCPtr() {
 		// Create an error to return

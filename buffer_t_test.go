@@ -18,11 +18,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"lang.yottadb.com/go/yottadb"
 	. "lang.yottadb.com/go/yottadb/internal/test_helpers"
+	"math/rand"
 	"runtime"
 	"strconv"
 	"testing"
 	"time"
-	"math/rand"
 )
 
 // TestStr2ZwrSTAndZwr2StrST tests the Str2ZwrST() and Zwr2StrST() methods
@@ -170,9 +170,9 @@ func TestAlloc(t *testing.T) {
 
 		value.Alloc(uint32(i))
 		// Randomly choose to set a string literal value to the allocated buffer
-		if (0 != rand.Intn(2)) {
+		if 0 != rand.Intn(2) {
 			err = value.SetValStrLit(tptoken, nil, "Hello")
-			if (i < 5) {
+			if i < 5 {
 				assert.Equal(t, yottadb.ErrorCode(err), yottadb.YDB_ERR_INVSTRLEN)
 			} else {
 				assert.Nil(t, err)
@@ -296,7 +296,7 @@ func TestDump(t *testing.T) {
 
 	// Dump from a nil buffer with an INVSTRLEN error
 	value.Alloc(0)
-	err := value.SetValStrLit(tp, nil, "Hello")	// this should return an INVSTRLEN error
+	err := value.SetValStrLit(tp, nil, "Hello") // this should return an INVSTRLEN error
 	assert.Equal(t, yottadb.ErrorCode(err), yottadb.YDB_ERR_INVSTRLEN)
 	value.DumpToWriter(&buf1)
 }

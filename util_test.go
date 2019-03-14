@@ -15,6 +15,7 @@ package yottadb_test
 import (
 	"github.com/stretchr/testify/assert"
 	"lang.yottadb.com/go/yottadb"
+	"os"
 	"strings"
 	"testing"
 )
@@ -32,4 +33,62 @@ func TestReleaseT(t *testing.T) {
 	// Make sure first char of YottaDB release number begins with 'r'.
 	ydbRel := []byte(fields[3])
 	assert.Equal(t, string(ydbRel[0]), "r")
+}
+
+func TestCallMTNoArgs(t *testing.T) {
+	envvarSave := make(map[string]string)
+	saveEnvvars(t, &envvarSave, "ydb_ci", "ydb_routines")
+	err := os.Setenv("ydb_ci", "calltab.ci")
+	assert.Nil(t, err)
+	// Set up ydb_routines if doesn't already have an m_routines component
+	includeInEnvvar(t, "ydb_routines", "./m_routines")
+	retval, err := yottadb.CallMT(yottadb.NOTTP, nil, "HelloWorld1", 64)
+	restoreEnvvars(t, &envvarSave, "ydb_ci", "ydb_routines")
+	assert.Nil(t, err)
+	assert.Equal(t, "entry called", retval)
+}
+
+func TestCallMTWithArgs(t *testing.T) {
+	envvarSave := make(map[string]string)
+	saveEnvvars(t, &envvarSave, "ydb_ci", "ydb_routines")
+	err := os.Setenv("ydb_ci", "calltab.ci")
+	assert.Nil(t, err)
+	// Set up ydb_routines if doesn't already have an m_routines component
+	includeInEnvvar(t, "ydb_routines", "./m_routines")
+	retval, err := yottadb.CallMT(yottadb.NOTTP, nil, "HelloWorld2", 64, "parm1", "parm2", "parm3")
+	restoreEnvvars(t, &envvarSave, "ydb_ci", "ydb_routines")
+	assert.Nil(t, err)
+	assert.Equal(t, "parm3parm2parm1", retval)
+}
+
+func TestCallMDescTNoArgs(t *testing.T) {
+	var mrtn yottadb.CallMDesc
+
+	envvarSave := make(map[string]string)
+	saveEnvvars(t, &envvarSave, "ydb_ci", "ydb_routines")
+	err := os.Setenv("ydb_ci", "calltab.ci")
+	assert.Nil(t, err)
+	// Set up ydb_routines if doesn't already have an m_routines component
+	includeInEnvvar(t, "ydb_routines", "./m_routines")
+	mrtn.SetRtnName("HelloWorld1")
+	retval, err := mrtn.CallMDescT(yottadb.NOTTP, nil, 64)
+	restoreEnvvars(t, &envvarSave, "ydb_ci", "ydb_routines")
+	assert.Nil(t, err)
+	assert.Equal(t, "entry called", retval)
+}
+
+func TestCallMDescTWithArgs(t *testing.T) {
+	var mrtn yottadb.CallMDesc
+
+	envvarSave := make(map[string]string)
+	saveEnvvars(t, &envvarSave, "ydb_ci", "ydb_routines")
+	err := os.Setenv("ydb_ci", "calltab.ci")
+	assert.Nil(t, err)
+	// Set up ydb_routines if doesn't already have an m_routines component
+	includeInEnvvar(t, "ydb_routines", "./m_routines")
+	mrtn.SetRtnName("HelloWorld2")
+	retval, err := mrtn.CallMDescT(yottadb.NOTTP, nil, 64, "parm1", "parm2", "parm3")
+	restoreEnvvars(t, &envvarSave, "ydb_ci", "ydb_routines")
+	assert.Nil(t, err)
+	assert.Equal(t, "parm3parm2parm1", retval)
 }
