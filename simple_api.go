@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	//
+// Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -46,6 +46,7 @@ func LockST(tptoken uint64, errstr *BufferT, timeoutNsec uint64, lockname ...*Ke
 	var vplist variadicPlist
 	var lockcnt, namecnt int
 	var parmindx int
+	var cbuft *C.ydb_buffer_t
 
 	printEntry("KeyT.SubNextST()")
 	defer vplist.free()
@@ -109,10 +110,9 @@ func LockST(tptoken uint64, errstr *BufferT, timeoutNsec uint64, lockname ...*Ke
 	}
 	vplist.setUsed(tptoken, errstr, uint32(parmindx))
 	// At this point, vplist now contains the plist we want to send to ydb_lock_s(). However, Golang/cgo does not permit
-	// either the call or even creating a function pointer to ydb_lock_s(). So instead of driving vplist.callVariadicPlistFuncST()
+	// either the call or even creating a function pointer to ydb_lock_s(). So instead of driving vplist.CallVariadicPlistFuncST()
 	// which is what we would normally do here, we're going to call a C helper function (defined in the cgo preamble at the
 	// top of this routine) to do the call that callVariadicPlistFuncST() would have done.
-	var cbuft *C.ydb_buffer_t
 	if errstr != nil {
 		cbuft = errstr.getCPtr()
 	}

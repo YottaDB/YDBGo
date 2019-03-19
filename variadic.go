@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2018 YottaDB LLC and/or its subsidiaries.	//
+// Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -52,22 +52,6 @@ func (vplist *variadicPlist) alloc() {
 	vplist.cvplist = (*C.gparam_list)(C.malloc(C.size_t(C.sizeof_gparam_list)))
 }
 
-// callVariadicPlistFuncSt is a variadicPlist method to drive a variadic plist function with the given
-// plist. The function pointer must be to a C routine as cgo does not allow golang function pointers to
-// be passed to C.
-func (vplist *variadicPlist) callVariadicPlistFuncST(tptoken uint64, errstr *BufferT, vpfunc unsafe.Pointer) int {
-	printEntry("variadicPlist.callVariadicPlistFuncST()")
-	if nil == vplist {
-		panic("*variadicPlist receiver of callVariadicPlistFuncST() cannot be nil")
-	}
-	var cbuft *C.ydb_buffer_t
-	if errstr != nil {
-		cbuft = errstr.getCPtr()
-	}
-	return int(C.ydb_call_variadic_plist_func_st(C.uint64_t(tptoken), cbuft, (C.ydb_vplist_func)(vpfunc),
-		(C.uintptr_t)(uintptr(unsafe.Pointer(vplist.cvplist)))))
-}
-
 // free is a variadicPlist method to release the allocated C buffer in this structure.
 func (vplist *variadicPlist) free() {
 	printEntry("variadicPlist.free()")
@@ -93,7 +77,7 @@ func (vplist *variadicPlist) dump(tptoken uint64) {
 		fmt.Printf("YDB: Error fetching STRUCTNOTALLOCD: %s\n", errmsg)
 		return
 	}
-	elemcnt := (*cvplist).n
+	elemcnt := cvplist.n
 	fmt.Printf("   Total of %d (%x) elements in this variadic plist\n", elemcnt, elemcnt)
 	if C.MAXVPARMS < elemcnt {
 		// Reset elemcnt to max we support. Value is probably trash but what the lower loop displays
@@ -128,8 +112,8 @@ func (vplist *variadicPlist) setUsed(tptoken uint64, errstr *BufferT, newUsed ui
 	return nil
 }
 
-// setVPlistParam is a varidicPlist method to set an entry to the variable plist - note the addresses we
-// add here MUST point to C allocated memory and NOT Golang allocated memory or a crash will result.
+// setVPlistParam is a variadicPlist method to set an entry to the variable plist - note any addresses being passed in
+// here MUST point to C allocated memory and NOT Golang allocated memory or cgo will cause a panic.
 func (vplist *variadicPlist) setVPlistParam(tptoken uint64, errstr *BufferT, paramindx int, paramaddr uintptr) error {
 	printEntry("variadicPlist.setVPlistParm")
 	if nil == vplist {
