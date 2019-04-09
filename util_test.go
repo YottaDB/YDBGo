@@ -42,7 +42,7 @@ func TestCallMTNoArgs(t *testing.T) {
 	assert.Nil(t, err)
 	// Set up ydb_routines if doesn't already have an m_routines component
 	includeInEnvvar(t, "ydb_routines", "./m_routines")
-	retval, err := yottadb.CallMT(yottadb.NOTTP, nil, "HelloWorld1", 64)
+	retval, err := yottadb.CallMT(yottadb.NOTTP, nil, 64, "HelloWorld1")
 	restoreEnvvars(t, &envvarSave, "ydb_ci", "ydb_routines")
 	assert.Nil(t, err)
 	assert.Equal(t, "entry called", retval)
@@ -55,7 +55,7 @@ func TestCallMTWithArgs(t *testing.T) {
 	assert.Nil(t, err)
 	// Set up ydb_routines if doesn't already have an m_routines component
 	includeInEnvvar(t, "ydb_routines", "./m_routines")
-	retval, err := yottadb.CallMT(yottadb.NOTTP, nil, "HelloWorld2", 64, "parm1", "parm2", "parm3")
+	retval, err := yottadb.CallMT(yottadb.NOTTP, nil, 64, "HelloWorld2", "parm1", "parm2", "parm3")
 	restoreEnvvars(t, &envvarSave, "ydb_ci", "ydb_routines")
 	assert.Nil(t, err)
 	assert.Equal(t, "parm3parm2parm1", retval)

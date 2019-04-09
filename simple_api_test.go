@@ -17,6 +17,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"lang.yottadb.com/go/yottadb"
 	. "lang.yottadb.com/go/yottadb/internal/test_helpers"
+	"strconv"
+	"strings"
 	"sync"
 	"testing"
 )
@@ -60,6 +62,10 @@ func TestSimpleAPILockManyParms(t *testing.T) {
 	assert.NotNil(t, err)
 	errmsg = err.Error()
 	expectederrmsg := "%YDB-E-NAMECOUNT2HI, Number of varnames specified as the namecount parameter in a LockST() call (37) exceeds the maximum (10)"
+	// For 32 bit, our 64 bit parms take up more space so reduce the maximum by 1
+	if 32 == strconv.IntSize {
+		expectederrmsg = strings.Replace(errmsg, "(10)", "(9)", 1)
+	}
 	assert.Equal(t, expectederrmsg, errmsg)
 }
 

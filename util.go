@@ -112,7 +112,7 @@ func (mdesc *CallMDesc) SetRtnName(rtnname string) {
 // and a return value is described in the call-in definition. Else return is nil.
 func (mdesc *CallMDesc) CallMDescT(tptoken uint64, errstr *BufferT, retvallen uint32, rtnargs ...interface{}) (string, error) {
 	var vplist variadicPlist
-	var parmIndx int
+	var parmIndx uint32
 	var err error
 	var retvalptr *C.ydb_string_t
 	var cbuft *C.ydb_buffer_t
@@ -129,11 +129,10 @@ func (mdesc *CallMDesc) CallMDescT(tptoken uint64, errstr *BufferT, retvallen ui
 	defer vplist.free() // Initialize variadic plist we need to use to call ydb_cip_helper()
 	vplist.alloc()
 	// First two parms are the tptoken and the contents of the BufferT (not the BufferT itself).
-	err = vplist.setVPlistParam(tptoken, errstr, parmIndx, uintptr(tptoken))
+	err = vplist.setVPlistParam64Bit(tptoken, errstr, &parmIndx, tptoken) // Takes care of bumping parmIndx
 	if nil != err {
-		panic(fmt.Sprintf("YDB: Unknown error with varidicPlist.setVPlistParam(): %s", err))
+		panic(fmt.Sprintf("YDB: Unknown error with varidicPlist64Bit.setVPlistParam(): %s", err))
 	}
-	parmIndx++
 	if errstr != nil {
 		cbuft = errstr.getCPtr()
 	}
@@ -221,7 +220,7 @@ func (mdesc *CallMDesc) CallMDescT(tptoken uint64, errstr *BufferT, retvallen ui
 // and a return value is described in the call-in definition. Else return is nil. This function differs from CallMDescT()
 // in that the name of the routine is specified here and must always be looked up in the routine list. To avoid having
 // two routines nearly identical, this routine is written to invoke CallMDescT().
-func CallMT(tptoken uint64, errstr *BufferT, rtnname string, retvallen uint32, rtnargs ...interface{}) (string, error) {
+func CallMT(tptoken uint64, errstr *BufferT, retvallen uint32, rtnname string, rtnargs ...interface{}) (string, error) {
 	var mdesc CallMDesc
 
 	printEntry("CallMDesc.CallMT()")

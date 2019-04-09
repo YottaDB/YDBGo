@@ -262,7 +262,6 @@ func LockE(tptoken uint64, errstr *BufferT, timeoutNsec uint64, namesnsubs ...in
 			return &YDBError{(int)(C.YDB_ERR_PARAMINVALID), errmsg}
 		}
 		newKey := new(KeyT)
-		defer (*newKey).Free() // Need to clean up these KeyT structs when done with them.
 		// Run through subscripts to find the biggest
 		maxsublen := 0
 		for _, sub := range newSubs {
@@ -270,19 +269,19 @@ func LockE(tptoken uint64, errstr *BufferT, timeoutNsec uint64, namesnsubs ...in
 				maxsublen = len(sub)
 			}
 		}
-		(*newKey).Alloc(uint32(len(newVarname)), uint32(len(newSubs)), uint32(maxsublen))
-		err := (*newKey).Varnm.SetValStr(tptoken, errstr, &newVarname)
+		newKey.Alloc(uint32(len(newVarname)), uint32(len(newSubs)), uint32(maxsublen))
+		err := newKey.Varnm.SetValStr(tptoken, errstr, &newVarname)
 		if nil != err {
 			panic(fmt.Sprintf("YDB: Unexpected error with SetValStr(): %s", err))
 		}
 		subcnt := len(newSubs)
 		for j := 0; subcnt > j; j++ {
-			err := (*newKey).Subary.SetValStr(tptoken, errstr, uint32(j), &newSubs[j])
+			err := newKey.Subary.SetValStr(tptoken, errstr, uint32(j), &newSubs[j])
 			if nil != err {
 				panic(fmt.Sprintf("YDB: Unexpected error with SetValStr(): %s", err))
 			}
 		}
-		err = (*newKey).Subary.SetElemUsed(tptoken, errstr, uint32(subcnt))
+		err = newKey.Subary.SetElemUsed(tptoken, errstr, uint32(subcnt))
 		if nil != err {
 			panic(fmt.Sprintf("YDB: Unexpected error with SetValStr(): %s", err))
 		}

@@ -14,7 +14,6 @@ package yottadb
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 	"unsafe"
 )
@@ -45,20 +44,19 @@ import "C"
 func LockST(tptoken uint64, errstr *BufferT, timeoutNsec uint64, lockname ...*KeyT) error {
 	var vplist variadicPlist
 	var lockcnt, namecnt int
-	var parmIndx int
+	var parmIndx uint32
 	var err error
 	var cbuft *C.ydb_buffer_t
 
 	printEntry("KeyT.SubNextST()")
 	defer vplist.free()
 	vplist.alloc()
-	// First two parms are the tptoken and the contents of the BufferT (not the BufferT itself).
-	err = vplist.setVPlistParam(tptoken, errstr, parmIndx, uintptr(tptoken))
+	// First two parms are the tptoken and the contents of the errstr BufferT (not the BufferT itself).
+	err = vplist.setVPlistParam64Bit(tptoken, errstr, &parmIndx, tptoken) // Takes care of bumping parmIndx
 	if nil != err {
-		panic(fmt.Sprintf("YDB: Unknown error with varidicPlist.setVPlistParam(): %s", err))
+		panic(fmt.Sprintf("YDB: Unknown error with varidicPlist.setVPlistParam64Bit(): %s", err))
 	}
-	parmIndx++
-	if errstr != nil {
+	if nil != errstr {
 		cbuft = errstr.getCPtr()
 	}
 	err = vplist.setVPlistParam(tptoken, errstr, parmIndx, uintptr(unsafe.Pointer(cbuft)))
@@ -66,40 +64,12 @@ func LockST(tptoken uint64, errstr *BufferT, timeoutNsec uint64, lockname ...*Ke
 		panic(fmt.Sprintf("YDB: Unknown error with varidicPlist.setVPlistParam(): %s", err))
 	}
 	parmIndx++
-	// Before we put the timeout parameter into the plist, we need to check our architecture. If this is 64 bit,
-	// we're fine and can proceed but if we are 32 bit, then the 64 bit timeoutNsec parameter needs to be split
-	// in half across two parms which will be reassembled in ydb_lock_s().
-	if 64 == strconv.IntSize {
-		err = vplist.setVPlistParam(tptoken, errstr, parmIndx, uintptr(timeoutNsec))
-		if nil != err {
-			panic(fmt.Sprintf("YDB: Unknown error with varidicPlist.setVPlistParam(): %s", err))
-		}
-		parmIndx++
-	} else {
-		if IsLittleEndian() {
-			err = vplist.setVPlistParam(tptoken, errstr, parmIndx, uintptr(timeoutNsec&0xffffffff))
-			if nil != err {
-				panic(fmt.Sprintf("YDB: Unknown error with varidicPlist.setVPlistParam(): %s", err))
-			}
-			parmIndx++
-			err = vplist.setVPlistParam(tptoken, errstr, parmIndx, uintptr(timeoutNsec>>32))
-			if nil != err {
-				panic(fmt.Sprintf("YDB: Unknown error with varidicPlist.setVPlistParam(): %s", err))
-			}
-			parmIndx++
-		} else {
-			err = vplist.setVPlistParam(tptoken, errstr, parmIndx, uintptr(timeoutNsec>>32))
-			if nil != err {
-				panic(fmt.Sprintf("YDB: Unknown error with varidicPlist.setVPlistParam(): %s", err))
-			}
-			parmIndx++
-			err = vplist.setVPlistParam(tptoken, errstr, parmIndx, uintptr(timeoutNsec&0xffffffff))
-			if nil != err {
-				panic(fmt.Sprintf("YDB: Unknown error with varidicPlist.setVPlistParam(): %s", err))
-			}
-			parmIndx++
-		}
+	// Put the timeout parameter into the plist
+	err = vplist.setVPlistParam64Bit(tptoken, errstr, &parmIndx, timeoutNsec) // Takes care of bumping parmIndx
+	if nil != err {
+		panic(fmt.Sprintf("YDB: Unknown error with varidicPlist.setVPlistParam(): %s", err))
 	}
+	// Add the lock count parameter
 	lockcnt = len(lockname)
 	namecnt = lockcnt
 	err = vplist.setVPlistParam(tptoken, errstr, parmIndx, uintptr(namecnt))
@@ -108,7 +78,7 @@ func LockST(tptoken uint64, errstr *BufferT, timeoutNsec uint64, lockname ...*Ke
 	}
 	parmIndx++
 	if 0 != lockcnt {
-		parmsleft := C.MAXVPARMS - parmIndx // We've already used two parms (timeout and namecount)
+		parmsleft := C.MAXVPARMS - parmIndx // We've already slotted 4 parms (tptoken, errstr, timeout, and namecount in up to 6 slots)
 		parmsleftorig := parmsleft          // Save for error below just-in-case
 		lockindx := 0                       // The next lockname index to be read
 		// Load the lockname parameters into the plist
