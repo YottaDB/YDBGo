@@ -51,7 +51,7 @@ func ErrorCode(err error) int {
 
 // NewError is a function to create a new YDBError and return it. Note that we use ydb_zstatus() instead of
 // using (for example) GetE() to fetch $ZSTATUS because ydb_zstatus does not require a tptoken. This means
-// that we don't need to pass tptoken to all the data access methods (For example, GetValStr()).
+// that we don't need to pass tptoken to all the data access methods (For example, ValStr()).
 //
 func NewError(tptoken uint64, errstr *BufferT, errnum int) error {
 	var msgptr *C.char

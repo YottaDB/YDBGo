@@ -244,13 +244,12 @@ func MessageT(tptoken uint64, errstr *BufferT, status int) (string, error) {
 	}
 	rc := C.ydb_message_t(C.uint64_t(tptoken), cbuft, C.int(status), msgval.getCPtr())
 	if C.YDB_OK != rc {
-		err := NewError(tptoken, errstr, int(rc))
-		return "", err
+		panic(fmt.Sprintf("YDB: Error calling ydb_message_t: %d", int(rc)))
 	}
 	// Returned string should be snug in the retval buffer. Pick it out so can return it as a string
 	msgptr, err := msgval.ValStr(tptoken, errstr)
 	if nil != err {
-		panic(fmt.Sprintf("Unexpected error with GetValStr(): %s", err))
+		panic(fmt.Sprintf("YDB: Unexpected error with ValStr(): %s", err))
 	}
 	return *msgptr, err
 }
