@@ -43,7 +43,7 @@ func miscGoTimersHelper(t *testing.T, wg *sync.WaitGroup, loops int) {
 	go func() {
 		for i := 0; i < loops; i++ {
 			start := time.Now()
-			r, err := yottadb.CallMT(yottadb.NOTTP, nil, 64, "TestMGoTimers", []string{})
+			r, err := yottadb.CallMT(yottadb.NOTTP, nil, 0, "TestMGoTimers", []string{})
 			assert.Nil(t, err)
 			elapsed := time.Since(start)
 			// This test failed on a loaded system with a 11% insteasd
