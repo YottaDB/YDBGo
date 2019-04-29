@@ -92,5 +92,8 @@ func IsLittleEndian() bool {
 // Exit is a function to drive YDB's exit handler in case of panic or other non-normal shutdown that bypasses
 // atexit() that would normally drive the exit handler.
 func Exit() {
-	C.ydb_exit()
+	rc := C.ydb_exit()
+	if YDB_OK != rc {
+		panic(fmt.Sprintf("YDB: Exit() got return code %d from C.ydb_exit()", rc))
+	}
 }
