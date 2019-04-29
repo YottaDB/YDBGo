@@ -30,7 +30,7 @@ import "C"
 // YDBError is a structure that defines the error message format which includes both the formated $ZSTATUS
 // type message and the numeric error value.
 type YDBError struct {
-	errcode int    // The error value (e.g. C.YDB_ERR_DBFILERR, etc)
+	errcode int    // The error value (e.g. YDB_ERR_DBFILERR, etc)
 	errmsg  string // The error string - generally from $ZSTATUS when available
 }
 
@@ -84,8 +84,8 @@ func NewError(tptoken uint64, errstr *BufferT, errnum int) error {
 		return &YDBError{errnum, errmsg}
 	}
 	// Fetch $ZSTATUS to return as the error string
-	msgptr = (*C.char)(C.malloc(C.size_t(C.YDB_MAX_ERRORMSG)))
-	C.ydb_zstatus(msgptr, C.int(C.YDB_MAX_ERRORMSG))
+	msgptr = (*C.char)(C.malloc(C.size_t(YDB_MAX_ERRORMSG)))
+	C.ydb_zstatus(msgptr, C.int(YDB_MAX_ERRORMSG))
 	errmsg = C.GoString((*C.char)(msgptr))
 	C.free(unsafe.Pointer(msgptr))
 	return &YDBError{errnum, errmsg}

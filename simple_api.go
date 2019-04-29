@@ -85,7 +85,7 @@ func LockST(tptoken uint64, errstr *BufferT, timeoutNsec uint64, lockname ...*Ke
 		for 0 < lockcnt {
 			// Make sure enough room for another set of 3 parms
 			if 3 > parmsleft {
-				errmsg, err := MessageT(tptoken, nil, (int)(C.YDB_ERR_NAMECOUNT2HI))
+				errmsg, err := MessageT(tptoken, nil, (int)(YDB_ERR_NAMECOUNT2HI))
 				if nil != err {
 					panic(fmt.Sprintf("YDB: Error fetching NAMECOUNT2HI: %s", err))
 				}
@@ -93,7 +93,7 @@ func LockST(tptoken uint64, errstr *BufferT, timeoutNsec uint64, lockname ...*Ke
 				errmsg = strings.Replace(errmsg, "!AD", "LockST()", 1)
 				errmsg = strings.Replace(errmsg, "!UL", fmt.Sprintf("%d", namecnt), 1)
 				errmsg = strings.Replace(errmsg, "!UL", fmt.Sprintf("%d", parmsleftorig/3), 1)
-				return &YDBError{(int)(C.YDB_ERR_NAMECOUNT2HI), errmsg}
+				return &YDBError{(int)(YDB_ERR_NAMECOUNT2HI), errmsg}
 			}
 			// Set the 3 parameters for this lockname
 			err = vplist.setVPlistParam(tptoken, errstr, parmIndx, uintptr(unsafe.Pointer((*lockname[lockindx]).Varnm.getCPtr())))
@@ -130,7 +130,7 @@ func LockST(tptoken uint64, errstr *BufferT, timeoutNsec uint64, lockname ...*Ke
 	// which is what we would normally do here, we're going to call a C helper function (defined in the cgo preamble at the
 	// top of this routine) to do the call that callVariadicPlistFuncST() would have done.
 	rc := vplist.callVariadicPlistFunc(C.ydb_get_lockst_funcvp()) // Drive ydb_lock_st()
-	if C.YDB_OK != rc {
+	if YDB_OK != rc {
 		err := NewError(tptoken, errstr, int(rc))
 		return err
 	}

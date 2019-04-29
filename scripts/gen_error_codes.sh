@@ -19,6 +19,7 @@ grep -E "#define\s+YDB_LOCK" $ydb_dist/libyottadb.h | awk '{s = ""; for (i = 3; 
 # We exclude YDB_MAX_TIME_NSEC because it is coded as a constant using data types Go doesn't understand
 grep -E "#define\s+YDB_MAX" $ydb_dist/libyottadb.h | awk '{s = ""; for (i = 3; i <= NF; i++) s = s $i " "; print $2,"=",s}' \
     | grep -v "YDB_MAX_TIME_NSEC" | grep -v "YDB_MAX_YDBERR" | grep -v "YDB_MAX_ERROR" >> error_codes.go
+grep -E "#define\s+YDB_MAX_ERRORMSG" $ydb_dist/libyottadb.h | awk '{print $2,"=",$3,"/* Maximum length of error message */"}' >> error_codes.go
 echo "" >> error_codes.go
 gcc -E $ydb_dist/libyottadb.h | grep YDB | tr ',' ' ' >> error_codes.go
 cat <<EOF >> error_codes.go

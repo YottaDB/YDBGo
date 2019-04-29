@@ -1556,6 +1556,7 @@ YDB_MAX_IDENT = 31 /* Maximum size of global/local name (not including '^') */
 YDB_MAX_NAMES = 35 /* Maximum number of variable names can be specified in a single ydb_*_s() call */ 
 YDB_MAX_STR = (1 * 1024 * 1024) /* Maximum YottaDB string length */ 
 YDB_MAX_SUBS = 31 /* Maximum subscripts currently supported */ 
+YDB_MAX_ERRORMSG = 1024 /* Maximum length of error message */
 
  YDB_DEL_TREE = 1 
  YDB_DEL_NODE = 2 

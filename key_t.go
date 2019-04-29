@@ -122,7 +122,7 @@ func (key *KeyT) DataST(tptoken uint64, errstr *BufferT) (uint32, error) {
 	}
 	rc := C.ydb_data_st(C.uint64_t(tptoken), cbuft, vargobuft, C.int(subgobuftary.ElemUsed()), subbuftary,
 		&retval)
-	if C.YDB_OK != rc {
+	if YDB_OK != rc {
 		err := NewError(tptoken, errstr, int(rc))
 		return 0, err
 	}
@@ -132,8 +132,8 @@ func (key *KeyT) DataST(tptoken uint64, errstr *BufferT) (uint32, error) {
 // DeleteST is a STAPI method to delete a node and perhaps its successors depending on the value of deltype.
 //
 // Matching DeleteE(), DeleteST() wraps ydb_delete_st() to delete a local or global variable node or (sub)tree, with a value of
-// C.YDB_DEL_NODE for deltype specifying that only the node should be deleted, leaving the (sub)tree untouched, and a value
-// of C.YDB_DEL_TREE specifying that the node as well as the (sub)tree are to be deleted.
+// YDB_DEL_NODE for deltype specifying that only the node should be deleted, leaving the (sub)tree untouched, and a value
+// of YDB_DEL_TREE specifying that the node as well as the (sub)tree are to be deleted.
 func (key *KeyT) DeleteST(tptoken uint64, errstr *BufferT, deltype int) error {
 	var cbuft *C.ydb_buffer_t
 
@@ -155,7 +155,7 @@ func (key *KeyT) DeleteST(tptoken uint64, errstr *BufferT, deltype int) error {
 	}
 	rc := C.ydb_delete_st(C.uint64_t(tptoken), cbuft, vargobuft, C.int(subgobuftary.ElemUsed()), subbuftary,
 		C.int(deltype))
-	if C.YDB_OK != rc {
+	if YDB_OK != rc {
 		err := NewError(tptoken, errstr, int(rc))
 		return err
 	}
@@ -192,7 +192,7 @@ func (key *KeyT) ValST(tptoken uint64, errstr *BufferT, retval *BufferT) error {
 	}
 	rc := C.ydb_get_st(C.uint64_t(tptoken), cbuft, vargobuft, C.int(subgobuftary.ElemUsed()), subbuftary,
 		retval.getCPtr())
-	if C.YDB_OK != rc {
+	if YDB_OK != rc {
 		err := NewError(tptoken, errstr, int(rc))
 		return err
 	}
@@ -240,7 +240,7 @@ func (key *KeyT) IncrST(tptoken uint64, errstr *BufferT, incr, retval *BufferT) 
 	rc := C.ydb_incr_st(C.uint64_t(tptoken), cbuft, vargobuft, C.int(subgobuftary.ElemUsed()), subbuftary,
 		(*C.ydb_buffer_t)(incrcbuft),
 		retval.getCPtr())
-	if C.YDB_OK != rc {
+	if YDB_OK != rc {
 		err := NewError(tptoken, errstr, int(rc))
 		return err
 	}
@@ -272,7 +272,7 @@ func (key *KeyT) LockDecrST(tptoken uint64, errstr *BufferT) error {
 		cbuft = errstr.getCPtr()
 	}
 	rc := C.ydb_lock_decr_st(C.uint64_t(tptoken), cbuft, vargobuft, C.int(subgobuftary.ElemUsed()), subbuftary)
-	if C.YDB_OK != rc {
+	if YDB_OK != rc {
 		err := NewError(tptoken, errstr, int(rc))
 		return err
 	}
@@ -285,7 +285,7 @@ func (key *KeyT) LockDecrST(tptoken uint64, errstr *BufferT) error {
 // resource name without releasing any locks the process already holds.
 //
 // If the process already holds the named lock resource, the method increments its count and returns.
-// If timeoutNsec exceeds C.YDB_MAX_TIME_NSEC, the method returns with an error return TIME2LONG.
+// If timeoutNsec exceeds YDB_MAX_TIME_NSEC, the method returns with an error return TIME2LONG.
 // If it is able to aquire the lock resource within timeoutNsec nanoseconds, it returns holding the lock, otherwise it returns
 // LOCK_TIMEOUT. If timeoutNsec is zero, the method makes exactly one attempt to acquire the lock.
 func (key *KeyT) LockIncrST(tptoken uint64, errstr *BufferT, timeoutNsec uint64) error {
@@ -309,7 +309,7 @@ func (key *KeyT) LockIncrST(tptoken uint64, errstr *BufferT, timeoutNsec uint64)
 	}
 	rc := C.ydb_lock_incr_st(C.uint64_t(tptoken), cbuft, C.ulonglong(timeoutNsec), vargobuft,
 		C.int(subgobuftary.ElemUsed()), subbuftary)
-	if C.YDB_OK != rc {
+	if YDB_OK != rc {
 		err := NewError(tptoken, errstr, int(rc))
 		return err
 	}
@@ -323,16 +323,17 @@ func (key *KeyT) LockIncrST(tptoken uint64, errstr *BufferT, timeoutNsec uint64)
 //
 // If there is a next node:
 //
-// If the number of subscripts of that next node exceeds next.elemsAlloc, the method sets next.elemsUsed to
-// the number of subscripts required, and returns an INSUFFSUBS error. In this case the elemsUsed is greater than elemsAlloc.
+// If the number of subscripts of that next node exceeds next.elemAlloc, the method sets next.elemUsed to
+// the number of subscripts required, and returns an INSUFFSUBS error. In this case the elemUsed is greater than elemAlloc.
 // If one of the C.ydb_buffer_t structures referenced by next (call the first or only element n) has insufficient space for
-// the corresponding subscript, the method sets next.elemsUsed to n, and the len_alloc of that C.ydb_buffer_t structure to the actual space
+// the corresponding subscript, the method sets next.elemUsed to n, and the len_alloc of that C.ydb_buffer_t structure to the actual space
 // required. The method returns an INVSTRLEN error. In this case the len_used of that structure is greater than its len_alloc.
-// Otherwise, it sets the structure next to reference the subscripts of that next node, and next.elemsUsed to the number of subscripts.
+// Otherwise, it sets the structure next to reference the subscripts of that next node, and next.elemUsed to the number of subscripts.
 //
 // If the node is the last in the tree, the method returns the NODEEND error, making no changes to the structures below next.
 func (key *KeyT) NodeNextST(tptoken uint64, errstr *BufferT, next *BufferTArray) error {
-	var nextElemsPtr *uint32
+	var nextElemPtr *uint32
+	var nextElemUsed uint32
 	var dummyElemUsed uint32
 	var nextSubaryPtr *C.ydb_buffer_t
 	var cbuft *C.ydb_buffer_t
@@ -351,11 +352,11 @@ func (key *KeyT) NodeNextST(tptoken uint64, errstr *BufferT, next *BufferTArray)
 	}
 	// The output buffer does not need to be allocated at this point though it may error in ydb_node_next_s() if not.
 	if nil != next {
-		next.cbuftary.elemsUsed = next.ElemAlloc() // Set all elements of output array available for output
-		nextElemsPtr = &next.cbuftary.elemsUsed
+		nextElemUsed = next.ElemAlloc() // Set all elements of output array available for output
+		nextElemPtr = &nextElemUsed
 		nextSubaryPtr = next.getCPtr()
 	} else {
-		nextElemsPtr = &dummyElemUsed
+		nextElemPtr = &dummyElemUsed
 		nextSubaryPtr = nil
 	}
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(subgobuftary.getCPtr()))
@@ -363,8 +364,11 @@ func (key *KeyT) NodeNextST(tptoken uint64, errstr *BufferT, next *BufferTArray)
 		cbuft = errstr.getCPtr()
 	}
 	rc := C.ydb_node_next_st(C.uint64_t(tptoken), cbuft, vargobuft, C.int(subgobuftary.ElemUsed()), subbuftary,
-		(*C.int)(unsafe.Pointer(nextElemsPtr)), (*C.ydb_buffer_t)(unsafe.Pointer(nextSubaryPtr)))
-	if C.YDB_OK != rc {
+		(*C.int)(unsafe.Pointer(nextElemPtr)), (*C.ydb_buffer_t)(unsafe.Pointer(nextSubaryPtr)))
+	if nil != next { // If return area supplied, set the subscript count in the output array (always)
+		next.cbuftary.elemUsed = nextElemUsed
+	}
+	if YDB_OK != rc {
 		err := NewError(tptoken, errstr, int(rc))
 		return err
 	}
@@ -378,16 +382,17 @@ func (key *KeyT) NodeNextST(tptoken uint64, errstr *BufferT, next *BufferTArray)
 //
 // If there is a previous node:
 //
-// If the number of subscripts of that previous node exceeds prev.elemsAlloc, the method sets prev.elemsUsed to
-// the number of subscripts required, and returns an INSUFFSUBS error. In this case the elemsUsed is greater than elemsAlloc.
+// If the number of subscripts of that previous node exceeds prev.elemAlloc, the method sets prev.elemUsed to
+// the number of subscripts required, and returns an INSUFFSUBS error. In this case the elemUsed is greater than elemAlloc.
 // If one of the C.ydb_buffer_t structures referenced by prev (call the first or only element n) has insufficient space for
-// the corresponding subscript, the method sets prev.elemsUsed to n, and the len_alloc of that C.ydb_buffer_t structure to the actual space
+// the corresponding subscript, the method sets prev.elemUsed to n, and the len_alloc of that C.ydb_buffer_t structure to the actual space
 // required. The method returns an INVSTRLEN error. In this case the len_used of that structure is greater than its len_alloc.
-// Otherwise, it sets the structure prev to reference the subscripts of that prev node, and prev.elemsUsed to the number of subscripts.
+// Otherwise, it sets the structure prev to reference the subscripts of that prev node, and prev.elemUsed to the number of subscripts.
 //
 // If the node is the first in the tree, the method returns the NODEEND error making no changes to the structures below prev.
 func (key *KeyT) NodePrevST(tptoken uint64, errstr *BufferT, prev *BufferTArray) error {
-	var prevElemsPtr *uint32
+	var prevElemPtr *uint32
+	var prevElemUsed uint32
 	var dummyElemUsed uint32
 	var prevSubaryPtr *C.ydb_buffer_t
 	var cbuft *C.ydb_buffer_t
@@ -406,11 +411,11 @@ func (key *KeyT) NodePrevST(tptoken uint64, errstr *BufferT, prev *BufferTArray)
 	}
 	// The output buffer does not need to be allocated at this point though it may error in ydb_node_previous_s() if not.
 	if nil != prev {
-		prev.cbuftary.elemsUsed = prev.ElemAlloc() // Set all elements of output array available for output
-		prevElemsPtr = &prev.cbuftary.elemsUsed
+		prevElemUsed = prev.ElemAlloc() // Set all elements of output array available for output
+		prevElemPtr = &prevElemUsed
 		prevSubaryPtr = prev.getCPtr()
 	} else {
-		prevElemsPtr = &dummyElemUsed
+		prevElemPtr = &dummyElemUsed
 		prevSubaryPtr = nil
 	}
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(subgobuftary.getCPtr()))
@@ -418,8 +423,11 @@ func (key *KeyT) NodePrevST(tptoken uint64, errstr *BufferT, prev *BufferTArray)
 		cbuft = errstr.getCPtr()
 	}
 	rc := C.ydb_node_previous_st(C.uint64_t(tptoken), cbuft, vargobuft, C.int(subgobuftary.ElemUsed()),
-		subbuftary, (*C.int)(unsafe.Pointer(prevElemsPtr)), (*C.ydb_buffer_t)(unsafe.Pointer(prevSubaryPtr)))
-	if C.YDB_OK != rc {
+		subbuftary, (*C.int)(unsafe.Pointer(prevElemPtr)), (*C.ydb_buffer_t)(unsafe.Pointer(prevSubaryPtr)))
+	if nil != prev { // If return area supplied, set the subscript count in the output array (always)
+		prev.cbuftary.elemUsed = prevElemUsed
+	}
+	if YDB_OK != rc {
 		err := NewError(tptoken, errstr, int(rc))
 		return err
 	}
@@ -451,7 +459,7 @@ func (key *KeyT) SetValST(tptoken uint64, errstr *BufferT, value *BufferT) error
 	}
 	rc := C.ydb_set_st(C.uint64_t(tptoken), cbuft, vargobuft, C.int(subgobuftary.ElemUsed()), cbuftary,
 		value.getCPtr())
-	if C.YDB_OK != rc {
+	if YDB_OK != rc {
 		err := NewError(tptoken, errstr, int(rc))
 		return err
 	}
@@ -492,7 +500,7 @@ func (key *KeyT) SubNextST(tptoken uint64, errstr *BufferT, retval *BufferT) err
 	}
 	rc := C.ydb_subscript_next_st(C.uint64_t(tptoken), cbuft, vargobuft, C.int(subgobuftary.ElemUsed()),
 		subbuftary, retval.getCPtr())
-	if C.YDB_OK != rc {
+	if YDB_OK != rc {
 		err := NewError(tptoken, errstr, int(rc))
 		return err
 	}
@@ -531,7 +539,7 @@ func (key *KeyT) SubPrevST(tptoken uint64, errstr *BufferT, retval *BufferT) err
 	}
 	rc := C.ydb_subscript_previous_st(C.uint64_t(tptoken), cbuft, vargobuft, C.int(subgobuftary.ElemUsed()),
 		subbuftary, retval.getCPtr())
-	if C.YDB_OK != rc {
+	if YDB_OK != rc {
 		err := NewError(tptoken, errstr, int(rc))
 		return err
 	}

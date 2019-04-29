@@ -46,7 +46,7 @@ func DataE(tptoken uint64, errstr *BufferT, varname string, subary []string) (ui
 		cbuft = errstr.getCPtr()
 	}
 	rc := C.ydb_data_st(C.uint64_t(tptoken), cbuft, vargobuft, C.int(dbkey.Subary.ElemUsed()), subbuftary, &retval)
-	if C.YDB_OK != rc {
+	if YDB_OK != rc {
 		err = NewError(tptoken, errstr, int(rc))
 		return 0, err
 	}
@@ -57,8 +57,8 @@ func DataE(tptoken uint64, errstr *BufferT, varname string, subary []string) (ui
 //
 // Matching DeleteST(), DeleteE() wraps ydb_delete_st() to
 // delete a local or global variable node or (sub)tree, with a value of
-// C.YDB_DEL_NODE for deltype specifying that only the node should be deleted, leaving the (sub)tree untouched, and a value
-// of C.YDB_DEL_TREE specifying that the node as well as the(sub)tree are to be deleted.
+// YDB_DEL_NODE for deltype specifying that only the node should be deleted, leaving the (sub)tree untouched, and a value
+// of YDB_DEL_TREE specifying that the node as well as the(sub)tree are to be deleted.
 func DeleteE(tptoken uint64, errstr *BufferT, deltype int, varname string, subary []string) error {
 	var dbkey KeyT
 	var err error
@@ -74,7 +74,7 @@ func DeleteE(tptoken uint64, errstr *BufferT, deltype int, varname string, subar
 	}
 	rc := C.ydb_delete_st(C.uint64_t(tptoken), cbuft, vargobuft, C.int(dbkey.Subary.ElemUsed()), subbuftary,
 		C.int(deltype))
-	if C.YDB_OK != rc {
+	if YDB_OK != rc {
 		err = NewError(tptoken, errstr, int(rc))
 		return err
 	}
@@ -87,7 +87,7 @@ func DeleteE(tptoken uint64, errstr *BufferT, deltype int, varname string, subar
 // Matching DeleteExclST(), DeleteExclE() wraps ydb_delete_excl_st() to delete all local variables except those
 // specified. In the event varnames has no elements (i.e.,[]string{}), DeleteExclE() deletes all local variables.
 //
-// In the event that the number of variable names in varnames exceeds C.YDB_MAX_NAMES, the error return is
+// In the event that the number of variable names in varnames exceeds YDB_MAX_NAMES, the error return is
 // ERRNAMECOUNT2HI. Otherwise, if ydb_delete_excl_st() returns an error, the function returns the error.
 //
 // As M and Go application code cannot be mixed in the same process, the warning in ydb_delete_excl_s() does not apply.
@@ -144,13 +144,13 @@ func ValE(tptoken uint64, errstr *BufferT, varname string, subary []string) (str
 	dbvalue.Alloc(easyAPIDefaultDataSize)
 	// Attempt to fetch the value multiple times. We do not know how big the incoming record is
 	// so loop till it fits.
-	for C.YDB_MAX_STR > easyAPIDefaultDataSize {
+	for YDB_MAX_STR > easyAPIDefaultDataSize {
 		// dbvalue is allocated with current best-guess size of returning data
 		err = dbkey.ValST(tptoken, errstr, &dbvalue)
 		if nil != err {
 			// Check if we had an INVSTRLEN error (too small an output buffer)
 			errorcode := ErrorCode(err)
-			if int(C.YDB_ERR_INVSTRLEN) == errorcode {
+			if int(YDB_ERR_INVSTRLEN) == errorcode {
 				// This is INVSTRLEN - reallocate the size we need
 				easyAPIDefaultDataSize = uint32(dbvalue.getCPtr().len_used)
 				dbvalue.Alloc(easyAPIDefaultDataSize)
@@ -202,7 +202,7 @@ func IncrE(tptoken uint64, errstr *BufferT, incr, varname string, subary []strin
 	}
 	rc := C.ydb_incr_st(C.uint64_t(tptoken), cbuft, vargobuft, C.int(dbkey.Subary.ElemUsed()), subbuftary,
 		incrval.getCPtr(), dbvalue.getCPtr())
-	if C.YDB_OK != rc {
+	if YDB_OK != rc {
 		err = NewError(tptoken, errstr, int(rc))
 		return "", err
 	}
@@ -222,7 +222,7 @@ func IncrE(tptoken uint64, errstr *BufferT, incr, varname string, subary []strin
 //
 // If lock resources are specified, upon return, the process will have acquired all of the named lock resources or none of the named lock resources.
 //
-// If timeoutNsec exceeds C.YDB_MAX_TIME_NSEC, the function returns with an error return of TIME2LONG.
+// If timeoutNsec exceeds YDB_MAX_TIME_NSEC, the function returns with an error return of TIME2LONG.
 // If the lock resource names exceeds the maximum number supported (currently eleven), the function returns a PARMOFLOW error.
 // If namesubs is not a series of alternating string and []string parameters, the function returns the INVLNPAIRLIST error.
 // If it is able to aquire the lock resource(s) within timeoutNsec nanoseconds, the function returns holding the lock
@@ -230,11 +230,11 @@ func IncrE(tptoken uint64, errstr *BufferT, incr, varname string, subary []strin
 func LockE(tptoken uint64, errstr *BufferT, timeoutNsec uint64, namesnsubs ...interface{}) error {
 	printEntry("LockE()")
 	if 0 != (uint32(len(namesnsubs)) & 1) {
-		errmsg, err := MessageT(tptoken, nil, (int)(C.YDB_ERR_INVLNPAIRLIST))
+		errmsg, err := MessageT(tptoken, nil, (int)(YDB_ERR_INVLNPAIRLIST))
 		if nil != err {
 			panic(fmt.Sprintf("YDB: Error fetching INVLNPAIRLIST: %s", err))
 		}
-		return &YDBError{(int)(C.YDB_ERR_INVLNPAIRLIST), errmsg}
+		return &YDBError{(int)(YDB_ERR_INVLNPAIRLIST), errmsg}
 	}
 	lckparms := len(namesnsubs)
 	parmlst := make([]*KeyT, lckparms/2) // Allocate parameter list of *KeyT values
@@ -242,24 +242,24 @@ func LockE(tptoken uint64, errstr *BufferT, timeoutNsec uint64, namesnsubs ...in
 		// Pull in the next varname and verify it is a string
 		newVarname, ok := namesnsubs[i].(string)
 		if !ok {
-			errmsg, err := MessageT(tptoken, nil, (int)(C.YDB_ERR_PARAMINVALID))
+			errmsg, err := MessageT(tptoken, nil, (int)(YDB_ERR_PARAMINVALID))
 			if nil != err {
 				panic(fmt.Sprintf("YDB: Error fetching PARAMINVALID: %s", err))
 			}
 			errmsg = strings.Replace(errmsg, "!AD", "%v", -1)
 			errmsg = fmt.Sprintf(errmsg, newVarname, "LockE()")
-			return &YDBError{(int)(C.YDB_ERR_PARAMINVALID), errmsg}
+			return &YDBError{(int)(YDB_ERR_PARAMINVALID), errmsg}
 		}
 		// Pull in the next subscript array and verify it is an array of strings
 		newSubs, ok := namesnsubs[i+1].([]string)
 		if !ok {
-			errmsg, err := MessageT(tptoken, nil, (int)(C.YDB_ERR_PARAMINVALID))
+			errmsg, err := MessageT(tptoken, nil, (int)(YDB_ERR_PARAMINVALID))
 			if nil != err {
 				panic(fmt.Sprintf("YDB: Error fetching PARAMINVALID: %s", err))
 			}
 			errmsg = strings.Replace(errmsg, "!AD", "%v", -1)
 			errmsg = fmt.Sprintf(errmsg, newVarname, "LockE()")
-			return &YDBError{(int)(C.YDB_ERR_PARAMINVALID), errmsg}
+			return &YDBError{(int)(YDB_ERR_PARAMINVALID), errmsg}
 		}
 		newKey := new(KeyT)
 		// Run through subscripts to find the biggest
@@ -309,7 +309,7 @@ func LockDecrE(tptoken uint64, errstr *BufferT, varname string, subary []string)
 		cbuft = errstr.getCPtr()
 	}
 	rc := C.ydb_lock_decr_st(C.uint64_t(tptoken), cbuft, vargobuft, C.int(dbkey.Subary.ElemUsed()), subbuftary)
-	if C.YDB_OK != rc {
+	if YDB_OK != rc {
 		err = NewError(tptoken, errstr, int(rc))
 		return err
 	}
@@ -323,7 +323,7 @@ func LockDecrE(tptoken uint64, errstr *BufferT, varname string, subary []string)
 // resource name without releasing any locks the process already holds.
 //
 // If the process already holds the named lock resource, the function increments its count and returns.
-// If timeoutNsec exceeds C.YDB_MAX_TIME_NSEC, the function returns with an error return TIME2LONG.
+// If timeoutNsec exceeds YDB_MAX_TIME_NSEC, the function returns with an error return TIME2LONG.
 // If it is able to aquire the lock resource within timeoutNsec nanoseconds, it returns holding the lock, otherwise it returns
 // LOCKTIMEOUT. If timeoutNsec is zero, the function makes exactly one attempt to acquire the lock.
 func LockIncrE(tptoken uint64, errstr *BufferT, timeoutNsec uint64, varname string, subary []string) error {
@@ -341,7 +341,7 @@ func LockIncrE(tptoken uint64, errstr *BufferT, timeoutNsec uint64, varname stri
 	}
 	rc := C.ydb_lock_incr_st(C.uint64_t(tptoken), cbuft, C.ulonglong(timeoutNsec), vargobuft,
 		C.int(dbkey.Subary.ElemUsed()), subbuftary)
-	if C.YDB_OK != rc {
+	if YDB_OK != rc {
 		err = NewError(tptoken, errstr, int(rc))
 		return err
 	}
@@ -366,21 +366,20 @@ func NodeNextE(tptoken uint64, errstr *BufferT, varname string, subary []string)
 	dbsubs.Alloc(easyAPIDefaultSubscrCnt, easyAPIDefaultSubscrSize)
 	// Attempt to fetch the next subscript set multiple times. We do not know how big the incoming subscripts are
 	// so loop till they fit.
-	for C.YDB_MAX_STR > easyAPIDefaultDataSize {
+	for YDB_MAX_STR > easyAPIDefaultDataSize {
 		// dbvalue is allocated with current best-guess size of returning data
-		dbsubs.cbuftary.elemsAlloc = dbsubs.ElemAlloc() // So allocation is passed as *ret_subs_cnt
 		err = dbkey.NodeNextST(tptoken, errstr, &dbsubs)
 		if nil != err {
 			// Check if we had an INVSTRLEN error (too small an output buffer)
 			errorcode := ErrorCode(err)
-			if int(C.YDB_ERR_INSUFFSUBS) == errorcode {
+			if int(YDB_ERR_INSUFFSUBS) == errorcode {
 				// This is INSUFFSUBS - pickup number of subscripts we actually need and reallocate
 				easyAPIDefaultSubscrCnt = dbsubs.ElemUsed()
 				dbsubs.Alloc(easyAPIDefaultSubscrCnt, easyAPIDefaultSubscrSize) // Reallocate and reset dbsubs
 				continue
 			}
-			if int(C.YDB_ERR_INVSTRLEN) == errorcode {
-				// This is INVSTRLEN - the last valid subscript (as shown by elemsUsed) is the element
+			if int(YDB_ERR_INVSTRLEN) == errorcode {
+				// This is INVSTRLEN - the last valid subscript (as shown by elemUsed) is the element
 				neededlen, err := dbsubs.ElemLenUsed(tptoken, errstr, dbsubs.ElemUsed())
 				if nil != err {
 					panic(fmt.Sprintf("YDB: Unexpected error with ElemLenUsed(): %s", err))
@@ -426,21 +425,20 @@ func NodePrevE(tptoken uint64, errstr *BufferT, varname string, subary []string)
 	dbsubs.Alloc(easyAPIDefaultSubscrCnt, easyAPIDefaultSubscrSize)
 	// Attempt to fetch the next subscript set multiple times. We do not know how big the incoming subscripts are
 	// so loop till they fit.
-	for C.YDB_MAX_STR > easyAPIDefaultDataSize {
+	for YDB_MAX_STR > easyAPIDefaultDataSize {
 		// dbvalue is allocated with current best-guess size of returning data
-		dbsubs.cbuftary.elemsAlloc = dbsubs.ElemAlloc() // So allocation is passed as *ret_subs_cnt
 		err = dbkey.NodePrevST(tptoken, errstr, &dbsubs)
 		if nil != err {
 			// Check if we had an INVSTRLEN error (too small an output buffer)
 			errorcode := ErrorCode(err)
-			if int(C.YDB_ERR_INSUFFSUBS) == errorcode {
+			if int(YDB_ERR_INSUFFSUBS) == errorcode {
 				// This is INSUFFSUBS - pickup number of subscripts we actually need and reallocate
 				easyAPIDefaultSubscrCnt = dbkey.Subary.ElemUsed()
 				dbsubs.Alloc(easyAPIDefaultSubscrCnt, easyAPIDefaultSubscrSize)
 				continue
 			}
-			if int(C.YDB_ERR_INVSTRLEN) == errorcode {
-				// This is INVSTRLEN - the last valid subscript (as shown by elemsUsed) is the element
+			if int(YDB_ERR_INVSTRLEN) == errorcode {
+				// This is INVSTRLEN - the last valid subscript (as shown by elemUsed) is the element
 				neededlen, err := dbsubs.ElemLenUsed(tptoken, errstr, dbsubs.ElemUsed())
 				if nil != err {
 					panic(fmt.Sprintf("YDB: Unexpected error with ElemLenUsed(): %s", err))
@@ -518,7 +516,7 @@ func SetValE(tptoken uint64, errstr *BufferT, value, varname string, subary []st
 	}
 	rc := C.ydb_set_st(C.uint64_t(tptoken), cbuft, vargobuft, C.int(dbkey.Subary.ElemUsed()), subbuftary,
 		dbvalue.getCPtr())
-	if C.YDB_OK != rc {
+	if YDB_OK != rc {
 		err := NewError(tptoken, errstr, int(rc))
 		return err
 	}
@@ -548,13 +546,13 @@ func SubNextE(tptoken uint64, errstr *BufferT, varname string, subary []string) 
 	dbsub.Alloc(easyAPIDefaultSubscrSize)
 	// Attempt to fetch the value multiple times. We do not know how big the incoming record is
 	// so loop till it fits.
-	for C.YDB_MAX_STR > easyAPIDefaultDataSize {
+	for YDB_MAX_STR > easyAPIDefaultDataSize {
 		// dbsub is allocated with current best-guess size of returning data
 		err = dbkey.SubNextST(tptoken, errstr, &dbsub)
 		if nil != err {
 			// Check if we had an INVSTRLEN error (too small an output buffer)
 			errorcode := ErrorCode(err)
-			if int(C.YDB_ERR_INVSTRLEN) == errorcode {
+			if int(YDB_ERR_INVSTRLEN) == errorcode {
 				// This is INVSTRLEN - reallocate the size we need
 				easyAPIDefaultSubscrSize = uint32(dbsub.getCPtr().len_used)
 				dbsub.Alloc(easyAPIDefaultSubscrSize)
@@ -592,13 +590,13 @@ func SubPrevE(tptoken uint64, errstr *BufferT, varname string, subary []string) 
 	dbsub.Alloc(easyAPIDefaultSubscrSize)
 	// Attempt to fetch the value multiple times. We do not know how big the incoming record is
 	// so loop till it fits.
-	for C.YDB_MAX_STR > easyAPIDefaultDataSize {
+	for YDB_MAX_STR > easyAPIDefaultDataSize {
 		// dbsub is allocated with current best-guess size of returning data
 		err = dbkey.SubPrevST(tptoken, errstr, &dbsub)
 		if nil != err {
 			// Check if we had an INVSTRLEN error (too small an output buffer)
 			errorcode := ErrorCode(err)
-			if int(C.YDB_ERR_INVSTRLEN) == errorcode {
+			if int(YDB_ERR_INVSTRLEN) == errorcode {
 				// This is INVSTRLEN - reallocate the size we need
 				easyAPIDefaultSubscrSize = uint32(dbsub.getCPtr().len_used)
 				dbsub.Alloc(easyAPIDefaultSubscrSize)
