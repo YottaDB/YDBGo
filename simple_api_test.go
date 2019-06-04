@@ -21,6 +21,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"os/exec"
 )
 
 func TestSimpleAPILockST(t *testing.T) {
@@ -72,8 +73,6 @@ func TestSimpleAPILockManyParms(t *testing.T) {
 func TestSimpleAPITpFullNesting(t *testing.T) {
 	var wg sync.WaitGroup
 
-	SkipARMV7LTests(t)
-
 	hit_tp_too_deep := 0
 	var fn func(string, uint64) error
 	fn = func(myId string, tptoken uint64) error {
@@ -95,8 +94,15 @@ func TestSimpleAPITpFullNesting(t *testing.T) {
 			return 0
 		}, "BATCH", []string{})
 	}
-
-	for i := 0; i < 100; i++ {
+	// checks the machine archtecture for armv6l and armv7l and reduces the number of routines created
+	var routines_to_make int
+	march, _ := exec.Command("uname", "-m").Output()
+	if string(march[:]) == "armv7l\n" || string(march[:]) == "armv6l\n" {
+		routines_to_make = 10
+	} else {
+		routines_to_make = 100
+	}
+	for i := 0; i < routines_to_make; i++ {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
@@ -104,5 +110,5 @@ func TestSimpleAPITpFullNesting(t *testing.T) {
 		}(i)
 	}
 	wg.Wait()
-	assert.Equal(t, 100*126, hit_tp_too_deep)
+	assert.Equal(t, routines_to_make*126, hit_tp_too_deep)
 }
