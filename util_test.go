@@ -18,6 +18,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"fmt"
 )
 
 // Note we do not test MessageT() here as it gets quite a workout in the other tests that run since it is used in
@@ -91,4 +92,81 @@ func TestCallMDescTWithArgs(t *testing.T) {
 	restoreEnvvars(t, &envvarSave, "ydb_ci", "ydb_routines")
 	assert.Nil(t, err)
 	assert.Equal(t, "parm3parm2parm1", retval)
+}
+
+func TestCallMT(t *testing.T) {
+	envvarSave := make(map[string]string)
+	saveEnvvars(t, &envvarSave, "ydb_ci", "ydb_routines")
+	err := os.Setenv("ydb_ci", "calltab.ci")
+	includeInEnvvar(t, "ydb_routines", "./m_routines")
+	defer restoreEnvvars(t, &envvarSave, "ydb_ci", "ydb_routines")
+
+	var errstr yottadb.BufferT
+	errstr.Alloc(2048)
+	defer errstr.Free()
+	cmpstr := "150375522,(SimpleThreadAPI),%YDB-E-INVSTRLEN, Invalid string length 20: max 15"
+
+	/* M callin that returns 20 characters, using a 20 character buffer */
+	retval, err := yottadb.CallMT(yottadb.NOTTP, &errstr, 20, "CallMTStrTest")
+	if nil != err {
+		panic(err)
+	}
+	if "a0a1a2a3a4a5a6a7a8a9" != retval {
+		panic(fmt.Sprintf("CallMT() did not return the correct string. Got: %s; Expected: a0a1a2a3a4a5a6a7a8a9", retval))
+	}
+	if 20 != len(retval) {
+		panic(fmt.Sprintf("CallMT() return is not the correct length. Got: %d; Expected: 20", len(retval)))
+	}
+
+	/* M callin that returns 20 characters, using a 15 character buffer; should return INVSTRLEN */
+	retval, err = yottadb.CallMT(yottadb.NOTTP, &errstr, 15, "CallMTStrTest")
+	out, _ := errstr.ValStr(yottadb.NOTTP, nil)
+	errCode := yottadb.ErrorCode(err)
+	if -yottadb.YDB_ERR_INVSTRLEN != errCode {
+		panic(fmt.Sprintf("CallMT() returned wrong ErrorCode. Got: %d; Expected: %d", errCode, yottadb.YDB_ERR_INVSTRLEN))
+	}
+	if *out != cmpstr {
+		panic(fmt.Sprintf("CallMT() returned wrong errstr. Got: %s; Expected: %s", *out, cmpstr))
+	}
+
+}
+
+func TestCallMDescT(t *testing.T) {
+	// env setup
+	envvarSave := make(map[string]string)
+	saveEnvvars(t, &envvarSave, "ydb_ci", "ydb_routines")
+	err := os.Setenv("ydb_ci", "calltab.ci")
+	includeInEnvvar(t, "ydb_routines", "./m_routines")
+	defer restoreEnvvars(t, &envvarSave, "ydb_ci", "ydb_routines")
+
+	var errstr yottadb.BufferT
+	errstr.Alloc(2048)
+	defer errstr.Free()
+	cmpstr := "150375522,(SimpleThreadAPI),%YDB-E-INVSTRLEN, Invalid string length 20: max 15"
+
+	var callin yottadb.CallMDesc
+	callin.SetRtnName("CallMTStrTest")
+
+	/* M callin that returns 20 characters, using a 20 character buffer */
+	retval, err := callin.CallMDescT(yottadb.NOTTP, nil, 20)
+	if nil != err {
+		panic(err)
+	}
+	if "a0a1a2a3a4a5a6a7a8a9" != retval {
+		panic(fmt.Sprintf("CallMT() did not return the correct string. Got: %s; Expected: a0a1a2a3a4a5a6a7a8a9", retval))
+	}
+	if 20 != len(retval) {
+		panic(fmt.Sprintf("CallMT() return is not the correct length. Got: %d; Expected: 20", len(retval)))
+	}
+
+	/* M callin that returns 20 characters, using a 15 character buffer; should return INVSTRLEN */
+	retval, err = callin.CallMDescT(yottadb.NOTTP, &errstr, 15)
+	out, _ := errstr.ValStr(yottadb.NOTTP, nil)
+	errCode := yottadb.ErrorCode(err)
+	if -yottadb.YDB_ERR_INVSTRLEN != errCode {
+		panic(fmt.Sprintf("CallMT() returned wrong ErrorCode. Got: %d; Expected: %d", errCode, yottadb.YDB_ERR_INVSTRLEN))
+	}
+	if *out != cmpstr {
+		panic(fmt.Sprintf("CallMT() returned wrong errstr. Got: %s; Expected: %s", *out, cmpstr))
+	}
 }
