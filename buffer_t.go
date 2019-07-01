@@ -75,14 +75,14 @@ func (buft *BufferT) Alloc(nBytes uint32) {
 	}
 
 	// Allocate a C flavor ydb_buffer_t struct to pass to simpleAPI
-	buft.cbuft = &internalBufferT{(*C.ydb_buffer_t)(C.malloc(C.size_t(C.sizeof_ydb_buffer_t)))}
+	buft.cbuft = &internalBufferT{(*C.ydb_buffer_t)(C.calloc(1, C.size_t(C.sizeof_ydb_buffer_t)))}
 	cbuftptr = buft.getCPtr()
 	cbuftptr.len_used = 0
 	cbuftptr.len_alloc = C.uint(nBytes)
 	cbuftptr.buf_addr = nil
 	// Allocate a new buffer of the given size; if size is 0, we just leave it as nil
 	if 0 < nBytes {
-		cbuftptr.buf_addr = (*C.char)(C.malloc(C.size_t(nBytes)))
+		cbuftptr.buf_addr = (*C.char)(C.calloc(1, C.size_t(nBytes)))
 	}
 	buft.ownsBuff = true
 	// Set a finalizer

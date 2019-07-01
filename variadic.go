@@ -55,7 +55,7 @@ func (vplist *variadicPlist) alloc() {
 		// Already allocated
 		return
 	}
-	vplist.cvplist = (*C.gparam_list)(C.malloc(C.size_t(C.sizeof_gparam_list)))
+	vplist.cvplist = (*C.gparam_list)(C.calloc(1, C.size_t(C.sizeof_gparam_list)))
 }
 
 // callVariadicPlistFunc is a variadicPlist method to drive a variadic plist function with the given

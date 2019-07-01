@@ -67,13 +67,13 @@ func (buftary *BufferTArray) Alloc(numBufs, nBytes uint32) {
 	if 0 != numBufs {
 		// Allocate new ydb_buffer_t array and initialize
 		len := C.size_t(uint32(C.sizeof_ydb_buffer_t) * numBufs)
-		cbuftary := (*[]C.ydb_buffer_t)(C.malloc(len))
+		cbuftary := (*[]C.ydb_buffer_t)(C.calloc(1, len))
 		buftary.cbuftary = &internalBufferTArray{0, numBufs, cbuftary}
 		// Allocate a buffer for each ydb_buffer_t structure of nBytes bytes
 		for i = 0; numBufs > i; i++ {
 			elemptr := (*C.ydb_buffer_t)(unsafe.Pointer(uintptr(unsafe.Pointer(cbuftary)) +
 				uintptr(C.sizeof_ydb_buffer_t*i)))
-			(*elemptr).buf_addr = (*C.char)(C.malloc(C.size_t(nBytes)))
+			(*elemptr).buf_addr = (*C.char)(C.calloc(1, C.size_t(nBytes)))
 			(*elemptr).len_alloc = C.uint(nBytes)
 			(*elemptr).len_used = 0
 		}

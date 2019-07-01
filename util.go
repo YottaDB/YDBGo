@@ -98,7 +98,7 @@ func (mdesc *CallMDesc) SetRtnName(rtnname string) {
 		C.free(unsafe.Pointer(cindPtr.rtn_name.address))
 		cindPtr.rtn_name.address = nil
 	} else {
-		cindPtr = (*C.ci_name_descriptor)(C.malloc(C.size_t(C.sizeof_ci_name_descriptor)))
+		cindPtr = (*C.ci_name_descriptor)(C.calloc(1, C.size_t(C.sizeof_ci_name_descriptor)))
 		mdesc.cmdesc = &internalCallMDesc{cindPtr}
 		// Set a finalizer so this block is released when garbage collected
 		runtime.SetFinalizer(mdesc.cmdesc, func(o *internalCallMDesc) { o.Free() })
@@ -149,9 +149,9 @@ func (mdesc *CallMDesc) CallMDescT(tptoken uint64, errstr *BufferT, retvallen ui
 	parmIndx++
 	// Setup return value if any (first variable parm)
 	if 0 != retvallen {
-		retvalptr = (*C.ydb_string_t)(C.malloc(C.size_t(C.sizeof_ydb_string_t)))
+		retvalptr = (*C.ydb_string_t)(C.calloc(1, C.size_t(C.sizeof_ydb_string_t)))
 		defer C.free(unsafe.Pointer(retvalptr)) // Free this when we are done
-		retvalptr.address = (*C.char)(C.malloc(C.size_t(retvallen)))
+		retvalptr.address = (*C.char)(C.calloc(1, C.size_t(retvallen)))
 		defer C.free(unsafe.Pointer(retvalptr.address))
 		retvalptr.length = (C.ulong)(retvallen)
 		err = vplist.setVPlistParam(tptoken, errstr, parmIndx, uintptr(unsafe.Pointer(retvalptr)))
@@ -168,7 +168,7 @@ func (mdesc *CallMDesc) CallMDescT(tptoken uint64, errstr *BufferT, retvallen ui
 	// Parameters can be various types supported by external calls. They are all converted to strings for now as
 	// golang does not have access to the call descriptor that defines argument types.
 	parmcnt := len(rtnargs)
-	parmblkptr := (*C.ydb_string_t)(C.malloc(C.size_t(C.sizeof_ydb_string_t * parmcnt)))
+	parmblkptr := (*C.ydb_string_t)(C.calloc(1, C.size_t(C.sizeof_ydb_string_t * parmcnt)))
 	defer C.free(unsafe.Pointer(parmblkptr))
 	parmptr := parmblkptr
 	// Turn each parameter into a ydb_string_t buffer descriptor and load it into our variadic plist

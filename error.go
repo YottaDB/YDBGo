@@ -84,7 +84,7 @@ func NewError(tptoken uint64, errstr *BufferT, errnum int) error {
 		return &YDBError{errnum, errmsg}
 	}
 	// Fetch $ZSTATUS to return as the error string
-	msgptr = (*C.char)(C.malloc(C.size_t(YDB_MAX_ERRORMSG)))
+	msgptr = (*C.char)(C.calloc(1, C.size_t(C.YDB_MAX_ERRORMSG)))
 	C.ydb_zstatus(msgptr, C.int(YDB_MAX_ERRORMSG))
 	errmsg = C.GoString((*C.char)(msgptr))
 	C.free(unsafe.Pointer(msgptr))
