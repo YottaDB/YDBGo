@@ -35,9 +35,9 @@ func max(x int, y int) int {
 	return y
 }
 
-// printEntry is a function to print the entry point of the function, when entered, if the debug flag is enabled.
+// printEntry is a function to print the entry point of the function, when entered, if the printEPHdrs flag is enabled.
 func printEntry(funcName string) {
-	if debugFlag {
+	if dbgPrintEPHdrs {
 		_, file, line, ok := runtime.Caller(2)
 		if ok {
 			fmt.Println("Entered ", funcName, " from ", file, " at line ", line)
@@ -77,6 +77,27 @@ func initkey(tptoken uint64, errstr *BufferT, dbkey *KeyT, varname *string, suba
 	if nil != err {
 		panic(fmt.Sprintf("YDB: Unexpected error with SetUsed(): %s", err))
 	}
+}
+
+// allocMem is a function to allocate memory optionally initializing it in various ways. This can be a future
+// point where storage management sanity code can be added.
+func allocMem(size C.size_t) unsafe.Pointer {
+	// This initial call must be to calloc() to get initialized (cleared) storage. We cannot allocate it and then
+	// do another call to initialize it as that means uninitialized memory is traversing the cgo boundary which
+	// is what triggers the cgo bug mentioned in the cgo docs (https://golang.org/cmd/cgo/#hdr-Passing_pointers).
+	mem := C.calloc(1, size)
+	if dbgInitMalloc && (0x00 != dbgInitMallocChar) { // Want to initialize to something other than nulls
+		_ = C.memset(mem, dbgInitMallocChar, size)
+	}
+	return mem
+}
+
+// freeMem is a function to return memory allocated with allocMem().
+func freeMem(mem unsafe.Pointer, size C.size_t) {
+	if dbgInitFree {
+		_ = C.memset(mem, dbgInitFreeChar, size)
+	}
+	C.free(mem)
 }
 
 // IsLittleEndian is a function to determine endianness. Exposed in case anyone else wants to know.

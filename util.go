@@ -56,7 +56,7 @@ func (mdesc *CallMDesc) Free() {
 	mdesc.cmdesc = nil
 }
 
-// Call C.free() on any C memory owned by this internalCallMDesc
+// Call freeMem() on any C memory owned by this internalCallMDesc
 func (imdesc *internalCallMDesc) Free() {
 	printEntry("internalCallMDesc.Free()")
 	if nil == imdesc {
@@ -65,11 +65,11 @@ func (imdesc *internalCallMDesc) Free() {
 	cindPtr := imdesc.cmdesc
 	if nil != cindPtr {
 		if nil != cindPtr.rtn_name.address {
-			C.free(unsafe.Pointer(cindPtr.rtn_name.address))
+			freeMem(unsafe.Pointer(cindPtr.rtn_name.address), C.size_t(cindPtr.rtn_name.length))
 			cindPtr.rtn_name.address = nil
 		}
-		C.free(unsafe.Pointer(cindPtr))
-		// The below keeps imdesc around long enough to get rid of this block's memory. No KeepAlive() necessary.
+		freeMem(unsafe.Pointer(cindPtr), C.size_t(C.sizeof_ci_name_descriptor))
+		// The below keeps imdesc around long enough to get rid of this block's C memory. No KeepAlive() necessary.
 		imdesc.cmdesc = nil
 	}
 }
@@ -96,10 +96,10 @@ func (mdesc *CallMDesc) SetRtnName(rtnname string) {
 		if nil == cindPtr.rtn_name.address {
 			panic("YDB: Routine name address is nil - out of design situation")
 		}
-		C.free(unsafe.Pointer(cindPtr.rtn_name.address))
+		freeMem(unsafe.Pointer(cindPtr.rtn_name.address), C.size_t(cindPtr.rtn_name.length))
 		cindPtr.rtn_name.address = nil
 	} else {
-		cindPtr = (*C.ci_name_descriptor)(C.calloc(1, C.size_t(C.sizeof_ci_name_descriptor)))
+		cindPtr = (*C.ci_name_descriptor)(allocMem(C.size_t(C.sizeof_ci_name_descriptor)))
 		mdesc.cmdesc = &internalCallMDesc{cindPtr}
 		// Set a finalizer so this block is released when garbage collected
 		runtime.SetFinalizer(mdesc.cmdesc, func(o *internalCallMDesc) { o.Free() })
@@ -151,10 +151,10 @@ func (mdesc *CallMDesc) CallMDescT(tptoken uint64, errstr *BufferT, retvallen ui
 	parmIndx++
 	// Setup return value if any (first variable parm)
 	if 0 != retvallen {
-		retvalptr = (*C.ydb_string_t)(C.calloc(1, C.size_t(C.sizeof_ydb_string_t)))
-		defer C.free(unsafe.Pointer(retvalptr)) // Free this when we are done
-		retvalptr.address = (*C.char)(C.calloc(1, C.size_t(retvallen)))
-		defer C.free(unsafe.Pointer(retvalptr.address))
+		retvalptr = (*C.ydb_string_t)(allocMem(C.size_t(C.sizeof_ydb_string_t)))
+		defer freeMem(unsafe.Pointer(retvalptr), C.size_t(C.sizeof_ydb_string_t)) // Free this when we are done
+		retvalptr.address = (*C.char)(allocMem(C.size_t(retvallen)))
+		defer freeMem(unsafe.Pointer(retvalptr.address), C.size_t(retvallen))
 		retvalptr.length = (C.ulong)(retvallen)
 		err = vplist.setVPlistParam(tptoken, errstr, parmIndx, uintptr(unsafe.Pointer(retvalptr)))
 		if nil != err {
@@ -170,8 +170,9 @@ func (mdesc *CallMDesc) CallMDescT(tptoken uint64, errstr *BufferT, retvallen ui
 	// Parameters can be various types supported by external calls. They are all converted to strings for now as
 	// golang does not have access to the call descriptor that defines argument types.
 	parmcnt := len(rtnargs)
-	parmblkptr := (*C.ydb_string_t)(C.calloc(1, C.size_t(C.sizeof_ydb_string_t*parmcnt)))
-	defer C.free(unsafe.Pointer(parmblkptr))
+	allocLen := C.size_t(C.sizeof_ydb_string_t * parmcnt)
+	parmblkptr := (*C.ydb_string_t)(allocMem(allocLen))
+	defer freeMem(unsafe.Pointer(parmblkptr), allocLen)
 	parmptr := parmblkptr
 	// Turn each parameter into a ydb_string_t buffer descriptor and load it into our variadic plist
 	for i = 0; i < parmcnt; i++ {
@@ -181,7 +182,7 @@ func (mdesc *CallMDesc) CallMDescT(tptoken uint64, errstr *BufferT, retvallen ui
 		parmptr.length = C.ulong(len(strparm))
 		if 0 < parmptr.length {
 			parmptr.address = C.CString(strparm)
-			defer C.free(unsafe.Pointer(parmptr.address))
+			defer freeMem(unsafe.Pointer(parmptr.address), C.size_t(parmptr.length))
 		}
 		// Now add parmptr to the variadic plist
 		err = vplist.setVPlistParam(tptoken, errstr, parmIndx, uintptr(unsafe.Pointer(parmptr)))

@@ -55,7 +55,7 @@ func (vplist *variadicPlist) alloc() {
 		// Already allocated
 		return
 	}
-	vplist.cvplist = (*C.gparam_list)(C.calloc(1, C.size_t(C.sizeof_gparam_list)))
+	vplist.cvplist = (*C.gparam_list)(allocMem(C.size_t(C.sizeof_gparam_list)))
 }
 
 // callVariadicPlistFunc is a variadicPlist method to drive a variadic plist function with the given
@@ -78,7 +78,7 @@ func (vplist *variadicPlist) callVariadicPlistFunc(vpfunc unsafe.Pointer) int {
 func (vplist *variadicPlist) free() {
 	printEntry("variadicPlist.free()")
 	if (nil != vplist) && (nil != vplist.cvplist) {
-		C.free(unsafe.Pointer(vplist.cvplist))
+		freeMem(unsafe.Pointer(vplist.cvplist), C.size_t(C.sizeof_gparam_list))
 		vplist.cvplist = nil
 	}
 }

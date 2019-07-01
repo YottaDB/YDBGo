@@ -67,13 +67,13 @@ func (buftary *BufferTArray) Alloc(numBufs, nBytes uint32) {
 	if 0 != numBufs {
 		// Allocate new ydb_buffer_t array and initialize
 		len := C.size_t(uint32(C.sizeof_ydb_buffer_t) * numBufs)
-		cbuftary := (*[]C.ydb_buffer_t)(C.calloc(1, len))
+		cbuftary := (*[]C.ydb_buffer_t)(allocMem(len))
 		buftary.cbuftary = &internalBufferTArray{0, numBufs, cbuftary}
 		// Allocate a buffer for each ydb_buffer_t structure of nBytes bytes
 		for i = 0; numBufs > i; i++ {
 			elemptr := (*C.ydb_buffer_t)(unsafe.Pointer(uintptr(unsafe.Pointer(cbuftary)) +
 				uintptr(C.sizeof_ydb_buffer_t*i)))
-			(*elemptr).buf_addr = (*C.char)(C.calloc(1, C.size_t(nBytes)))
+			(*elemptr).buf_addr = (*C.char)(allocMem(C.size_t(nBytes)))
 			(*elemptr).len_alloc = C.uint(nBytes)
 			(*elemptr).len_used = 0
 		}
@@ -109,11 +109,11 @@ func (buftary *BufferTArray) DumpToWriter(writer io.Writer) {
 				uintptr(C.sizeof_ydb_buffer_t*i))))
 			// It is possible len_used is greater than len_alloc (if this buffer was populated by SimpleAPI C code)
 			// Ensure we do not overrun the allocated buffer while dumping this object in that case.
-			min := (*elemptr).len_used
-			if min > (*elemptr).len_alloc {
-				min = (*elemptr).len_alloc
+			min := elemptr.len_used
+			if min > elemptr.len_alloc {
+				min = elemptr.len_alloc
 			}
-			valstr := C.GoStringN((*elemptr).buf_addr, C.int(min))
+			valstr := C.GoStringN(elemptr.buf_addr, C.int(min))
 			fmt.Fprintf(writer, "  %d: %s\n", i, valstr)
 		}
 	}
@@ -145,12 +145,12 @@ func (ibuftary *internalBufferTArray) Free() {
 	for i := 0; int(ibuftary.elemAlloc) > i; i++ {
 		elemptr := (*C.ydb_buffer_t)(unsafe.Pointer(uintptr(unsafe.Pointer(cbuftary)) +
 			uintptr(C.sizeof_ydb_buffer_t*i)))
-		if 0 != (*elemptr).len_alloc {
-			C.free(unsafe.Pointer((*elemptr).buf_addr))
+		if 0 != elemptr.len_alloc {
+			freeMem(unsafe.Pointer(elemptr.buf_addr), C.size_t(elemptr.len_alloc))
 		}
 	}
 	// Array buffers are freed, now free the array of ydb_buffer_t structs if it exists
-	C.free(unsafe.Pointer(cbuftary))
+	freeMem(unsafe.Pointer(cbuftary), C.size_t(C.sizeof_ydb_buffer_t*ibuftary.elemAlloc))
 	// The below keeps ibuftary around long enough to get rid of this block's memory. No KeepAlive() necessary.
 	ibuftary.cbuftary = nil
 }
@@ -514,7 +514,7 @@ func (buftary *BufferTArray) TpST(tptoken uint64, errstr *BufferT, tpfn func(uin
 		panic("YDB: *BufferTArray receiver of TpST() cannot be nil")
 	}
 	tid := C.CString(transid)
-	defer C.free(unsafe.Pointer(tid))
+	defer freeMem(unsafe.Pointer(tid), C.size_t(len(transid)))
 	tpfnparm := atomic.AddUint64(&tpIndex, 1)
 	tpMap.Store(tpfnparm, tpfn)
 	cbuftary := (*C.ydb_buffer_t)(unsafe.Pointer((*buftary).getCPtr()))

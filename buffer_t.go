@@ -75,14 +75,14 @@ func (buft *BufferT) Alloc(nBytes uint32) {
 	}
 
 	// Allocate a C flavor ydb_buffer_t struct to pass to simpleAPI
-	buft.cbuft = &internalBufferT{(*C.ydb_buffer_t)(C.calloc(1, C.size_t(C.sizeof_ydb_buffer_t)))}
+	buft.cbuft = &internalBufferT{(*C.ydb_buffer_t)(allocMem(C.size_t(C.sizeof_ydb_buffer_t)))}
 	cbuftptr = buft.getCPtr()
 	cbuftptr.len_used = 0
 	cbuftptr.len_alloc = C.uint(nBytes)
 	cbuftptr.buf_addr = nil
 	// Allocate a new buffer of the given size; if size is 0, we just leave it as nil
 	if 0 < nBytes {
-		cbuftptr.buf_addr = (*C.char)(C.calloc(1, C.size_t(nBytes)))
+		cbuftptr.buf_addr = (*C.char)(allocMem(C.size_t(nBytes)))
 	}
 	buft.ownsBuff = true
 	// Set a finalizer
@@ -147,7 +147,7 @@ func (buft *BufferT) Free() {
 	buft.cbuft = nil
 }
 
-// Calls C.free on any C memory owned by this internalBuffer
+// Calls freeMem on any C memory owned by this internalBuffer
 func (ibuft *internalBufferT) Free() {
 	printEntry("internalBufferT.Free()")
 	if nil == ibuft {
@@ -157,9 +157,9 @@ func (ibuft *internalBufferT) Free() {
 	if nil != cbuftptr {
 		// ydb_buffer_t block exists - free its buffer first if it exists
 		if nil != cbuftptr.buf_addr {
-			C.free(unsafe.Pointer(cbuftptr.buf_addr))
+			freeMem(unsafe.Pointer(cbuftptr.buf_addr), C.size_t(cbuftptr.len_alloc))
 		}
-		C.free(unsafe.Pointer(cbuftptr))
+		freeMem(unsafe.Pointer(cbuftptr), C.sizeof_ydb_buffer_t)
 		// The below keeps ibuft around long enough to get rid of this block's memory. No KeepAlive() necessary.
 		ibuft.cbuft = nil
 	}

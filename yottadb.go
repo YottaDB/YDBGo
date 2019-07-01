@@ -35,7 +35,11 @@ const MinimumYDBReleaseMinor int = 26
 // MinimumYDBRelease - (string) Minimum YottaDB release name required by this wrapper
 const MinimumYDBRelease string = "r1.26"
 
-const debugFlag bool = false
+const dbgPrintEPHdrs bool = false    // Print entry point headers when routine is entered
+const dbgInitMalloc bool = false     // Initialize C malloc'd storage (already initialized to zeroes)
+const dbgInitMallocChar C.int = 0xff // Single byte value that malloc'd storage is set to
+const dbgInitFree bool = false       // (Re)Initialize C malloc code on free to prevent use after free
+const dbgInitFreeChar C.int = 0xfe   // Char to initialize released memory to
 
 var easyAPIDefaultDataSize uint32 = 256  // Init value - may grow - Base allocation for returned data values
 var easyAPIDefaultSubscrCnt uint32 = 10  // Init value - may grow - Base subscript count allocation for returned subscr list
