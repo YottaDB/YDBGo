@@ -69,6 +69,7 @@ func (imdesc *internalCallMDesc) Free() {
 			cindPtr.rtn_name.address = nil
 		}
 		C.free(unsafe.Pointer(cindPtr))
+		// The below keeps imdesc around long enough to get rid of this block's memory. No KeepAlive() necessary.
 		imdesc.cmdesc = nil
 	}
 }
@@ -106,6 +107,7 @@ func (mdesc *CallMDesc) SetRtnName(rtnname string) {
 	cindPtr.rtn_name.address = C.CString(rtnname) // Allocates new memory we need to release when done (done by finalizer)
 	cindPtr.rtn_name.length = C.ulong(rtnnamelen)
 	cindPtr.handle = nil
+	runtime.KeepAlive(mdesc)
 }
 
 // CallMDescT allows calls to M with string arguments and an optional string return value if the called function returns one
@@ -207,6 +209,10 @@ func (mdesc *CallMDesc) CallMDescT(tptoken uint64, errstr *BufferT, retvallen ui
 	} else {
 		retval = ""
 	}
+	runtime.KeepAlive(mdesc) // Make sure mdesc hangs around through the YDB call
+	runtime.KeepAlive(vplist)
+	runtime.KeepAlive(rtnargs)
+	runtime.KeepAlive(errstr)
 	return retval, nil
 }
 
@@ -251,6 +257,8 @@ func MessageT(tptoken uint64, errstr *BufferT, status int) (string, error) {
 	if nil != err {
 		panic(fmt.Sprintf("YDB: Unexpected error with ValStr(): %s", err))
 	}
+	runtime.KeepAlive(errstr)
+	runtime.KeepAlive(msgval)
 	return *msgptr, err
 }
 

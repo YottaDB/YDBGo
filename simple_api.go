@@ -14,6 +14,7 @@ package yottadb
 
 import (
 	"fmt"
+	"runtime"
 	"strings"
 	"unsafe"
 )
@@ -134,13 +135,8 @@ func LockST(tptoken uint64, errstr *BufferT, timeoutNsec uint64, lockname ...*Ke
 		err := NewError(tptoken, errstr, int(rc))
 		return err
 	}
-	// The purpose of the following "check" is only to make an inexpensive post-call reference to the lockname array and thus
-	// all of the ydb_buffer_t structures anchored within the Keys it contains. The purpose of this reference is to prevent
-	// lockname and its components from being garbage collected and the subsequent embedded C structures we are STILL using
-	// from being freed and reallocated while the lock call is made. The actual check itself should ALWAYS be false so again,
-	// this 'if' statement is just a reference to prevent GCing lockname until this routine is done.
-	if parmIndx < uint32(len(lockname)) {
-		panic("should never happen")
-	}
+	runtime.KeepAlive(lockname) // Make sure these structures hangs around through the YDB call
+	runtime.KeepAlive(errstr)
+	runtime.KeepAlive(vplist)
 	return nil
 }

@@ -68,8 +68,10 @@ func (vplist *variadicPlist) callVariadicPlistFunc(vpfunc unsafe.Pointer) int {
 	if nil == vplist {
 		panic("*variadicPlist receiver of callVariadicPlistFunc() cannot be nil")
 	}
-	return int(C.ydb_call_variadic_plist_func((C.ydb_vplist_func)(vpfunc),
+	retval := int(C.ydb_call_variadic_plist_func((C.ydb_vplist_func)(vpfunc),
 		(C.uintptr_t)(uintptr(unsafe.Pointer(vplist.cvplist)))))
+	runtime.KeepAlive(vplist)
+	return retval
 }
 
 // free is a variadicPlist method to release the allocated C buffer in this structure.
@@ -105,6 +107,7 @@ func (vplist *variadicPlist) dump(tptoken uint64) {
 		elemu64 := *elemptr
 		fmt.Printf("   Elem %d: %d / 0x%x\n", i, elemu64, elemu64)
 	}
+	runtime.KeepAlive(vplist)
 }
 
 // setUsed is a variadicPlist method to set the number of used elements in the variadic plist array.
@@ -125,7 +128,8 @@ func (vplist *variadicPlist) setUsed(tptoken uint64, errstr *BufferT, newUsed ui
 	if C.MAXVPARMS <= newUsed {
 		panic(fmt.Sprintf("YDB: setUsed item count %d exceeds maximum count of %d", newUsed, C.MAXVPARMS))
 	}
-	(*cvplist).n = C.intptr_t(newUsed)
+	cvplist.n = C.intptr_t(newUsed)
+	runtime.KeepAlive(vplist)
 	return nil
 }
 
@@ -153,6 +157,7 @@ func (vplist *variadicPlist) setVPlistParam(tptoken uint64, errstr *BufferT, par
 	elemptr := (*uintptr)(unsafe.Pointer(uintptr(unsafe.Pointer(&cvplist.arg[0])) +
 		uintptr(paramindx*uint32(unsafe.Sizeof(paramaddr)))))
 	*elemptr = paramaddr
+	runtime.KeepAlive(vplist)
 	return nil
 }
 
@@ -234,5 +239,6 @@ func (vplist *variadicPlist) setVPlistParam64Bit(tptoken uint64, errstr *BufferT
 		}
 	}
 	(*paramindx)++
+	runtime.KeepAlive(vplist)
 	return nil
 }

@@ -15,6 +15,7 @@ package yottadb
 import (
 	"io"
 	"os"
+	"runtime"
 	"unsafe"
 )
 
@@ -126,6 +127,8 @@ func (key *KeyT) DataST(tptoken uint64, errstr *BufferT) (uint32, error) {
 		err := NewError(tptoken, errstr, int(rc))
 		return 0, err
 	}
+	runtime.KeepAlive(key) // Make sure key hangs around through the YDB call
+	runtime.KeepAlive(errstr)
 	return uint32(retval), nil
 }
 
@@ -159,6 +162,8 @@ func (key *KeyT) DeleteST(tptoken uint64, errstr *BufferT, deltype int) error {
 		err := NewError(tptoken, errstr, int(rc))
 		return err
 	}
+	runtime.KeepAlive(key) // Make sure key hangs around through the YDB call
+	runtime.KeepAlive(errstr)
 	return nil
 }
 
@@ -196,7 +201,9 @@ func (key *KeyT) ValST(tptoken uint64, errstr *BufferT, retval *BufferT) error {
 		err := NewError(tptoken, errstr, int(rc))
 		return err
 	}
-	// Returned string should be snug in the retval buffer
+	runtime.KeepAlive(key) // Make sure key hangs around through the YDB call
+	runtime.KeepAlive(retval)
+	runtime.KeepAlive(errstr)
 	return nil
 }
 
@@ -244,7 +251,10 @@ func (key *KeyT) IncrST(tptoken uint64, errstr *BufferT, incr, retval *BufferT) 
 		err := NewError(tptoken, errstr, int(rc))
 		return err
 	}
-	// Returned string should be snug in the retval buffer
+	runtime.KeepAlive(key) // Make sure key hangs around through the YDB call
+	runtime.KeepAlive(retval)
+	runtime.KeepAlive(incr)
+	runtime.KeepAlive(errstr)
 	return nil
 }
 
@@ -276,6 +286,8 @@ func (key *KeyT) LockDecrST(tptoken uint64, errstr *BufferT) error {
 		err := NewError(tptoken, errstr, int(rc))
 		return err
 	}
+	runtime.KeepAlive(key) // Make sure key hangs around through the YDB call
+	runtime.KeepAlive(errstr)
 	return nil
 }
 
@@ -313,6 +325,8 @@ func (key *KeyT) LockIncrST(tptoken uint64, errstr *BufferT, timeoutNsec uint64)
 		err := NewError(tptoken, errstr, int(rc))
 		return err
 	}
+	runtime.KeepAlive(key) // Make sure key hangs around through the YDB call
+	runtime.KeepAlive(errstr)
 	return nil
 }
 
@@ -372,6 +386,9 @@ func (key *KeyT) NodeNextST(tptoken uint64, errstr *BufferT, next *BufferTArray)
 		err := NewError(tptoken, errstr, int(rc))
 		return err
 	}
+	runtime.KeepAlive(key) // Make sure key hangs around through the YDB call
+	runtime.KeepAlive(next)
+	runtime.KeepAlive(errstr)
 	return nil
 }
 
@@ -431,6 +448,9 @@ func (key *KeyT) NodePrevST(tptoken uint64, errstr *BufferT, prev *BufferTArray)
 		err := NewError(tptoken, errstr, int(rc))
 		return err
 	}
+	runtime.KeepAlive(key) // Make sure key hangs around through the YDB call
+	runtime.KeepAlive(prev)
+	runtime.KeepAlive(errstr)
 	return nil
 }
 
@@ -463,6 +483,9 @@ func (key *KeyT) SetValST(tptoken uint64, errstr *BufferT, value *BufferT) error
 		err := NewError(tptoken, errstr, int(rc))
 		return err
 	}
+	runtime.KeepAlive(key) // Make sure key hangs around through the YDB call
+	runtime.KeepAlive(value)
+	runtime.KeepAlive(errstr)
 	return nil
 }
 
@@ -504,6 +527,9 @@ func (key *KeyT) SubNextST(tptoken uint64, errstr *BufferT, retval *BufferT) err
 		err := NewError(tptoken, errstr, int(rc))
 		return err
 	}
+	runtime.KeepAlive(key) // Make sure key hangs around through the YDB call
+	runtime.KeepAlive(retval)
+	runtime.KeepAlive(errstr)
 	return nil
 }
 
@@ -543,5 +569,8 @@ func (key *KeyT) SubPrevST(tptoken uint64, errstr *BufferT, retval *BufferT) err
 		err := NewError(tptoken, errstr, int(rc))
 		return err
 	}
+	runtime.KeepAlive(key) // Make sure key hangs around through the YDB call
+	runtime.KeepAlive(retval)
+	runtime.KeepAlive(errstr)
 	return nil
 }

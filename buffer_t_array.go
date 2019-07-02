@@ -81,6 +81,7 @@ func (buftary *BufferTArray) Alloc(numBufs, nBytes uint32) {
 			o.Free()
 		})
 	}
+	runtime.KeepAlive(buftary)
 }
 
 // Dump is a STAPI method to dump (print) the contents of this BufferTArray block for debugging purposes. It dumps to stdout
@@ -116,6 +117,7 @@ func (buftary *BufferTArray) DumpToWriter(writer io.Writer) {
 			fmt.Fprintf(writer, "  %d: %s\n", i, valstr)
 		}
 	}
+	runtime.KeepAlive(buftary)
 }
 
 // Free is a method to release all allocated C storage in a BufferTArray. It is the inverse of the Alloc() method: release the numSubs buffers
@@ -149,6 +151,7 @@ func (ibuftary *internalBufferTArray) Free() {
 	}
 	// Array buffers are freed, now free the array of ydb_buffer_t structs if it exists
 	C.free(unsafe.Pointer(cbuftary))
+	// The below keeps ibuftary around long enough to get rid of this block's memory. No KeepAlive() necessary.
 	ibuftary.cbuftary = nil
 }
 
@@ -181,6 +184,7 @@ func (buftary *BufferTArray) ElemLenAlloc() uint32 {
 	} else { // Nothing is allocated yet so "allocated length" is 0
 		retlen = 0
 	}
+	runtime.KeepAlive(buftary)
 	return retlen
 }
 
@@ -209,6 +213,7 @@ func (buftary *BufferTArray) ElemLenUsed(tptoken uint64, errstr *BufferT, idx ui
 		return 0, &YDBError{(int)(YDB_ERR_INSUFFSUBS), errmsg}
 	}
 	elemptr := (*C.ydb_buffer_t)(unsafe.Pointer(uintptr(unsafe.Pointer(cbuftary)) + uintptr(C.sizeof_ydb_buffer_t*idx)))
+	runtime.KeepAlive(buftary)
 	return uint32(elemptr.len_used), nil
 }
 
@@ -264,6 +269,7 @@ func (buftary *BufferTArray) ValBAry(tptoken uint64, errstr *BufferT, idx uint32
 	}
 	// The entire buffer is there so return that
 	bary = C.GoBytes(unsafe.Pointer(cbufptr), C.int(lenused))
+	runtime.KeepAlive(buftary)
 	return &bary, nil
 }
 
@@ -307,6 +313,7 @@ func (buftary *BufferTArray) ValStr(tptoken uint64, errstr *BufferT, idx uint32)
 	}
 	// The entire buffer is there so return that
 	str = C.GoStringN(cbufptr, C.int(lenused))
+	runtime.KeepAlive(buftary)
 	return &str, nil
 }
 
@@ -344,7 +351,8 @@ func (buftary *BufferTArray) SetElemLenUsed(tptoken uint64, errstr *BufferT, idx
 		return &YDBError{(int)(YDB_ERR_INVSTRLEN), errmsg}
 	}
 	// Set the new used length
-	(*elemptr).len_used = C.uint(newLen)
+	elemptr.len_used = C.uint(newLen)
+	runtime.KeepAlive(buftary)
 	return nil
 }
 
@@ -410,7 +418,8 @@ func (buftary *BufferTArray) SetValBAry(tptoken uint64, errstr *BufferT, idx uin
 			unsafe.Pointer(&((*value)[0])),
 			C.size_t(vallen))
 	}
-	(*elemptr).len_used = C.uint(vallen) // Set the used length of the buffer for this element
+	elemptr.len_used = C.uint(vallen) // Set the used length of the buffer for this element
+	runtime.KeepAlive(buftary)
 	return nil
 }
 
@@ -464,6 +473,8 @@ func (buftary *BufferTArray) DeleteExclST(tptoken uint64, errstr *BufferT) error
 		err := NewError(tptoken, errstr, int(rc))
 		return err
 	}
+	runtime.KeepAlive(buftary)
+	runtime.KeepAlive(errstr)
 	return nil
 }
 
@@ -517,6 +528,8 @@ func (buftary *BufferTArray) TpST(tptoken uint64, errstr *BufferT, tpfn func(uin
 		err := NewError(tptoken, errstr, int(rc))
 		return err
 	}
+	runtime.KeepAlive(buftary)
+	runtime.KeepAlive(errstr)
 	return nil
 }
 
@@ -531,7 +544,9 @@ func ydbTpStWrapper(tptoken uint64, errstr *C.ydb_buffer_t, tpfnparm unsafe.Poin
 		panic("YDB: Could not find callback routine")
 	}
 	errbuff.BufferTFromPtr((unsafe.Pointer)(errstr))
-	return (v.(func(uint64, *BufferT) int32))(tptoken, &errbuff)
+	retval := (v.(func(uint64, *BufferT) int32))(tptoken, &errbuff)
+	runtime.KeepAlive(errstr)
+	return retval
 }
 
 // getCPtr returns a pointer to the internal C.ydb_buffer_t

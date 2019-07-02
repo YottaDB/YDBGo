@@ -130,6 +130,7 @@ func (buft *BufferT) DumpToWriter(writer io.Writer) {
 		}
 	}
 	fmt.Fprintf(writer, "\n")
+	runtime.KeepAlive(buft) // Make sure buft hangs around through the YDB call
 }
 
 // Free is a method to release both the buffer and ydb_buffer_t block associated with the BufferT block.
@@ -140,7 +141,7 @@ func (buft *BufferT) Free() {
 	if nil == buft {
 		return
 	}
-	if true == buft.ownsBuff {
+	if buft.ownsBuff {
 		buft.cbuft.Free()
 	}
 	buft.cbuft = nil
@@ -159,6 +160,7 @@ func (ibuft *internalBufferT) Free() {
 			C.free(unsafe.Pointer(cbuftptr.buf_addr))
 		}
 		C.free(unsafe.Pointer(cbuftptr))
+		// The below keeps ibuft around long enough to get rid of this block's memory. No KeepAlive() necessary.
 		ibuft.cbuft = nil
 	}
 }
@@ -181,7 +183,9 @@ func (buft *BufferT) LenAlloc(tptoken uint64, errstr *BufferT) (uint32, error) {
 		}
 		return 0, &YDBError{(int)(YDB_ERR_STRUCTNOTALLOCD), errmsg}
 	}
-	return (uint32)(cbuftptr.len_alloc), nil
+	retval := uint32(cbuftptr.len_alloc)
+	runtime.KeepAlive(buft)
+	return retval, nil
 }
 
 // LenUsed is a method to fetch the ydb_buffer_t.len_used field containing the used length of the buffer. Note
@@ -214,6 +218,7 @@ func (buft *BufferT) LenUsed(tptoken uint64, errstr *BufferT) (uint32, error) {
 		}
 		return 0, &YDBError{(int)(YDB_ERR_INVSTRLEN), errmsg}
 	}
+	runtime.KeepAlive(buft)
 	return uint32(lenused), nil
 }
 
@@ -251,6 +256,7 @@ func (buft *BufferT) ValBAry(tptoken uint64, errstr *BufferT) (*[]byte, error) {
 	}
 	// The entire buffer is there so return that.
 	bary = C.GoBytes(unsafe.Pointer(cbufptr), C.int(lenused))
+	runtime.KeepAlive(buft) // Make sure buft hangs around
 	return &bary, nil
 }
 
@@ -288,6 +294,7 @@ func (buft *BufferT) ValStr(tptoken uint64, errstr *BufferT) (*string, error) {
 	}
 	// The entire buffer is there so return that
 	str = C.GoStringN(cbufptr, C.int(lenused))
+	runtime.KeepAlive(buft) // Make sure buft hangs around
 	return &str, nil
 }
 
@@ -325,6 +332,7 @@ func (buft *BufferT) SetLenUsed(tptoken uint64, errstr *BufferT, newLen uint32) 
 		return &YDBError{(int)(YDB_ERR_INVSTRLEN), errmsg}
 	}
 	cbuftptr.len_used = C.uint(newLen)
+	runtime.KeepAlive(buft) // Make sure buft hangs around
 	return nil
 }
 
@@ -363,6 +371,7 @@ func (buft *BufferT) SetValBAry(tptoken uint64, errstr *BufferT, value *[]byte) 
 			C.size_t(vallen))
 	}
 	cbuftptr.len_used = vallen
+	runtime.KeepAlive(buft) // Make sure buft hangs around
 	return nil
 }
 
@@ -433,7 +442,9 @@ func (buft *BufferT) Str2ZwrST(tptoken uint64, errstr *BufferT, zwr *BufferT) er
 		err := NewError(tptoken, errstr, int(rc))
 		return err
 	}
-	// Returned string should be snug in the zwr buffer
+	runtime.KeepAlive(buft)
+	runtime.KeepAlive(errstr)
+	runtime.KeepAlive(zwr)
 	return nil
 }
 
@@ -471,7 +482,9 @@ func (buft *BufferT) Zwr2StrST(tptoken uint64, errstr *BufferT, str *BufferT) er
 		err := NewError(tptoken, errstr, int(rc))
 		return err
 	}
-	// Returned string should be snug in the str buffer
+	runtime.KeepAlive(buft)
+	runtime.KeepAlive(errstr)
+	runtime.KeepAlive(str)
 	return nil
 }
 

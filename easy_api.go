@@ -14,6 +14,7 @@ package yottadb
 
 import (
 	"fmt"
+	"runtime"
 	"strings"
 	"unsafe"
 )
@@ -50,6 +51,8 @@ func DataE(tptoken uint64, errstr *BufferT, varname string, subary []string) (ui
 		err = NewError(tptoken, errstr, int(rc))
 		return 0, err
 	}
+	runtime.KeepAlive(dbkey) // Make sure dbkey stays in tact through the call into YDB
+	runtime.KeepAlive(errstr)
 	return uint32(retval), nil
 }
 
@@ -78,6 +81,8 @@ func DeleteE(tptoken uint64, errstr *BufferT, deltype int, varname string, subar
 		err = NewError(tptoken, errstr, int(rc))
 		return err
 	}
+	runtime.KeepAlive(dbkey) // Make sure dbkey stays in tact through the call into YDB
+	runtime.KeepAlive(errstr)
 	return nil
 }
 
@@ -207,6 +212,8 @@ func IncrE(tptoken uint64, errstr *BufferT, incr, varname string, subary []strin
 		return "", err
 	}
 	retval, err = dbvalue.ValStr(tptoken, errstr)
+	runtime.KeepAlive(dbkey) // Make sure dbkey and incrval stays in tact through the call into YDB
+	runtime.KeepAlive(incrval)
 	return *retval, err
 }
 
@@ -313,6 +320,8 @@ func LockDecrE(tptoken uint64, errstr *BufferT, varname string, subary []string)
 		err = NewError(tptoken, errstr, int(rc))
 		return err
 	}
+	runtime.KeepAlive(dbkey) // Make sure dbkey stays in tact through the call into YDB
+	runtime.KeepAlive(errstr)
 	return nil
 }
 
@@ -345,8 +354,9 @@ func LockIncrE(tptoken uint64, errstr *BufferT, timeoutNsec uint64, varname stri
 		err = NewError(tptoken, errstr, int(rc))
 		return err
 	}
+	runtime.KeepAlive(dbkey) // Make sure dbkey stays in tact through the call into YDB
+	runtime.KeepAlive(errstr)
 	return nil
-
 }
 
 // NodeNextE is a STAPI function to return a string array of the subscripts that describe the next node.
@@ -520,6 +530,9 @@ func SetValE(tptoken uint64, errstr *BufferT, value, varname string, subary []st
 		err := NewError(tptoken, errstr, int(rc))
 		return err
 	}
+	runtime.KeepAlive(dbkey) // Make sure dbkey and dbvalue stays intact through the call into YDB
+	runtime.KeepAlive(dbvalue)
+	runtime.KeepAlive(errstr)
 	return nil
 }
 
