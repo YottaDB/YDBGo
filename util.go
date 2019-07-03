@@ -168,7 +168,7 @@ func (mdesc *CallMDesc) CallMDescT(tptoken uint64, errstr *BufferT, retvallen ui
 	// Parameters can be various types supported by external calls. They are all converted to strings for now as
 	// golang does not have access to the call descriptor that defines argument types.
 	parmcnt := len(rtnargs)
-	parmblkptr := (*C.ydb_string_t)(C.calloc(1, C.size_t(C.sizeof_ydb_string_t * parmcnt)))
+	parmblkptr := (*C.ydb_string_t)(C.calloc(1, C.size_t(C.sizeof_ydb_string_t*parmcnt)))
 	defer C.free(unsafe.Pointer(parmblkptr))
 	parmptr := parmblkptr
 	// Turn each parameter into a ydb_string_t buffer descriptor and load it into our variadic plist

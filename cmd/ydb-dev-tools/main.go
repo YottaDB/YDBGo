@@ -30,18 +30,17 @@ import (
 
 // GlueCodeParameters encapsulates parameters to pass to the GlueCode template
 type GlueCodeParameters struct {
-	PackageName string
+	PackageName  string
 	FunctionName string
 }
 
 // Subcommand provides additional actions on this ydb-dev-tools command
 type Subcommand struct {
-	name string
-	help string
-	flags *flag.FlagSet
+	name   string
+	help   string
+	flags  *flag.FlagSet
 	handle func()
 }
-
 
 // As we add additional commnads, this will have to be broken up into submodules much like
 //  the "go" command does (https://github.com/golang/go/blob/master/src/cmd/go)
@@ -68,11 +67,17 @@ func handleGenerate() {
 	}
 	params := GlueCodeParameters{packageName, routineName}
 	tmpl, err := template.New("output").Parse(fileTemplate)
-	if err != nil { panic(err) }
+	if err != nil {
+		panic(err)
+	}
 	f, err := os.Create(routineName + "_cgo.go")
-	if err != nil {	panic(err) }
+	if err != nil {
+		panic(err)
+	}
 	err = tmpl.Execute(f, params)
-	if err != nil { panic(err) }
+	if err != nil {
+		panic(err)
+	}
 }
 
 // Parses arguments and calls appropriate subcommands; currently, the only subcommand is generate.
@@ -89,14 +94,14 @@ func main() {
 	}
 	myFlags.StringVar(&routineName, "func", "", "the function name we are generating a template for")
 	myFlags.StringVar(&packageName, "pkg", "", "the package name we are generating a template for")
-	
+
 	if 2 >= len(os.Args) {
 		Usage()
 		os.Exit(2)
 	}
 
 	action := os.Args[1]
-	
+
 	val, ok := programFlags[action]
 	if ok {
 		val.handle()

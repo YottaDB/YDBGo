@@ -13,12 +13,12 @@
 package yottadb_test
 
 import (
+	"fmt"
 	"github.com/stretchr/testify/assert"
 	"lang.yottadb.com/go/yottadb"
 	"os"
 	"strings"
 	"testing"
-	"fmt"
 )
 
 // Note we do not test MessageT() here as it gets quite a workout in the other tests that run since it is used in

@@ -37,3 +37,5 @@ cat <<EOF >> error_codes.go
 )
 
 EOF
+
+gofmt -e -w error_codes.go

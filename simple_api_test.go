@@ -17,11 +17,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"lang.yottadb.com/go/yottadb"
 	. "lang.yottadb.com/go/yottadb/internal/test_helpers"
+	"os/exec"
 	"strconv"
 	"strings"
 	"sync"
 	"testing"
-	"os/exec"
 )
 
 func TestSimpleAPILockST(t *testing.T) {

@@ -13,19 +13,19 @@
 package test_helpers
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"lang.yottadb.com/go/yottadb"
 	"os"
 	"os/exec"
+	"regexp"
 	"runtime"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 	"unsafe"
-	"regexp"
-	"bufio"
-	"strings"
 )
 
 // #cgo pkg-config: yottadb
@@ -268,7 +268,7 @@ func SkipARMV7LTests(t *testing.T) {
 
 func SkipMemIntensiveTests(t *testing.T) {
 	// We read this as kB, so convert to MB then GB
-	if GetSystemMemory(t) < (1024*1024) {
+	if GetSystemMemory(t) < (1024 * 1024) {
 		t.Skipf("Machine appears to have less then 1 GB memory, skipping test")
 	}
 }
