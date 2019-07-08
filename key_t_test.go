@@ -533,18 +533,21 @@ func TestKeyTGetValueThatWontFitInBuffer(t *testing.T) {
 	assert.NotNil(t, err)
 	errcode = yottadb.ErrorCode(err)
 	assert.Equal(t, yottadb.YDB_ERR_INVSTRLEN, errcode)
+	assert.Equal(t, "%YDB-E-INVSTRLEN, Invalid string length 11: max 10", err.Error())
 
 	// Verify that getting val on the buffer results in error
 	_, err = buff.ValBAry(tptoken, nil)
 	assert.NotNil(t, err)
 	errcode = yottadb.ErrorCode(err)
 	assert.Equal(t, yottadb.YDB_ERR_INVSTRLEN, errcode)
+	assert.Equal(t, "%YDB-E-INVSTRLEN, Invalid string length 11: max 10", err.Error())
 
 	// Verify that getting len on the buffer results in error
 	_, err = buff.ValStr(tptoken, nil)
 	assert.NotNil(t, err)
 	errcode = yottadb.ErrorCode(err)
 	assert.Equal(t, yottadb.YDB_ERR_INVSTRLEN, errcode)
+	assert.Equal(t, "%YDB-E-INVSTRLEN, Invalid string length 11: max 10", err.Error())
 }
 
 func TestKeyTNodeNextWithSmallBufAry(t *testing.T) {
@@ -583,18 +586,21 @@ func TestKeyTNodeNextWithSmallBufAry(t *testing.T) {
 	assert.NotNil(t, err)
 	errcode = yottadb.ErrorCode(err)
 	assert.Equal(t, yottadb.YDB_ERR_INVSTRLEN, errcode)
+	assert.Equal(t, "%YDB-E-INVSTRLEN, Invalid string length 12: max 5", err.Error())
 	buftary.SetElemUsed(tptoken, nil, 1)
 
 	_, err = buftary.ValBAry(tptoken, nil, 0)
 	assert.NotNil(t, err)
 	errcode = yottadb.ErrorCode(err)
 	assert.Equal(t, yottadb.YDB_ERR_INVSTRLEN, errcode)
+	assert.Equal(t, "%YDB-E-INVSTRLEN, Invalid string length 12: max 5", err.Error())
 	buftary.SetElemUsed(tptoken, nil, 1)
 
 	err = buftary.SetValStrLit(tptoken, nil, 0, "Hello world")
 	assert.NotNil(t, err)
 	errcode = yottadb.ErrorCode(err)
 	assert.Equal(t, yottadb.YDB_ERR_INVSTRLEN, errcode)
+	assert.Equal(t, "%YDB-E-INVSTRLEN, Invalid string length 11: max 5", err.Error())
 	buftary.SetElemUsed(tptoken, nil, 1)
 }
 

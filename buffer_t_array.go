@@ -73,9 +73,9 @@ func (buftary *BufferTArray) Alloc(numBufs, nBytes uint32) {
 		for i = 0; numBufs > i; i++ {
 			elemptr := (*C.ydb_buffer_t)(unsafe.Pointer(uintptr(unsafe.Pointer(cbuftary)) +
 				uintptr(C.sizeof_ydb_buffer_t*i)))
-			(*elemptr).buf_addr = (*C.char)(allocMem(C.size_t(nBytes)))
-			(*elemptr).len_alloc = C.uint(nBytes)
-			(*elemptr).len_used = 0
+			elemptr.buf_addr = (*C.char)(allocMem(C.size_t(nBytes)))
+			elemptr.len_alloc = C.uint(nBytes)
+			elemptr.len_used = 0
 		}
 		runtime.SetFinalizer(buftary.cbuftary, func(o *internalBufferTArray) {
 			o.Free()
@@ -151,7 +151,7 @@ func (ibuftary *internalBufferTArray) Free() {
 	}
 	// Array buffers are freed, now free the array of ydb_buffer_t structs if it exists
 	freeMem(unsafe.Pointer(cbuftary), C.size_t(C.sizeof_ydb_buffer_t*ibuftary.elemAlloc))
-	// The below keeps ibuftary around long enough to get rid of this block's memory. No KeepAlive() necessary.
+	// The below keeps ibuftary around long enough to get rid of this block's C memory. No KeepAlive() necessary.
 	ibuftary.cbuftary = nil
 }
 
@@ -256,15 +256,12 @@ func (buftary *BufferTArray) ValBAry(tptoken uint64, errstr *BufferT, idx uint32
 		return nil, &YDBError{(int)(YDB_ERR_STRUCTNOTALLOCD), errmsg}
 	}
 	elemptr := (*C.ydb_buffer_t)(unsafe.Pointer(uintptr(unsafe.Pointer(cbuftary)) + uintptr(C.sizeof_ydb_buffer_t*idx)))
-	lenalloc := (*elemptr).len_alloc
-	lenused := (*elemptr).len_used
-	cbufptr := (*elemptr).buf_addr
+	lenalloc := elemptr.len_alloc
+	lenused := elemptr.len_used
+	cbufptr := elemptr.buf_addr
 	if lenused > lenalloc { // INVSTRLEN from last operation return what we can and give error
 		bary = C.GoBytes(unsafe.Pointer(cbufptr), C.int(lenalloc)) // Return what we can (alloc size)
-		errmsg, err := MessageT(tptoken, errstr, (int)(YDB_ERR_INVSTRLEN))
-		if nil != err {
-			panic(fmt.Sprintf("YDB: Error fetching INVSTRLEN: %s", err))
-		}
+		errmsg := formatINVSTRLEN(tptoken, errstr, lenalloc, lenused)
 		return &bary, &YDBError{(int)(YDB_ERR_INVSTRLEN), errmsg}
 	}
 	// The entire buffer is there so return that
@@ -300,15 +297,12 @@ func (buftary *BufferTArray) ValStr(tptoken uint64, errstr *BufferT, idx uint32)
 		return nil, &YDBError{(int)(YDB_ERR_STRUCTNOTALLOCD), errmsg}
 	}
 	elemptr := (*C.ydb_buffer_t)(unsafe.Pointer(uintptr(unsafe.Pointer(cbuftary)) + uintptr(C.sizeof_ydb_buffer_t*idx)))
-	lenalloc := (*elemptr).len_alloc
-	lenused := (*elemptr).len_used
-	cbufptr := (*elemptr).buf_addr
+	lenalloc := elemptr.len_alloc
+	lenused := elemptr.len_used
+	cbufptr := elemptr.buf_addr
 	if lenused > lenalloc { // INVSTRLEN from last operation return what we can and give error
 		str = C.GoStringN(cbufptr, C.int(lenalloc)) // Return what we can (alloc size)
-		errmsg, err := MessageT(tptoken, errstr, (int)(YDB_ERR_INVSTRLEN))
-		if nil != err {
-			panic(fmt.Sprintf("YDB: Error fetching INVSTRLEN: %s", err))
-		}
+		errmsg := formatINVSTRLEN(tptoken, errstr, lenalloc, lenused)
 		return &str, &YDBError{(int)(YDB_ERR_INVSTRLEN), errmsg}
 	}
 	// The entire buffer is there so return that
@@ -342,12 +336,9 @@ func (buftary *BufferTArray) SetElemLenUsed(tptoken uint64, errstr *BufferT, idx
 		return &YDBError{(int)(YDB_ERR_STRUCTNOTALLOCD), errmsg}
 	}
 	elemptr := (*C.ydb_buffer_t)(unsafe.Pointer(uintptr(unsafe.Pointer(cbuftary)) + uintptr(C.sizeof_ydb_buffer_t*idx)))
-	lenalloc := (*elemptr).len_alloc
+	lenalloc := elemptr.len_alloc
 	if newLen > uint32(lenalloc) { // INVSTRLEN from last operation - return what we can and give error
-		errmsg, err := MessageT(tptoken, errstr, (int)(YDB_ERR_INVSTRLEN))
-		if nil != err {
-			panic(fmt.Sprintf("YDB: Error fetching INVSTRLEN: %s", err))
-		}
+		errmsg := formatINVSTRLEN(tptoken, errstr, lenalloc, C.uint(newLen))
 		return &YDBError{(int)(YDB_ERR_INVSTRLEN), errmsg}
 	}
 	// Set the new used length
@@ -403,18 +394,15 @@ func (buftary *BufferTArray) SetValBAry(tptoken uint64, errstr *BufferT, idx uin
 		return &YDBError{(int)(YDB_ERR_STRUCTNOTALLOCD), errmsg}
 	}
 	elemptr := (*C.ydb_buffer_t)(unsafe.Pointer(uintptr(unsafe.Pointer(cbuftary)) + uintptr(C.sizeof_ydb_buffer_t*idx)))
-	lenalloc := uint32((*elemptr).len_alloc)
+	lenalloc := uint32(elemptr.len_alloc)
 	vallen := uint32(len(*value))
 	if vallen > lenalloc { // INVSTRLEN from last operation - return what we can and give error
-		errmsg, err := MessageT(tptoken, errstr, (int)(YDB_ERR_INVSTRLEN))
-		if nil != err {
-			panic(fmt.Sprintf("YDB: Error fetching INVSTRLEN: %s", err))
-		}
+		errmsg := formatINVSTRLEN(tptoken, errstr, C.uint(lenalloc), C.uint(vallen))
 		return &YDBError{(int)(YDB_ERR_INVSTRLEN), errmsg}
 	}
 	// Copy the Golang buffer to the C buffer
 	if 0 < vallen {
-		C.memcpy(unsafe.Pointer((*elemptr).buf_addr),
+		C.memcpy(unsafe.Pointer(elemptr.buf_addr),
 			unsafe.Pointer(&((*value)[0])),
 			C.size_t(vallen))
 	}

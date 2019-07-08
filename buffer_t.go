@@ -160,7 +160,7 @@ func (ibuft *internalBufferT) Free() {
 			freeMem(unsafe.Pointer(cbuftptr.buf_addr), C.size_t(cbuftptr.len_alloc))
 		}
 		freeMem(unsafe.Pointer(cbuftptr), C.sizeof_ydb_buffer_t)
-		// The below keeps ibuft around long enough to get rid of this block's memory. No KeepAlive() necessary.
+		// The below keeps ibuft around long enough to get rid of this block's C memory. No KeepAlive() necessary.
 		ibuft.cbuft = nil
 	}
 }
@@ -212,10 +212,7 @@ func (buft *BufferT) LenUsed(tptoken uint64, errstr *BufferT) (uint32, error) {
 	lenalloc := cbuftptr.len_alloc
 	lenused := cbuftptr.len_used
 	if lenused > lenalloc {
-		errmsg, err := MessageT(tptoken, errstr, (int)(YDB_ERR_INVSTRLEN))
-		if nil != err {
-			panic(fmt.Sprintf("YDB: Error fetching INVSTRLEN: %s", err))
-		}
+		errmsg := formatINVSTRLEN(tptoken, errstr, lenalloc, lenused)
 		return 0, &YDBError{(int)(YDB_ERR_INVSTRLEN), errmsg}
 	}
 	runtime.KeepAlive(buft)
@@ -248,10 +245,7 @@ func (buft *BufferT) ValBAry(tptoken uint64, errstr *BufferT) (*[]byte, error) {
 	cbufptr := cbuftptr.buf_addr
 	if lenused > lenalloc { // INVSTRLEN from last operation - return what we can and give error
 		bary = C.GoBytes(unsafe.Pointer(cbufptr), C.int(lenalloc)) // Return what we can (alloc size)
-		errmsg, err := MessageT(tptoken, errstr, (int)(YDB_ERR_INVSTRLEN))
-		if nil != err {
-			panic(fmt.Sprintf("YDB: Error fetching INVSTRLEN: %s", err))
-		}
+		errmsg := formatINVSTRLEN(tptoken, errstr, lenalloc, lenused)
 		return &bary, &YDBError{(int)(YDB_ERR_INVSTRLEN), errmsg}
 	}
 	// The entire buffer is there so return that.
@@ -286,10 +280,7 @@ func (buft *BufferT) ValStr(tptoken uint64, errstr *BufferT) (*string, error) {
 	cbufptr := cbuftptr.buf_addr
 	if lenused > lenalloc { // INVSTRLEN from last operation - return what we can and give error
 		str = C.GoStringN(cbufptr, C.int(lenalloc)) // Return what we can (alloc size)
-		errmsg, err := MessageT(tptoken, errstr, (int)(YDB_ERR_INVSTRLEN))
-		if nil != err {
-			panic(fmt.Sprintf("YDB: Error fetching INVSTRLEN: %s", err))
-		}
+		errmsg := formatINVSTRLEN(tptoken, errstr, lenalloc, lenused)
 		return &str, &YDBError{(int)(YDB_ERR_INVSTRLEN), errmsg}
 	}
 	// The entire buffer is there so return that
@@ -325,10 +316,7 @@ func (buft *BufferT) SetLenUsed(tptoken uint64, errstr *BufferT, newLen uint32) 
 	}
 	lenalloc := cbuftptr.len_alloc
 	if newLen > uint32(lenalloc) {
-		errmsg, err := MessageT(tptoken, errstr, (int)(YDB_ERR_INVSTRLEN))
-		if nil != err {
-			panic(fmt.Sprintf("YDB: Error fetching INVSTRLEN: %s", err))
-		}
+		errmsg := formatINVSTRLEN(tptoken, errstr, lenalloc, C.uint(newLen))
 		return &YDBError{(int)(YDB_ERR_INVSTRLEN), errmsg}
 	}
 	cbuftptr.len_used = C.uint(newLen)
@@ -357,11 +345,9 @@ func (buft *BufferT) SetValBAry(tptoken uint64, errstr *BufferT, value *[]byte) 
 		return &YDBError{(int)(YDB_ERR_STRUCTNOTALLOCD), errmsg}
 	}
 	vallen := C.uint(len(*value))
-	if vallen > cbuftptr.len_alloc {
-		errmsg, err := MessageT(tptoken, errstr, (int)(YDB_ERR_INVSTRLEN))
-		if nil != err {
-			panic(fmt.Sprintf("YDB: Error fetching INVSTRLEN: %s", err))
-		}
+	lenalloc := cbuftptr.len_alloc
+	if vallen > lenalloc {
+		errmsg := formatINVSTRLEN(tptoken, errstr, lenalloc, vallen)
 		return &YDBError{(int)(YDB_ERR_INVSTRLEN), errmsg}
 	}
 	// Copy the Golang buffer to the C buffer
