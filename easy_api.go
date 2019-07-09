@@ -36,16 +36,16 @@ func DataE(tptoken uint64, errstr *BufferT, varname string, subary []string) (ui
 	var retval C.uint
 	var dbkey KeyT
 	var err error
+	var cbuft *C.ydb_buffer_t
 
 	printEntry("DataE()")
 	defer dbkey.Free()
-	initkey(tptoken, errstr, &dbkey, &varname, &subary)
-	vargobuft := dbkey.Varnm.getCPtr()
-	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(dbkey.Subary.getCPtr()))
-	var cbuft *C.ydb_buffer_t
-	if errstr != nil {
+	initkey(tptoken, errstr, &dbkey, varname, subary)
+	if nil != errstr {
 		cbuft = errstr.getCPtr()
 	}
+	vargobuft := dbkey.Varnm.getCPtr()
+	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(dbkey.Subary.getCPtr()))
 	rc := C.ydb_data_st(C.uint64_t(tptoken), cbuft, vargobuft, C.int(dbkey.Subary.ElemUsed()), subbuftary, &retval)
 	if YDB_OK != rc {
 		err = NewError(tptoken, errstr, int(rc))
@@ -65,16 +65,16 @@ func DataE(tptoken uint64, errstr *BufferT, varname string, subary []string) (ui
 func DeleteE(tptoken uint64, errstr *BufferT, deltype int, varname string, subary []string) error {
 	var dbkey KeyT
 	var err error
+	var cbuft *C.ydb_buffer_t
 
 	printEntry("DeleteE()")
 	defer dbkey.Free()
-	initkey(tptoken, errstr, &dbkey, &varname, &subary)
-	vargobuft := dbkey.Varnm.getCPtr()
-	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(dbkey.Subary.getCPtr()))
-	var cbuft *C.ydb_buffer_t
-	if errstr != nil {
+	initkey(tptoken, errstr, &dbkey, varname, subary)
+	if nil != errstr {
 		cbuft = errstr.getCPtr()
 	}
+	vargobuft := dbkey.Varnm.getCPtr()
+	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(dbkey.Subary.getCPtr()))
 	rc := C.ydb_delete_st(C.uint64_t(tptoken), cbuft, vargobuft, C.int(dbkey.Subary.ElemUsed()), subbuftary,
 		C.int(deltype))
 	if YDB_OK != rc {
@@ -116,7 +116,7 @@ func DeleteExclE(tptoken uint64, errstr *BufferT, varnames []string) error {
 	}
 	vnames.Alloc(varnmcnt, maxvarnmlen)
 	for i, varname = range varnames {
-		err = vnames.SetValStr(tptoken, errstr, uint32(i), &varname)
+		err = vnames.SetValStr(tptoken, errstr, uint32(i), varname)
 		if nil != err {
 			panic(fmt.Sprintf("YDB: Unexpected error with SetValStr(): %s", err))
 		}
@@ -140,12 +140,11 @@ func ValE(tptoken uint64, errstr *BufferT, varname string, subary []string) (str
 	var dbkey KeyT
 	var dbvalue BufferT
 	var err error
-	var retval *string
 
 	printEntry("ValE()")
 	defer dbkey.Free()
 	defer dbvalue.Free()
-	initkey(tptoken, errstr, &dbkey, &varname, &subary)
+	initkey(tptoken, errstr, &dbkey, varname, subary)
 	dbvalue.Alloc(easyAPIDefaultDataSize)
 	// Attempt to fetch the value multiple times. We do not know how big the incoming record is
 	// so loop till it fits.
@@ -166,8 +165,11 @@ func ValE(tptoken uint64, errstr *BufferT, varname string, subary []string) (str
 		}
 		break // No error so success and we are done!
 	}
-	retval, err = dbvalue.ValStr(tptoken, errstr)
-	return *retval, err
+	retval, err := dbvalue.ValStr(tptoken, errstr)
+	if nil != err {
+		panic(fmt.Sprintf("YDB: Unexpected error with ValStr(): %s", err))
+	}
+	return retval, nil
 }
 
 // IncrE is a STAPI function to increment the given value by the given amount and return the new value.
@@ -182,16 +184,16 @@ func IncrE(tptoken uint64, errstr *BufferT, incr, varname string, subary []strin
 	var dbkey KeyT
 	var dbvalue, incrval BufferT
 	var err error
-	var retval *string
+	var cbuft *C.ydb_buffer_t
 
 	printEntry("IncrE()")
 	defer dbkey.Free()
 	defer dbvalue.Free()
 	defer incrval.Free()
-	initkey(tptoken, errstr, &dbkey, &varname, &subary)
+	initkey(tptoken, errstr, &dbkey, varname, subary)
 	dbvalue.Alloc(easyAPIDefaultDataSize)
 	incrval.Alloc(uint32(len(incr)))
-	err = incrval.SetValStr(tptoken, errstr, &incr)
+	err = incrval.SetValStr(tptoken, errstr, incr)
 	if nil != err {
 		panic(fmt.Sprintf("YDB: Unexpected error with SetValStr(): %s", err))
 	}
@@ -201,8 +203,7 @@ func IncrE(tptoken uint64, errstr *BufferT, incr, varname string, subary []strin
 	// large enough for any reasonable value being incremented.
 	vargobuft := dbkey.Varnm.getCPtr()
 	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(dbkey.Subary.getCPtr()))
-	var cbuft *C.ydb_buffer_t
-	if errstr != nil {
+	if nil != errstr {
 		cbuft = errstr.getCPtr()
 	}
 	rc := C.ydb_incr_st(C.uint64_t(tptoken), cbuft, vargobuft, C.int(dbkey.Subary.ElemUsed()), subbuftary,
@@ -211,10 +212,13 @@ func IncrE(tptoken uint64, errstr *BufferT, incr, varname string, subary []strin
 		err = NewError(tptoken, errstr, int(rc))
 		return "", err
 	}
-	retval, err = dbvalue.ValStr(tptoken, errstr)
+	retval, err := dbvalue.ValStr(tptoken, errstr)
+	if nil != err {
+		panic(fmt.Sprintf("YDB: Unexpected error with ValStr(): %s", err))
+	}
 	runtime.KeepAlive(dbkey) // Make sure dbkey and incrval stays in tact through the call into YDB
 	runtime.KeepAlive(incrval)
-	return *retval, err
+	return retval, nil
 }
 
 // LockE is a STAPI function whose purpose is to release all locks and then lock the locks designated. The variadic list
@@ -277,13 +281,14 @@ func LockE(tptoken uint64, errstr *BufferT, timeoutNsec uint64, namesnsubs ...in
 			}
 		}
 		newKey.Alloc(uint32(len(newVarname)), uint32(len(newSubs)), uint32(maxsublen))
-		err := newKey.Varnm.SetValStr(tptoken, errstr, &newVarname)
+		defer newKey.Free() // Force release of C storage without waiting for GC
+		err := newKey.Varnm.SetValStr(tptoken, errstr, newVarname)
 		if nil != err {
 			panic(fmt.Sprintf("YDB: Unexpected error with SetValStr(): %s", err))
 		}
 		subcnt := len(newSubs)
 		for j := 0; subcnt > j; j++ {
-			err := newKey.Subary.SetValStr(tptoken, errstr, uint32(j), &newSubs[j])
+			err := newKey.Subary.SetValStr(tptoken, errstr, uint32(j), newSubs[j])
 			if nil != err {
 				panic(fmt.Sprintf("YDB: Unexpected error with SetValStr(): %s", err))
 			}
@@ -305,16 +310,16 @@ func LockE(tptoken uint64, errstr *BufferT, timeoutNsec uint64, namesnsubs ...in
 func LockDecrE(tptoken uint64, errstr *BufferT, varname string, subary []string) error {
 	var dbkey KeyT
 	var err error
+	var cbuft *C.ydb_buffer_t
 
 	printEntry("LockDecrE()")
 	defer dbkey.Free()
-	initkey(tptoken, errstr, &dbkey, &varname, &subary)
-	vargobuft := dbkey.Varnm.getCPtr()
-	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(dbkey.Subary.getCPtr()))
-	var cbuft *C.ydb_buffer_t
-	if errstr != nil {
+	initkey(tptoken, errstr, &dbkey, varname, subary)
+	if nil != errstr {
 		cbuft = errstr.getCPtr()
 	}
+	vargobuft := dbkey.Varnm.getCPtr()
+	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(dbkey.Subary.getCPtr()))
 	rc := C.ydb_lock_decr_st(C.uint64_t(tptoken), cbuft, vargobuft, C.int(dbkey.Subary.ElemUsed()), subbuftary)
 	if YDB_OK != rc {
 		err = NewError(tptoken, errstr, int(rc))
@@ -338,16 +343,16 @@ func LockDecrE(tptoken uint64, errstr *BufferT, varname string, subary []string)
 func LockIncrE(tptoken uint64, errstr *BufferT, timeoutNsec uint64, varname string, subary []string) error {
 	var dbkey KeyT
 	var err error
+	var cbuft *C.ydb_buffer_t
 
 	printEntry("LockIncrE()")
 	defer dbkey.Free()
-	initkey(tptoken, errstr, &dbkey, &varname, &subary)
-	vargobuft := dbkey.Varnm.getCPtr()
-	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(dbkey.Subary.getCPtr()))
-	var cbuft *C.ydb_buffer_t
-	if errstr != nil {
+	initkey(tptoken, errstr, &dbkey, varname, subary)
+	if nil != errstr {
 		cbuft = errstr.getCPtr()
 	}
+	vargobuft := dbkey.Varnm.getCPtr()
+	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(dbkey.Subary.getCPtr()))
 	rc := C.ydb_lock_incr_st(C.uint64_t(tptoken), cbuft, C.ulonglong(timeoutNsec), vargobuft,
 		C.int(dbkey.Subary.ElemUsed()), subbuftary)
 	if YDB_OK != rc {
@@ -372,7 +377,7 @@ func NodeNextE(tptoken uint64, errstr *BufferT, varname string, subary []string)
 	printEntry("NodeNextE()")
 	defer dbkey.Free()
 	defer dbsubs.Free()
-	initkey(tptoken, errstr, &dbkey, &varname, &subary)
+	initkey(tptoken, errstr, &dbkey, varname, subary)
 	dbsubs.Alloc(easyAPIDefaultSubscrCnt, easyAPIDefaultSubscrSize)
 	// Attempt to fetch the next subscript set multiple times. We do not know how big the incoming subscripts are
 	// so loop till they fit.
@@ -411,7 +416,7 @@ func NodeNextE(tptoken uint64, errstr *BufferT, varname string, subary []string)
 		if nil != err {
 			panic(fmt.Sprintf("YDB: Unexpected error with ValStr(): %s", err))
 		}
-		nextsubs[i] = *nextsub
+		nextsubs[i] = nextsub
 	}
 	return nextsubs, nil
 }
@@ -431,7 +436,7 @@ func NodePrevE(tptoken uint64, errstr *BufferT, varname string, subary []string)
 	printEntry("NodePrevE()")
 	defer dbkey.Free()
 	defer dbsubs.Free()
-	initkey(tptoken, errstr, &dbkey, &varname, &subary)
+	initkey(tptoken, errstr, &dbkey, varname, subary)
 	dbsubs.Alloc(easyAPIDefaultSubscrCnt, easyAPIDefaultSubscrSize)
 	// Attempt to fetch the next subscript set multiple times. We do not know how big the incoming subscripts are
 	// so loop till they fit.
@@ -470,20 +475,21 @@ func NodePrevE(tptoken uint64, errstr *BufferT, varname string, subary []string)
 		if nil != err {
 			panic(fmt.Sprintf("YDB: Unexpected error with ValStr(): %s", err))
 		}
-		nextsubs[i] = *nextsub
+		nextsubs[i] = nextsub
 	}
 	return nextsubs, nil
 }
 
 // SetValE is a STAPI function to set a value into the given node (varname and subscripts).
 //
-// Matching SetST(), at the referenced local or global variable node, or the intrinsic special variable, SetValE() wraps
+// Matching SetValST(), at the referenced local or global variable node, or the intrinsic special variable, SetValE() wraps
 // ydb_set_st() to set the value specified.
 func SetValE(tptoken uint64, errstr *BufferT, value, varname string, subary []string) error {
 	var dbkey KeyT
 	var dbvalue BufferT
 	var maxsublen, sublen, i uint32
 	var err error
+	var cbuft *C.ydb_buffer_t
 
 	printEntry("SetValE()")
 	defer dbkey.Free()
@@ -498,13 +504,13 @@ func SetValE(tptoken uint64, errstr *BufferT, value, varname string, subary []st
 		}
 	}
 	dbkey.Alloc(uint32(len(varname)), subcnt, maxsublen)
-	dbkey.Varnm.SetValStr(tptoken, errstr, &varname)
+	dbkey.Varnm.SetValStr(tptoken, errstr, varname)
 	if nil != err {
 		panic(fmt.Sprintf("YDB: Unexpected error with SetValStr(): %s", err))
 	}
 	// Load subscripts into KeyT (if any)
 	for i = 0; i < subcnt; i++ {
-		err = dbkey.Subary.SetValStr(tptoken, errstr, i, &subary[i])
+		err = dbkey.Subary.SetValStr(tptoken, errstr, i, subary[i])
 		if nil != err {
 			panic(fmt.Sprintf("YDB: Unexpected error with SetValStr(): %s", err))
 		}
@@ -514,16 +520,15 @@ func SetValE(tptoken uint64, errstr *BufferT, value, varname string, subary []st
 		panic(fmt.Sprintf("YDB: Unexpected error with SetUsed(): %s", err))
 	}
 	dbvalue.Alloc(uint32(len(value)))
-	err = dbvalue.SetValStr(tptoken, errstr, &value)
+	err = dbvalue.SetValStr(tptoken, errstr, value)
 	if nil != err {
 		panic(fmt.Sprintf("YDB: Unexpected error with SetValStr(): %s", err))
 	}
-	vargobuft := dbkey.Varnm.getCPtr()
-	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(dbkey.Subary.getCPtr()))
-	var cbuft *C.ydb_buffer_t
-	if errstr != nil {
+	if nil != errstr {
 		cbuft = errstr.getCPtr()
 	}
+	vargobuft := dbkey.Varnm.getCPtr()
+	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(dbkey.Subary.getCPtr()))
 	rc := C.ydb_set_st(C.uint64_t(tptoken), cbuft, vargobuft, C.int(dbkey.Subary.ElemUsed()), subbuftary,
 		dbvalue.getCPtr())
 	if YDB_OK != rc {
@@ -550,12 +555,11 @@ func SubNextE(tptoken uint64, errstr *BufferT, varname string, subary []string) 
 	var dbkey KeyT
 	var dbsub BufferT
 	var err error
-	var retval *string
 
 	printEntry("SubNextE()")
 	defer dbkey.Free()
 	defer dbsub.Free()
-	initkey(tptoken, errstr, &dbkey, &varname, &subary)
+	initkey(tptoken, errstr, &dbkey, varname, subary)
 	dbsub.Alloc(easyAPIDefaultSubscrSize)
 	// Attempt to fetch the value multiple times. We do not know how big the incoming record is
 	// so loop till it fits.
@@ -576,8 +580,11 @@ func SubNextE(tptoken uint64, errstr *BufferT, varname string, subary []string) 
 		}
 		break // No error so success and we are done!
 	}
-	retval, err = dbsub.ValStr(tptoken, errstr)
-	return *retval, err
+	retval, err := dbsub.ValStr(tptoken, errstr)
+	if nil != err {
+		panic(fmt.Sprintf("YDB: Unexpected error with ValStr(): %s", err))
+	}
+	return retval, nil
 }
 
 // SubPrevE is a STAPI function to return the previous subscript at the current subscript level.
@@ -594,12 +601,11 @@ func SubPrevE(tptoken uint64, errstr *BufferT, varname string, subary []string) 
 	var dbkey KeyT
 	var dbsub BufferT
 	var err error
-	var retval *string
 
 	printEntry("SubPrevE()")
 	defer dbkey.Free()
 	defer dbsub.Free()
-	initkey(tptoken, errstr, &dbkey, &varname, &subary)
+	initkey(tptoken, errstr, &dbkey, varname, subary)
 	dbsub.Alloc(easyAPIDefaultSubscrSize)
 	// Attempt to fetch the value multiple times. We do not know how big the incoming record is
 	// so loop till it fits.
@@ -620,8 +626,11 @@ func SubPrevE(tptoken uint64, errstr *BufferT, varname string, subary []string) 
 		}
 		break // No error so success and we are done!
 	}
-	retval, err = dbsub.ValStr(tptoken, errstr)
-	return *retval, err
+	retval, err := dbsub.ValStr(tptoken, errstr)
+	if nil != err {
+		panic(fmt.Sprintf("YDB: Unexpected error with ValStr(): %s", err))
+	}
+	return retval, nil
 }
 
 // TpE is a Easy API function to drive transactions.
@@ -657,7 +666,7 @@ func TpE(tptoken uint64, errstr *BufferT, tpfn func(uint64, *BufferT) int32, tra
 	}
 	vnames.Alloc(varnmcnt, maxvarnmlen)
 	for i, varname = range varnames {
-		err = vnames.SetValStr(tptoken, errstr, uint32(i), &varname)
+		err = vnames.SetValStr(tptoken, errstr, uint32(i), varname)
 		if nil != err {
 			panic(fmt.Sprintf("YDB: Unexpected error with SetValStr(): %s", err))
 		}

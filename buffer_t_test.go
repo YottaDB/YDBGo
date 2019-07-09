@@ -28,7 +28,7 @@ import (
 // TestStr2ZwrSTAndZwr2StrST tests the Str2ZwrST() and Zwr2StrST() methods
 func TestStr2ZwrSTAndZwr2StrST(t *testing.T) {
 	var ovalue, cvalue, noalloc_value yottadb.BufferT
-	var outstrp *string
+	var outstr string
 	var tptoken uint64 = yottadb.NOTTP
 	var err error
 
@@ -40,26 +40,26 @@ func TestStr2ZwrSTAndZwr2StrST(t *testing.T) {
 	if DebugFlag {
 		fmt.Println("Original string unmodified:  ", origstr)
 	}
-	err = ovalue.SetValStr(tptoken, nil, &origstr)
+	err = ovalue.SetValStr(tptoken, nil, origstr)
 	Assertnoerr(err, t)
 	err = ovalue.Str2ZwrST(tptoken, nil, &cvalue)
 	Assertnoerr(err, t)
-	outstrp, err = cvalue.ValStr(tptoken, nil)
+	outstr, err = cvalue.ValStr(tptoken, nil)
 	Assertnoerr(err, t)
 	if DebugFlag {
-		t.Log("Str2ZwrS modified string:    ", *outstrp)
+		t.Log("Str2ZwrS modified string:    ", outstr)
 	}
 	err = cvalue.Zwr2StrST(tptoken, nil, &ovalue)
 	Assertnoerr(err, t)
-	outstrp, err = ovalue.ValStr(tptoken, nil)
+	outstr, err = ovalue.ValStr(tptoken, nil)
 	Assertnoerr(err, t)
 	if DebugFlag {
-		t.Log("Zwr2StrS re-modified string: ", *outstrp)
+		t.Log("Zwr2StrS re-modified string: ", outstr)
 	}
-	if *outstrp != origstr {
+	if outstr != origstr {
 		t.Log("  Re-modified string should be same as original string but is not")
 		t.Log("  Original string:", origstr)
-		t.Log("  Modified string:", *outstrp)
+		t.Log("  Modified string:", outstr)
 		t.Fail()
 	}
 	// Try calling on a non-allocated value
@@ -146,23 +146,23 @@ func TestAlloc(t *testing.T) {
 	cvalue.Alloc(128)
 
 	origstr := "helloWorld"
-	err = ovalue.SetValStr(tptoken, nil, &origstr)
+	err = ovalue.SetValStr(tptoken, nil, origstr)
 	assert.Nil(t, err)
 
 	// Try allocating again
 	ovalue.Alloc(64)
 
-	err = ovalue.SetValStr(tptoken, nil, &origstr)
+	err = ovalue.SetValStr(tptoken, nil, origstr)
 	assert.Nil(t, err)
 
 	// Try setting a buffer, reallocating to a smaller size
 	ovalue.Alloc(10)
-	err = ovalue.SetValStrLit(tptoken, nil, "Hello")
+	err = ovalue.SetValStr(tptoken, nil, "Hello")
 	assert.Nil(t, err)
 	ovalue.Alloc(3)
 	str, err := ovalue.ValStr(tptoken, nil)
 	assert.Nil(t, err)
-	assert.Equal(t, "", *str)
+	assert.Equal(t, "", str)
 
 	// Alloc BufferT var1; Copy to another BufferT var2; Free copy var2; Alloc new BufferT var1
 	for i := 0; i < 10; i++ {
@@ -171,7 +171,7 @@ func TestAlloc(t *testing.T) {
 		value.Alloc(uint32(i))
 		// Randomly choose to set a string literal value to the allocated buffer
 		if 0 != rand.Intn(2) {
-			err = value.SetValStrLit(tptoken, nil, "Hello")
+			err = value.SetValStr(tptoken, nil, "Hello")
 			if i < 5 {
 				assert.Equal(t, yottadb.ErrorCode(err), yottadb.YDB_ERR_INVSTRLEN)
 			} else {
@@ -196,7 +196,7 @@ func TestLen(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, l, uint32(0))
 
-	err = value.SetValStrLit(yottadb.NOTTP, nil, "Hello")
+	err = value.SetValStr(yottadb.NOTTP, nil, "Hello")
 	assert.Nil(t, err)
 	l, err = value.LenUsed(yottadb.NOTTP, nil)
 	assert.Nil(t, err)
@@ -224,7 +224,7 @@ func TestInvalidAllonLen(t *testing.T) {
 	defer value.Free()
 	value.Alloc(length)
 
-	err := value.SetValStr(yottadb.NOTTP, nil, &global_name)
+	err := value.SetValStr(yottadb.NOTTP, nil, global_name)
 	assert.NotNil(t, err)
 }
 
@@ -235,7 +235,7 @@ func TestValStr(t *testing.T) {
 
 	// Get value before being init'd
 	str, err := value.ValStr(yottadb.NOTTP, nil)
-	assert.Nil(t, str)
+	assert.Equal(t, str, "")
 	assert.NotNil(t, err)
 
 	defer value.Free()
@@ -243,7 +243,7 @@ func TestValStr(t *testing.T) {
 	defer value_store.Free()
 	value_store.Alloc(length - 2)
 
-	err = value.SetValStr(yottadb.NOTTP, nil, &global_name)
+	err = value.SetValStr(yottadb.NOTTP, nil, global_name)
 	assert.Nil(t, err)
 
 	/*str, err = value.ValStr(yottadb.NOTTP)
@@ -261,12 +261,12 @@ func TestValBAry(t *testing.T) {
 	defer value.Free()
 	value.Alloc(64)
 
-	err := value.SetValStr(tp, nil, &str)
+	err := value.SetValStr(tp, nil, str)
 	assert.Nil(t, err)
 
 	bytes, err := value.ValBAry(tp, nil)
 	assert.Nil(t, err)
-	assert.Equal(t, *bytes, []byte(str))
+	assert.Equal(t, bytes, []byte(str))
 
 	// Try to set value on non-alloc'd value
 	err = noalloc_value.SetValBAry(tp, nil, bytes)
@@ -288,7 +288,7 @@ func TestDump(t *testing.T) {
 
 	defer value.Free()
 	value.Alloc(64)
-	value.SetValStrLit(tp, nil, "Hello")
+	value.SetValStr(tp, nil, "Hello")
 	value.DumpToWriter(&buf1)
 	assert.Contains(t, buf1.String(), "Hello")
 	assert.Contains(t, buf1.String(), "64")
@@ -296,7 +296,7 @@ func TestDump(t *testing.T) {
 
 	// Dump from a nil buffer with an INVSTRLEN error
 	value.Alloc(0)
-	err := value.SetValStrLit(tp, nil, "Hello") // this should return an INVSTRLEN error
+	err := value.SetValStr(tp, nil, "Hello") // this should return an INVSTRLEN error
 	assert.Equal(t, yottadb.ErrorCode(err), yottadb.YDB_ERR_INVSTRLEN)
 	value.DumpToWriter(&buf1)
 }
@@ -326,8 +326,8 @@ func TestBufferTNilRecievers(t *testing.T) {
 	test_wrapper(func() { value.ValStr(tp, nil) })
 	test_wrapper(func() { value.SetLenUsed(tp, nil, 1000) })
 	test_wrapper(func() { value.SetValBAry(tp, nil, nil) })
-	test_wrapper(func() { value.SetValStr(tp, nil, nil) })
-	test_wrapper(func() { value.SetValStrLit(tp, nil, "ok") })
+	test_wrapper(func() { value.SetValStr(tp, nil, "") })
+	test_wrapper(func() { value.SetValStr(tp, nil, "ok") })
 	test_wrapper(func() { value.Str2ZwrST(tp, nil, nil) })
 	test_wrapper(func() { value.Zwr2StrST(tp, nil, nil) })
 }
@@ -353,7 +353,7 @@ func TestBufferTFree(t *testing.T) {
 			defer buft.Free()
 			buft.Alloc(allocation_size)
 			tt := buffer[:]
-			err := buft.SetValBAry(yottadb.NOTTP, nil, &tt)
+			err := buft.SetValBAry(yottadb.NOTTP, nil, tt)
 			Assertnoerr(err, t)
 		}()
 		// Trigger a garbage collection
@@ -385,7 +385,7 @@ func TestBufferTFinalizerCleansCAlloc(t *testing.T) {
 			var buft yottadb.BufferT
 			buft.Alloc(allocation_size)
 			tt := buffer[:]
-			err := buft.SetValBAry(yottadb.NOTTP, nil, &tt)
+			err := buft.SetValBAry(yottadb.NOTTP, nil, tt)
 			Assertnoerr(err, t)
 		}()
 		// Trigger a garbage collection
@@ -431,5 +431,5 @@ func TestBufferTInStruct(t *testing.T) {
 	}()
 	val, err := new_buf.ValStr(tptoken, nil)
 	assert.Nil(t, err)
-	assert.Equal(t, *val, "")
+	assert.Equal(t, val, "")
 }

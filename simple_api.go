@@ -26,7 +26,7 @@ import (
 // void *ydb_get_lockst_funcvp(void);
 // void *ydb_get_lockst_funcvp(void)
 // {
-// 	return (void *)&ydb_lock_st;
+//         return (void *)&ydb_lock_st;
 // }
 import "C"
 

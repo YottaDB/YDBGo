@@ -49,27 +49,27 @@ func printEntry(funcName string) {
 }
 
 // initkey is a function to initialize a provided key with the provided varname and subscript array in string form.
-func initkey(tptoken uint64, errstr *BufferT, dbkey *KeyT, varname *string, subary *[]string) {
+func initkey(tptoken uint64, errstr *BufferT, dbkey *KeyT, varname string, subary []string) {
 	var maxsublen, sublen, i uint32
 	var err error
 
-	subcnt := uint32(len(*subary))
+	subcnt := uint32(len(subary))
 	maxsublen = 0
 	for i = 0; i < subcnt; i++ {
 		// Find maximum length of subscript so know how much to allocate
-		sublen = uint32(len((*subary)[i]))
+		sublen = uint32(len(subary[i]))
 		if sublen > maxsublen {
 			maxsublen = sublen
 		}
 	}
-	dbkey.Alloc(uint32(len(*varname)), subcnt, maxsublen)
+	dbkey.Alloc(uint32(len(varname)), subcnt, maxsublen)
 	dbkey.Varnm.SetValStr(tptoken, errstr, varname)
 	if nil != err {
 		panic(fmt.Sprintf("YDB: Unexpected error with SetValStr(): %s", err))
 	}
 	// Load subscripts into KeyT (if any)
 	for i = 0; i < subcnt; i++ {
-		err = dbkey.Subary.SetValStr(tptoken, errstr, i, &((*subary)[i]))
+		err = dbkey.Subary.SetValStr(tptoken, errstr, i, subary[i])
 		if nil != err {
 			panic(fmt.Sprintf("YDB: Unexpected error with SetValStr(): %s", err))
 		}

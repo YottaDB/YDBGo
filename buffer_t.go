@@ -43,13 +43,13 @@ type internalBufferT struct {
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// BufferTFromPtr sets this BufferT internal structure to point to the given buffer.
+// bufferTFromPtr sets this BufferT internal structure to point to the given buffer.
 //
 // Intended for use by functions implementing transaction logic, the method sets cbuft in the BufferT structure to errstr.
 //
 // Note: Modifying errstr, or accessing memory it references may lead to code that behaves unpredictably and is hard to debug. Always
-// "wrap" it using BufferTFromPtr() and use the methods for the BufferT structure.
-func (buft *BufferT) BufferTFromPtr(pointer unsafe.Pointer) {
+// "wrap" it using bufferTFromPtr() and use the methods for the BufferT structure.
+func (buft *BufferT) bufferTFromPtr(pointer unsafe.Pointer) {
 	if nil == buft {
 		panic("YDB: *BufferT receiver of BufferTFromPtr() cannot be nil")
 	}
@@ -165,6 +165,15 @@ func (ibuft *internalBufferT) Free() {
 	}
 }
 
+// getCPtr returns a pointer to the internal ydb_buffer_t
+func (buft *BufferT) getCPtr() *C.ydb_buffer_t {
+	ptr := (*C.ydb_buffer_t)(nil)
+	if nil != buft && nil != buft.cbuft {
+		ptr = buft.cbuft.cbuft
+	}
+	return ptr
+}
+
 // LenAlloc is a method to fetch the ydb_buffer_t.len_alloc field containing the allocated length of the buffer.
 //
 // If the C.ydb_buffer_t structure referenced by cbuft has not yet been allocated, return the STRUCTNOTALLOCD error.
@@ -219,12 +228,12 @@ func (buft *BufferT) LenUsed(tptoken uint64, errstr *BufferT) (uint32, error) {
 	return uint32(lenused), nil
 }
 
-// ValBAry is a method to fetch the buffer contents as a byte array (returned as *[]byte to limit copies made).
+// ValBAry is a method to fetch the buffer contents as a byte array.
 //
 // If the C.ydb_buffer_t structure referenced by cbuft has not yet been allocated, return the STRUCTNOTALLOCD error.
 // If the len_used field of the C.ydb_buffer_t structure is greater than its len_alloc field (owing to a prior
 // INVSTRLEN error), return an INVSTRLEN error. Otherwise, return len_used bytes of the buffer as a byte array.
-func (buft *BufferT) ValBAry(tptoken uint64, errstr *BufferT) (*[]byte, error) {
+func (buft *BufferT) ValBAry(tptoken uint64, errstr *BufferT) ([]byte, error) {
 	var bary []byte
 
 	printEntry("BufferT.ValBAry()")
@@ -246,20 +255,20 @@ func (buft *BufferT) ValBAry(tptoken uint64, errstr *BufferT) (*[]byte, error) {
 	if lenused > lenalloc { // INVSTRLEN from last operation - return what we can and give error
 		bary = C.GoBytes(unsafe.Pointer(cbufptr), C.int(lenalloc)) // Return what we can (alloc size)
 		errmsg := formatINVSTRLEN(tptoken, errstr, lenalloc, lenused)
-		return &bary, &YDBError{(int)(YDB_ERR_INVSTRLEN), errmsg}
+		return bary, &YDBError{(int)(YDB_ERR_INVSTRLEN), errmsg}
 	}
 	// The entire buffer is there so return that.
 	bary = C.GoBytes(unsafe.Pointer(cbufptr), C.int(lenused))
 	runtime.KeepAlive(buft) // Make sure buft hangs around
-	return &bary, nil
+	return bary, nil
 }
 
-// ValStr is a method to fetch the buffer contents as a string (returned as *string to limit copies made).
+// ValStr is a method to fetch the buffer contents as a string.
 //
 // If the C.ydb_buffer_t structure referenced by cbuft has not yet been allocated, return the STRUCTNOTALLOCD error.
 // If the len_used field of the C.ydb_buffer_t structure is greater than its len_alloc field (owing to a prior
 // INVSTRLEN error), return an INVSTRLEN error. Otherwise, return len_used bytes of the buffer as a string.
-func (buft *BufferT) ValStr(tptoken uint64, errstr *BufferT) (*string, error) {
+func (buft *BufferT) ValStr(tptoken uint64, errstr *BufferT) (string, error) {
 	var str string
 
 	printEntry("BufferT.ValStr()")
@@ -273,7 +282,7 @@ func (buft *BufferT) ValStr(tptoken uint64, errstr *BufferT) (*string, error) {
 		if nil != err {
 			panic(fmt.Sprintf("YDB: Error fetching STRUCTNOTALLOCD: %s", err))
 		}
-		return nil, &YDBError{(int)(YDB_ERR_STRUCTNOTALLOCD), errmsg}
+		return "", &YDBError{(int)(YDB_ERR_STRUCTNOTALLOCD), errmsg}
 	}
 	lenalloc := cbuftptr.len_alloc
 	lenused := cbuftptr.len_used
@@ -281,12 +290,12 @@ func (buft *BufferT) ValStr(tptoken uint64, errstr *BufferT) (*string, error) {
 	if lenused > lenalloc { // INVSTRLEN from last operation - return what we can and give error
 		str = C.GoStringN(cbufptr, C.int(lenalloc)) // Return what we can (alloc size)
 		errmsg := formatINVSTRLEN(tptoken, errstr, lenalloc, lenused)
-		return &str, &YDBError{(int)(YDB_ERR_INVSTRLEN), errmsg}
+		return str, &YDBError{(int)(YDB_ERR_INVSTRLEN), errmsg}
 	}
 	// The entire buffer is there so return that
 	str = C.GoStringN(cbufptr, C.int(lenused))
 	runtime.KeepAlive(buft) // Make sure buft hangs around
-	return &str, nil
+	return str, nil
 }
 
 // SetLenUsed is a method to set the used length of buffer in the ydb_buffer_t block (must be <= alloclen).
@@ -330,7 +339,7 @@ func (buft *BufferT) SetLenUsed(tptoken uint64, errstr *BufferT, newLen uint32) 
 // If the length of value is greater than the len_alloc field of the C.ydb_buffer_t structure referenced by
 // cbuft, make no changes and return INVSTRLEN. Otherwise, copy the bytes of value to the location referenced
 // by the buf_addr field of the C.ydbbuffer_t structure, set the len_used field to the length of value.
-func (buft *BufferT) SetValBAry(tptoken uint64, errstr *BufferT, value *[]byte) error {
+func (buft *BufferT) SetValBAry(tptoken uint64, errstr *BufferT, value []byte) error {
 	printEntry("BufferT.SetValBAry()")
 	if nil == buft {
 		panic("YDB: *BufferT receiver of SetValBAry() cannot be nil")
@@ -344,7 +353,7 @@ func (buft *BufferT) SetValBAry(tptoken uint64, errstr *BufferT, value *[]byte) 
 		}
 		return &YDBError{(int)(YDB_ERR_STRUCTNOTALLOCD), errmsg}
 	}
-	vallen := C.uint(len(*value))
+	vallen := C.uint(len(value))
 	lenalloc := cbuftptr.len_alloc
 	if vallen > lenalloc {
 		errmsg := formatINVSTRLEN(tptoken, errstr, lenalloc, vallen)
@@ -352,9 +361,7 @@ func (buft *BufferT) SetValBAry(tptoken uint64, errstr *BufferT, value *[]byte) 
 	}
 	// Copy the Golang buffer to the C buffer
 	if 0 < vallen {
-		C.memcpy(unsafe.Pointer(cbuftptr.buf_addr),
-			unsafe.Pointer(&((*value)[0])),
-			C.size_t(vallen))
+		C.memcpy(unsafe.Pointer(cbuftptr.buf_addr), unsafe.Pointer(&value[0]), C.size_t(vallen))
 	}
 	cbuftptr.len_used = vallen
 	runtime.KeepAlive(buft) // Make sure buft hangs around
@@ -367,28 +374,13 @@ func (buft *BufferT) SetValBAry(tptoken uint64, errstr *BufferT, value *[]byte) 
 // If the length of value is greater than the len_alloc field of the C.ydb_buffer_t structure referenced by
 // cbuft, make no changes and return INVSTRLEN. Otherwise, copy the bytes of value to the location referenced
 // by the buf_addr field of the C.ydbbuffer_t structure, set the len_used field to the length of value.
-func (buft *BufferT) SetValStr(tptoken uint64, errstr *BufferT, value *string) error {
+func (buft *BufferT) SetValStr(tptoken uint64, errstr *BufferT, value string) error {
 	printEntry("BufferT.SetValStr()")
 	if nil == buft {
 		panic("YDB: *BufferT receiver of SetValStr() cannot be nil")
 	}
-	valuebary := []byte(*value)
-	return buft.SetValBAry(tptoken, errstr, &valuebary)
-}
-
-// SetValStrLit is a method to set a literal string into the given buffer.
-//
-// If the C.ydb_buffer_t structure referenced by cbuft has not yet been allocated, return the STRUCTNOTALLOCD error.
-// If the length of value is greater than the len_alloc field of the C.ydb_buffer_t structure referenced by
-// cbuft, make no changes and return INVSTRLEN. Otherwise, copy the bytes of value to the location referenced
-// by the buf_addr field of the C.ydbbuffer_t structure, set the len_used field to the length of value.
-func (buft *BufferT) SetValStrLit(tptoken uint64, errstr *BufferT, value string) error {
-	printEntry("BufferT.SetValStrLit()")
-	if nil == buft {
-		panic("YDB: *BufferT receiver of SetValStrLit() cannot be nil")
-	}
 	valuebary := []byte(value)
-	return buft.SetValBAry(tptoken, errstr, &valuebary)
+	return buft.SetValBAry(tptoken, errstr, valuebary)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -404,6 +396,8 @@ func (buft *BufferT) SetValStrLit(tptoken uint64, errstr *BufferT, value string)
 // len_used will be greater than len_alloc until corrected by application code. Otherwise, set the buffer referenced by buf_addr
 // to the zwrite format string, and set len_used to the length.
 func (buft *BufferT) Str2ZwrST(tptoken uint64, errstr *BufferT, zwr *BufferT) error {
+	var cbuft *C.ydb_buffer_t
+
 	printEntry("BufferT.Str2ZwrST()")
 	if nil == buft {
 		panic("YDB: *BufferT receiver of Str2ZwrST() cannot be nil")
@@ -419,8 +413,7 @@ func (buft *BufferT) Str2ZwrST(tptoken uint64, errstr *BufferT, zwr *BufferT) er
 		}
 		return &YDBError{(int)(YDB_ERR_STRUCTNOTALLOCD), errmsg}
 	}
-	var cbuft *C.ydb_buffer_t
-	if errstr != nil {
+	if nil != errstr {
 		cbuft = errstr.getCPtr()
 	}
 	rc := C.ydb_str2zwr_st(C.uint64_t(tptoken), cbuft, buft.getCPtr(), zwr.getCPtr())
@@ -444,6 +437,8 @@ func (buft *BufferT) Str2ZwrST(tptoken uint64, errstr *BufferT, zwr *BufferT) er
 //
 // Note that the length of a string in zwrite format is always greater than or equal to the string in its original, unencoded format.
 func (buft *BufferT) Zwr2StrST(tptoken uint64, errstr *BufferT, str *BufferT) error {
+	var cbuft *C.ydb_buffer_t
+
 	printEntry("BufferT.Zwr2StrST()")
 	if nil == buft {
 		panic("YDB: *BufferT receiver of Zwr2StrST() cannot be nil")
@@ -459,8 +454,7 @@ func (buft *BufferT) Zwr2StrST(tptoken uint64, errstr *BufferT, str *BufferT) er
 		}
 		return &YDBError{(int)(YDB_ERR_STRUCTNOTALLOCD), errmsg}
 	}
-	var cbuft *C.ydb_buffer_t
-	if errstr != nil {
+	if nil != errstr {
 		cbuft = errstr.getCPtr()
 	}
 	rc := C.ydb_zwr2str_st(C.uint64_t(tptoken), cbuft, buft.getCPtr(), str.getCPtr())
@@ -472,13 +466,4 @@ func (buft *BufferT) Zwr2StrST(tptoken uint64, errstr *BufferT, str *BufferT) er
 	runtime.KeepAlive(errstr)
 	runtime.KeepAlive(str)
 	return nil
-}
-
-// getCPtr returns a pointer to the internal ydb_buffer_t
-func (buft *BufferT) getCPtr() *C.ydb_buffer_t {
-	ptr := (*C.ydb_buffer_t)(nil)
-	if nil != buft && nil != buft.cbuft {
-		ptr = buft.cbuft.cbuft
-	}
-	return ptr
 }

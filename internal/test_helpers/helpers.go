@@ -63,7 +63,7 @@ func Dbdeleteall(tptoken uint64, errstr *yottadb.BufferT, errors *int, t *testin
 
 	defer dbkey.Free()
 	dbkey.Alloc(VarSiz, AryDim, SubSiz)
-	err := dbkey.Varnm.SetValStrLit(tptoken, nil, "^%") // Start with first possible key
+	err := dbkey.Varnm.SetValStr(tptoken, nil, "^%") // Start with first possible key
 	Assertnoerr(err, t)
 	for {
 		err = dbkey.SubNextST(tptoken, nil, dbkey.Varnm) // Find the 'next' global name
@@ -118,9 +118,9 @@ func Buftary2strary(tptoken uint64, errstr *yottadb.BufferT, buftary *yottadb.Bu
 	arraylen := int(buftary.ElemUsed())
 	retval := make([]string, arraylen)
 	for i := 0; arraylen > i; i++ {
-		subval, err := (*buftary).ValStr(tptoken, nil, uint32(i))
+		subval, err := buftary.ValStr(tptoken, nil, uint32(i))
 		Assertnoerr(err, t)
-		retval[i] = *subval
+		retval[i] = subval
 	}
 	return &retval, nil
 }
@@ -166,29 +166,29 @@ func TestTpRtn(tptoken uint64, errstr unsafe.Pointer, tpfnparm unsafe.Pointer) i
 	}
 	dbkey.Alloc(VarSiz, AryDim, SubSiz)
 	dbval.Alloc(ValSiz)
-	err = dbkey.Varnm.SetValStrLit(tptoken, nil, "^Variable1A")
+	err = dbkey.Varnm.SetValStr(tptoken, nil, "^Variable1A")
 	Assertnoerr(err, nil)
-	err = dbkey.Subary.SetValStrLit(tptoken, nil, 0, "Index0")
+	err = dbkey.Subary.SetValStr(tptoken, nil, 0, "Index0")
 	Assertnoerr(err, nil)
-	err = dbkey.Subary.SetValStrLit(tptoken, nil, 1, "Index1")
+	err = dbkey.Subary.SetValStr(tptoken, nil, 1, "Index1")
 	Assertnoerr(err, nil)
-	err = dbkey.Subary.SetValStrLit(tptoken, nil, 2, "Index2")
+	err = dbkey.Subary.SetValStr(tptoken, nil, 2, "Index2")
 	Assertnoerr(err, nil)
 	err = dbkey.Subary.SetElemUsed(tptoken, nil, 3)
 	Assertnoerr(err, nil)
-	err = dbval.SetValStrLit(tptoken, nil, "The value of Variable1A")
+	err = dbval.SetValStr(tptoken, nil, "The value of Variable1A")
 	Assertnoerr(err, nil)
 	err = dbkey.SetValST(tptoken, nil, &dbval)
 	if nil != err {
 		fmt.Println("First SetS error: ", err)
 	}
-	err = dbkey.Varnm.SetValStrLit(tptoken, nil, "^Variable2B")
+	err = dbkey.Varnm.SetValStr(tptoken, nil, "^Variable2B")
 	Assertnoerr(err, nil)
-	err = dbkey.Subary.SetValStrLit(tptoken, nil, 0, "Idx0")
+	err = dbkey.Subary.SetValStr(tptoken, nil, 0, "Idx0")
 	Assertnoerr(err, nil)
-	err = dbkey.Subary.SetValStrLit(tptoken, nil, 1, "Idx1")
+	err = dbkey.Subary.SetValStr(tptoken, nil, 1, "Idx1")
 	Assertnoerr(err, nil)
-	err = dbval.SetValStrLit(tptoken, nil, "The value of Variable2B")
+	err = dbval.SetValStr(tptoken, nil, "The value of Variable2B")
 	Assertnoerr(err, nil)
 	err = dbkey.Subary.SetElemUsed(tptoken, nil, 2)
 	Assertnoerr(err, nil)

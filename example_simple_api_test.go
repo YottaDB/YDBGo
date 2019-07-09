@@ -29,7 +29,6 @@ func Example_simpleAPI() {
 	var key1 yottadb.KeyT
 	var buff1, cur_sub yottadb.BufferT
 	var tptoken uint64
-	var val1 *string
 	var err error
 
 	// The tptoken argument to many functions is either a value passed into the
@@ -38,7 +37,7 @@ func Example_simpleAPI() {
 
 	// Set global node ["^hello", "world"] to "Go World"
 	key1.Alloc(64, 10, 64)
-	err = key1.Varnm.SetValStrLit(tptoken, nil, "^hello")
+	err = key1.Varnm.SetValStr(tptoken, nil, "^hello")
 	if err != nil {
 		panic(err)
 	}
@@ -46,14 +45,14 @@ func Example_simpleAPI() {
 	if err != nil {
 		panic(err)
 	}
-	err = key1.Subary.SetValStrLit(tptoken, nil, 0, "world")
+	err = key1.Subary.SetValStr(tptoken, nil, 0, "world")
 	if err != nil {
 		panic(err)
 	}
 
 	// Create a buffer which is used to specify the value we will be setting the global to
 	buff1.Alloc(64)
-	err = buff1.SetValStrLit(tptoken, nil, "Go world")
+	err = buff1.SetValStr(tptoken, nil, "Go world")
 	if err != nil {
 		panic(err)
 	}
@@ -70,11 +69,11 @@ func Example_simpleAPI() {
 	// For the sake of demonstration, we will first clear the buffer we used to set the
 	// value
 	buff1.Alloc(64)
-	val1, err = buff1.ValStr(tptoken, nil)
+	val1, err := buff1.ValStr(tptoken, nil)
 	if err != nil {
 		panic(err)
 	}
-	if (*val1) != "" {
+	if (val1) != "" {
 		panic("Buffer not empty when it should be!")
 	}
 	err = key1.ValST(tptoken, nil, &buff1)
@@ -82,16 +81,16 @@ func Example_simpleAPI() {
 		panic(err)
 	}
 	val1, err = buff1.ValStr(tptoken, nil)
-	if (*val1) != "Go world" {
+	if (val1) != "Go world" {
 		panic("Value not what was expected; did someone else set something?")
 	}
 
 	// Set a few more nodes so we can iterate through them
-	err = key1.Subary.SetValStrLit(tptoken, nil, 0, "shire")
+	err = key1.Subary.SetValStr(tptoken, nil, 0, "shire")
 	if err != nil {
 		panic(err)
 	}
-	err = buff1.SetValStrLit(tptoken, nil, "Go Middle Earth")
+	err = buff1.SetValStr(tptoken, nil, "Go Middle Earth")
 	if err != nil {
 		panic(err)
 	}
@@ -100,11 +99,11 @@ func Example_simpleAPI() {
 		panic(err)
 	}
 
-	err = key1.Subary.SetValStrLit(tptoken, nil, 0, "Winterfell")
+	err = key1.Subary.SetValStr(tptoken, nil, 0, "Winterfell")
 	if err != nil {
 		panic(err)
 	}
-	err = buff1.SetValStrLit(tptoken, nil, "Go Westeros")
+	err = buff1.SetValStr(tptoken, nil, "Go Westeros")
 	if err != nil {
 		panic(err)
 	}
@@ -118,7 +117,7 @@ func Example_simpleAPI() {
 
 	// Start iterating through the list at the start by setting the last subscript
 	//  to ""; stop when we get the error code meaning end
-	err = key1.Subary.SetValStrLit(tptoken, nil, 0, "")
+	err = key1.Subary.SetValStr(tptoken, nil, 0, "")
 	for true {
 		err = key1.SubNextST(tptoken, nil, &cur_sub)
 		if err != nil {
@@ -133,7 +132,7 @@ func Example_simpleAPI() {
 		if err != nil {
 			panic(err)
 		}
-		fmt.Printf("%s ", (*val1))
+		fmt.Printf("%s ", val1)
 		// Move to that key by setting the next node in the key
 		key1.Subary.SetValStr(tptoken, nil, 0, val1)
 	}

@@ -32,7 +32,7 @@ func Example_transactionProcessing() {
 	// Restore all YDB local buffers on a TP-restart
 	buffertary1.Alloc(1, 32)
 	errstr.Alloc(1024)
-	err = buffertary1.SetValStrLit(tptoken, &errstr, 0, "*")
+	err = buffertary1.SetValStr(tptoken, &errstr, 0, "*")
 	if err != nil {
 		panic(err)
 	}

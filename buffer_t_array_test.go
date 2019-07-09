@@ -40,9 +40,9 @@ func TestBufTAryDeleteExclST(t *testing.T) {
 	err = yottadb.SetValE(tptoken, nil, "I AM A VALUE", "var4", []string{})
 	Assertnoerr(err, t)
 	// Now delete var1 and var3 by exclusively keeping var2 and var 4
-	err = namelst.SetValStrLit(tptoken, nil, 0, "var2")
+	err = namelst.SetValStr(tptoken, nil, 0, "var2")
 	Assertnoerr(err, t)
-	err = namelst.SetValStrLit(tptoken, nil, 1, "var4")
+	err = namelst.SetValStr(tptoken, nil, 1, "var4")
 	Assertnoerr(err, t)
 	err = namelst.SetElemUsed(tptoken, nil, 2)
 	Assertnoerr(err, t)
@@ -77,7 +77,7 @@ func TestBufTAryDump(t *testing.T) {
 
 	defer value.Free()
 	value.Alloc(10, 64)
-	value.SetValStrLit(tp, nil, 0, "Hello")
+	value.SetValStr(tp, nil, 0, "Hello")
 	value.SetElemUsed(tp, nil, 1)
 	value.DumpToWriter(&buf1)
 	// BufferTArray dump does not show any info about included buffers, so no asserts for
@@ -87,7 +87,7 @@ func TestBufTAryDump(t *testing.T) {
 
 	// Dump from a nil BufferTArray with an INVSTRLEN error
 	value.Alloc(1, 0)
-	value.SetValStrLit(tp, nil, 0, "Hello") // this should return an INVSTRLEN error
+	value.SetValStr(tp, nil, 0, "Hello") // this should return an INVSTRLEN error
 	value.DumpToWriter(&buf1)
 }
 
@@ -161,19 +161,19 @@ func TestBufTAryBAry(t *testing.T) {
 
 	// Get a value with some value
 
-	err = value.SetValBAry(tp, nil, 1, &v)
+	err = value.SetValBAry(tp, nil, 1, v)
 	assert.Nil(t, err)
 	r, err = value.ValBAry(tp, nil, 1)
 	assert.Nil(t, err)
-	assert.Equal(t, *r, v)
+	assert.Equal(t, r, v)
 
 	// Try set a value on out of bounds element
-	err = value.SetValBAry(tp, nil, 11, &v)
+	err = value.SetValBAry(tp, nil, 11, v)
 	assert.NotNil(t, err)
 
 	// Try to set a value on a freed structure
 	value.Free()
-	err = value.SetValBAry(tp, nil, 0, &v)
+	err = value.SetValBAry(tp, nil, 0, v)
 	assert.NotNil(t, err)
 	errcode := yottadb.ErrorCode(err)
 	//t.Skipf("We need to figure out what the expected result is")
@@ -222,20 +222,20 @@ func TestBufTAryValStr(t *testing.T) {
 	// Test before Alloc
 	r, err := value.ValStr(tp, nil, 0)
 	assert.NotNil(t, err)
-	assert.Nil(t, r)
+	assert.Equal(t, r, "")
 
 	value.Alloc(10, 50)
 
 	// Test after alloc, before setting value outside of range
 	r, err = value.ValStr(tp, nil, 11)
 	assert.NotNil(t, err)
-	assert.Nil(t, r)
+	assert.Equal(t, r, "")
 
 	// Test after alloc, valid except not defined
 	r, err = value.ValStr(tp, nil, 0)
 	assert.Nil(t, err)
 	assert.NotNil(t, r)
-	assert.Equal(t, *r, "")
+	assert.Equal(t, r, "")
 }
 
 func TestBufTAryElemUsed(t *testing.T) {
@@ -302,8 +302,8 @@ func TestBufferTAryNilRecievers(t *testing.T) {
 	test_wrapper(func() { value.SetElemLenUsed(tp, nil, 0, 10) })
 	test_wrapper(func() { value.SetElemUsed(tp, nil, 32) })
 	test_wrapper(func() { value.SetValBAry(tp, nil, 0, nil) })
-	test_wrapper(func() { value.SetValStr(tp, nil, 0, nil) })
-	test_wrapper(func() { value.SetValStrLit(tp, nil, 0, "ok") })
+	test_wrapper(func() { value.SetValStr(tp, nil, 0, "") })
+	test_wrapper(func() { value.SetValStr(tp, nil, 0, "ok") })
 	test_wrapper(func() { value.DeleteExclST(tp, nil) })
 	test_wrapper(func() { value.TpST(tp, nil, nil, "OK") })
 }
@@ -386,7 +386,7 @@ func TestBufferTArrayFree(t *testing.T) {
 			defer buft.Free()
 			buft.Alloc(1, allocation_size)
 			tt := buffer[:]
-			err := buft.SetValBAry(yottadb.NOTTP, nil, 0, &tt)
+			err := buft.SetValBAry(yottadb.NOTTP, nil, 0, tt)
 			Assertnoerr(err, t)
 		}()
 		// Trigger a garbage collection
@@ -419,7 +419,7 @@ func TestBufferTArrayFinalizerCleansCAlloc(t *testing.T) {
 			var buft yottadb.BufferTArray
 			buft.Alloc(1, allocation_size)
 			tt := buffer[:]
-			err := buft.SetValBAry(yottadb.NOTTP, nil, 0, &tt)
+			err := buft.SetValBAry(yottadb.NOTTP, nil, 0, tt)
 			Assertnoerr(err, t)
 		}()
 		// Trigger a garbage collection

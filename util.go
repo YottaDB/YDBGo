@@ -135,7 +135,7 @@ func (mdesc *CallMDesc) CallMDescT(tptoken uint64, errstr *BufferT, retvallen ui
 	if nil != err {
 		panic(fmt.Sprintf("YDB: Unknown error with varidicPlist64Bit.setVPlistParam(): %s", err))
 	}
-	if errstr != nil {
+	if nil != errstr {
 		cbuft = errstr.getCPtr()
 	}
 	err = vplist.setVPlistParam(tptoken, errstr, parmIndx, uintptr(unsafe.Pointer(cbuft)))
@@ -241,12 +241,12 @@ func CallMT(tptoken uint64, errstr *BufferT, retvallen uint32, rtnname string, r
 // MessageT is a STAPI utility function to return the error message (sans argument substitution) of a given error number.
 func MessageT(tptoken uint64, errstr *BufferT, status int) (string, error) {
 	var msgval BufferT
+	var cbuft *C.ydb_buffer_t
 
 	printEntry("MessageT()")
 	defer msgval.Free()
 	msgval.Alloc(uint32(YDB_MAX_ERRORMSG))
-	var cbuft *C.ydb_buffer_t
-	if errstr != nil {
+	if nil != errstr {
 		cbuft = errstr.getCPtr()
 	}
 	rc := C.ydb_message_t(C.uint64_t(tptoken), cbuft, C.int(status), msgval.getCPtr())
@@ -260,7 +260,7 @@ func MessageT(tptoken uint64, errstr *BufferT, status int) (string, error) {
 	}
 	runtime.KeepAlive(errstr)
 	runtime.KeepAlive(msgval)
-	return *msgptr, err
+	return msgptr, err
 }
 
 // ReleaseT is a STAPI utility function to return release information for this verison of the Golang wrapper plus

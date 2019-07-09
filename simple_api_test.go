@@ -32,9 +32,9 @@ func TestSimpleAPILockST(t *testing.T) {
 	var errors int
 
 	dbkey.Alloc(VarSiz, AryDim, SubSiz) // Reallocate the key
-	err = dbkey.Varnm.SetValStrLit(tptoken, nil, "^Variable1A")
+	err = dbkey.Varnm.SetValStr(tptoken, nil, "^Variable1A")
 	Assertnoerr(err, t)
-	err = dbkey.Subary.SetValStrLit(tptoken, nil, 0, "Index0")
+	err = dbkey.Subary.SetValStr(tptoken, nil, 0, "Index0")
 	Assertnoerr(err, t)
 	err = dbkey.Subary.SetElemUsed(tptoken, nil, 1)
 	Assertnoerr(err, t)
@@ -47,9 +47,9 @@ func TestSimpleAPILockST(t *testing.T) {
 
 func TestSimpleAPILockManyParms(t *testing.T) {
 	var errmsg string
+	var locks [](*yottadb.KeyT)
 
 	maxvparms := 36 // Currently hard coded in simple_api.go as a C decl.
-	var locks [](*yottadb.KeyT)
 
 	locks = make([](*yottadb.KeyT), maxvparms+1)
 

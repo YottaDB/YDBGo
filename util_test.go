@@ -125,8 +125,8 @@ func TestCallMT(t *testing.T) {
 	if -yottadb.YDB_ERR_INVSTRLEN != errCode {
 		panic(fmt.Sprintf("CallMT() returned wrong ErrorCode. Got: %d; Expected: %d", errCode, yottadb.YDB_ERR_INVSTRLEN))
 	}
-	if *out != cmpstr {
-		panic(fmt.Sprintf("CallMT() returned wrong errstr. Got: %s; Expected: %s", *out, cmpstr))
+	if out != cmpstr {
+		panic(fmt.Sprintf("CallMT() returned wrong errstr. Got: %s; Expected: %s", out, cmpstr))
 	}
 
 }
@@ -166,7 +166,7 @@ func TestCallMDescT(t *testing.T) {
 	if -yottadb.YDB_ERR_INVSTRLEN != errCode {
 		panic(fmt.Sprintf("CallMT() returned wrong ErrorCode. Got: %d; Expected: %d", errCode, yottadb.YDB_ERR_INVSTRLEN))
 	}
-	if *out != cmpstr {
-		panic(fmt.Sprintf("CallMT() returned wrong errstr. Got: %s; Expected: %s", *out, cmpstr))
+	if out != cmpstr {
+		panic(fmt.Sprintf("CallMT() returned wrong errstr. Got: %s; Expected: %s", out, cmpstr))
 	}
 }

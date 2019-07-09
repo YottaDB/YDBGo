@@ -155,6 +155,15 @@ func (ibuftary *internalBufferTArray) Free() {
 	ibuftary.cbuftary = nil
 }
 
+// getCPtr returns a pointer to the internal C.ydb_buffer_t
+func (buftary *BufferTArray) getCPtr() *C.ydb_buffer_t {
+	ptr := (*C.ydb_buffer_t)(nil)
+	if (nil != buftary) && (nil != buftary.cbuftary) {
+		ptr = (*C.ydb_buffer_t)(unsafe.Pointer(buftary.cbuftary.cbuftary))
+	}
+	return ptr
+}
+
 // ElemAlloc is a method to return elemAlloc from a BufferTArray.
 func (buftary *BufferTArray) ElemAlloc() uint32 {
 	printEntry("BufferTArray.ElemAlloc()")
@@ -204,7 +213,7 @@ func (buftary *BufferTArray) ElemLenUsed(tptoken uint64, errstr *BufferT, idx ui
 		return 0, &YDBError{(int)(YDB_ERR_STRUCTNOTALLOCD), errmsg}
 	}
 	elemcnt := buftary.ElemAlloc()
-	if !(idx < elemcnt) {
+	if idx >= elemcnt { // Request for non-existant element
 		// Create an error to return
 		errmsg, err := MessageT(tptoken, errstr, (int)(YDB_ERR_INSUFFSUBS))
 		if nil != err {
@@ -229,8 +238,8 @@ func (buftary *BufferTArray) ElemUsed() uint32 {
 	return buftary.cbuftary.elemUsed
 }
 
-// ValBAry is a method to fetch the buffer of the indicated array element and return it as a byte array pointer.
-func (buftary *BufferTArray) ValBAry(tptoken uint64, errstr *BufferT, idx uint32) (*[]byte, error) {
+// ValBAry is a method to fetch the buffer of the indicated array element and return it as a byte array.
+func (buftary *BufferTArray) ValBAry(tptoken uint64, errstr *BufferT, idx uint32) ([]byte, error) {
 	var bary []byte
 
 	printEntry("BufferTArray.ValBAry()")
@@ -262,16 +271,16 @@ func (buftary *BufferTArray) ValBAry(tptoken uint64, errstr *BufferT, idx uint32
 	if lenused > lenalloc { // INVSTRLEN from last operation return what we can and give error
 		bary = C.GoBytes(unsafe.Pointer(cbufptr), C.int(lenalloc)) // Return what we can (alloc size)
 		errmsg := formatINVSTRLEN(tptoken, errstr, lenalloc, lenused)
-		return &bary, &YDBError{(int)(YDB_ERR_INVSTRLEN), errmsg}
+		return bary, &YDBError{(int)(YDB_ERR_INVSTRLEN), errmsg}
 	}
 	// The entire buffer is there so return that
 	bary = C.GoBytes(unsafe.Pointer(cbufptr), C.int(lenused))
 	runtime.KeepAlive(buftary)
-	return &bary, nil
+	return bary, nil
 }
 
-// ValStr is a method to fetch the buffer of the indicated array element and return it as a string pointer.
-func (buftary *BufferTArray) ValStr(tptoken uint64, errstr *BufferT, idx uint32) (*string, error) {
+// ValStr is a method to fetch the buffer of the indicated array element and return it as a string.
+func (buftary *BufferTArray) ValStr(tptoken uint64, errstr *BufferT, idx uint32) (string, error) {
 	var str string
 
 	printEntry("BufferTArray.ValStr()")
@@ -285,7 +294,7 @@ func (buftary *BufferTArray) ValStr(tptoken uint64, errstr *BufferT, idx uint32)
 		if nil != err {
 			panic(fmt.Sprintf("YDB: Error fetching INSUFFSUBS: %s", err))
 		}
-		return nil, &YDBError{(int)(YDB_ERR_INSUFFSUBS), errmsg}
+		return "", &YDBError{(int)(YDB_ERR_INSUFFSUBS), errmsg}
 	}
 	cbuftary := buftary.getCPtr()
 	if nil == cbuftary {
@@ -294,7 +303,7 @@ func (buftary *BufferTArray) ValStr(tptoken uint64, errstr *BufferT, idx uint32)
 		if nil != err {
 			panic(fmt.Sprintf("YDB: Error fetching STRUCTNOTALLOCD: %s", err))
 		}
-		return nil, &YDBError{(int)(YDB_ERR_STRUCTNOTALLOCD), errmsg}
+		return "", &YDBError{(int)(YDB_ERR_STRUCTNOTALLOCD), errmsg}
 	}
 	elemptr := (*C.ydb_buffer_t)(unsafe.Pointer(uintptr(unsafe.Pointer(cbuftary)) + uintptr(C.sizeof_ydb_buffer_t*idx)))
 	lenalloc := elemptr.len_alloc
@@ -303,12 +312,12 @@ func (buftary *BufferTArray) ValStr(tptoken uint64, errstr *BufferT, idx uint32)
 	if lenused > lenalloc { // INVSTRLEN from last operation return what we can and give error
 		str = C.GoStringN(cbufptr, C.int(lenalloc)) // Return what we can (alloc size)
 		errmsg := formatINVSTRLEN(tptoken, errstr, lenalloc, lenused)
-		return &str, &YDBError{(int)(YDB_ERR_INVSTRLEN), errmsg}
+		return str, &YDBError{(int)(YDB_ERR_INVSTRLEN), errmsg}
 	}
 	// The entire buffer is there so return that
 	str = C.GoStringN(cbufptr, C.int(lenused))
 	runtime.KeepAlive(buftary)
-	return &str, nil
+	return str, nil
 }
 
 // SetElemLenUsed is a method to set the len_used field of a given ydb_buffer_t struct in the BufferTArray.
@@ -370,7 +379,7 @@ func (buftary *BufferTArray) SetElemUsed(tptoken uint64, errstr *BufferT, newUse
 }
 
 // SetValBAry is a method to set a byte array (value) into the buffer at the given index (idx).
-func (buftary *BufferTArray) SetValBAry(tptoken uint64, errstr *BufferT, idx uint32, value *[]byte) error {
+func (buftary *BufferTArray) SetValBAry(tptoken uint64, errstr *BufferT, idx uint32, value []byte) error {
 	printEntry("BufferTArray.SetValBAry()")
 	if nil == buftary {
 		panic("YDB: *BufferTArray receiver of SetValBAry() cannot be nil")
@@ -395,16 +404,14 @@ func (buftary *BufferTArray) SetValBAry(tptoken uint64, errstr *BufferT, idx uin
 	}
 	elemptr := (*C.ydb_buffer_t)(unsafe.Pointer(uintptr(unsafe.Pointer(cbuftary)) + uintptr(C.sizeof_ydb_buffer_t*idx)))
 	lenalloc := uint32(elemptr.len_alloc)
-	vallen := uint32(len(*value))
+	vallen := uint32(len(value))
 	if vallen > lenalloc { // INVSTRLEN from last operation - return what we can and give error
 		errmsg := formatINVSTRLEN(tptoken, errstr, C.uint(lenalloc), C.uint(vallen))
 		return &YDBError{(int)(YDB_ERR_INVSTRLEN), errmsg}
 	}
 	// Copy the Golang buffer to the C buffer
 	if 0 < vallen {
-		C.memcpy(unsafe.Pointer(elemptr.buf_addr),
-			unsafe.Pointer(&((*value)[0])),
-			C.size_t(vallen))
+		C.memcpy(unsafe.Pointer((*elemptr).buf_addr), unsafe.Pointer(&value[0]), C.size_t(vallen))
 	}
 	elemptr.len_used = C.uint(vallen) // Set the used length of the buffer for this element
 	runtime.KeepAlive(buftary)
@@ -412,23 +419,13 @@ func (buftary *BufferTArray) SetValBAry(tptoken uint64, errstr *BufferT, idx uin
 }
 
 // SetValStr is a method to set a string (value) into the buffer at the given index (idx).
-func (buftary *BufferTArray) SetValStr(tptoken uint64, errstr *BufferT, idx uint32, value *string) error {
+func (buftary *BufferTArray) SetValStr(tptoken uint64, errstr *BufferT, idx uint32, value string) error {
 	printEntry("BufferTArray.SetValStr()")
 	if nil == buftary {
 		panic("YDB: *BufferTArray receiver of SetValBAry() cannot be nil")
 	}
-	valuebary := []byte(*value)
-	return buftary.SetValBAry(tptoken, errstr, idx, &valuebary)
-}
-
-// SetValStrLit is a method to set a string literal (value) into the buffer at the given index (idx).
-func (buftary *BufferTArray) SetValStrLit(tptoken uint64, errstr *BufferT, idx uint32, value string) error {
-	printEntry("BufferTArray.SetValStrLit()")
-	if nil == buftary {
-		panic("YDB: *BufferTArray receiver of SetValBAry() cannot be nil")
-	}
 	valuebary := []byte(value)
-	return buftary.SetValBAry(tptoken, errstr, idx, &valuebary)
+	return buftary.SetValBAry(tptoken, errstr, idx, valuebary)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -452,7 +449,7 @@ func (buftary *BufferTArray) DeleteExclST(tptoken uint64, errstr *BufferT) error
 	if nil == buftary {
 		panic("YDB: *BufferTArray receiver of DeleteExclST() cannot be nil")
 	}
-	if errstr != nil {
+	if nil != errstr {
 		cbuft = errstr.getCPtr()
 	}
 	rc := C.ydb_delete_excl_st(C.uint64_t(tptoken), cbuft, C.int(buftary.ElemUsed()),
@@ -505,10 +502,10 @@ func (buftary *BufferTArray) TpST(tptoken uint64, errstr *BufferT, tpfn func(uin
 	defer freeMem(unsafe.Pointer(tid), C.size_t(len(transid)))
 	tpfnparm := atomic.AddUint64(&tpIndex, 1)
 	tpMap.Store(tpfnparm, tpfn)
-	cbuftary := (*C.ydb_buffer_t)(unsafe.Pointer((*buftary).getCPtr()))
-	if errstr != nil {
+	if nil != errstr {
 		cbuft = errstr.getCPtr()
 	}
+	cbuftary := (*C.ydb_buffer_t)(unsafe.Pointer((*buftary).getCPtr()))
 	rc := C.ydb_tp_st(C.uint64_t(tptoken), cbuft, (C.ydb_tpfnptr_t)(C.ydb_tp_st_wrapper_cgo),
 		unsafe.Pointer(&tpfnparm), tid, C.int((*buftary).ElemUsed()), cbuftary)
 	tpMap.Delete(tpfnparm)
@@ -531,17 +528,8 @@ func ydbTpStWrapper(tptoken uint64, errstr *C.ydb_buffer_t, tpfnparm unsafe.Poin
 	if !ok {
 		panic("YDB: Could not find callback routine")
 	}
-	errbuff.BufferTFromPtr((unsafe.Pointer)(errstr))
+	errbuff.bufferTFromPtr((unsafe.Pointer)(errstr))
 	retval := (v.(func(uint64, *BufferT) int32))(tptoken, &errbuff)
 	runtime.KeepAlive(errstr)
 	return retval
-}
-
-// getCPtr returns a pointer to the internal C.ydb_buffer_t
-func (buftary *BufferTArray) getCPtr() *C.ydb_buffer_t {
-	ptr := (*C.ydb_buffer_t)(nil)
-	if nil != buftary && nil != buftary.cbuftary {
-		ptr = (*C.ydb_buffer_t)(unsafe.Pointer(buftary.cbuftary.cbuftary))
-	}
-	return ptr
 }
