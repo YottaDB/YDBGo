@@ -138,13 +138,13 @@ func (mdesc *CallMDesc) CallMDescT(tptoken uint64, errstr *BufferT, retvallen ui
 	if nil != errstr {
 		cbuft = errstr.getCPtr()
 	}
-	err = vplist.setVPlistParam(tptoken, errstr, parmIndx, uintptr(unsafe.Pointer(cbuft)))
+	err = vplist.setVPlistParam(tptoken, errstr, parmIndx, unsafe.Pointer(cbuft))
 	if nil != err {
 		panic(fmt.Sprintf("YDB: Unknown error with varidicPlist.setVPlistParam(): %s", err))
 	}
 	parmIndx++
 	// Third parm for ydb_cip_t() is the descriptor address so add that now
-	err = vplist.setVPlistParam(tptoken, errstr, parmIndx, uintptr(unsafe.Pointer(mdesc.cmdesc.cmdesc)))
+	err = vplist.setVPlistParam(tptoken, errstr, parmIndx, unsafe.Pointer(mdesc.cmdesc.cmdesc))
 	if nil != err {
 		panic(fmt.Sprintf("YDB: Unknown error with varidicPlist.setVPlistParam(): %s", err))
 	}
@@ -156,7 +156,7 @@ func (mdesc *CallMDesc) CallMDescT(tptoken uint64, errstr *BufferT, retvallen ui
 		retvalptr.address = (*C.char)(allocMem(C.size_t(retvallen)))
 		defer freeMem(unsafe.Pointer(retvalptr.address), C.size_t(retvallen))
 		retvalptr.length = (C.ulong)(retvallen)
-		err = vplist.setVPlistParam(tptoken, errstr, parmIndx, uintptr(unsafe.Pointer(retvalptr)))
+		err = vplist.setVPlistParam(tptoken, errstr, parmIndx, unsafe.Pointer(retvalptr))
 		if nil != err {
 			return "", err
 		}
@@ -185,7 +185,7 @@ func (mdesc *CallMDesc) CallMDescT(tptoken uint64, errstr *BufferT, retvallen ui
 			defer freeMem(unsafe.Pointer(parmptr.address), C.size_t(parmptr.length))
 		}
 		// Now add parmptr to the variadic plist
-		err = vplist.setVPlistParam(tptoken, errstr, parmIndx, uintptr(unsafe.Pointer(parmptr)))
+		err = vplist.setVPlistParam(tptoken, errstr, parmIndx, unsafe.Pointer(parmptr))
 		if nil != err {
 			return "", err
 		}

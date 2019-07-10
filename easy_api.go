@@ -16,7 +16,6 @@ import (
 	"fmt"
 	"runtime"
 	"strings"
-	"unsafe"
 )
 
 // #include "libyottadb.h"
@@ -45,7 +44,7 @@ func DataE(tptoken uint64, errstr *BufferT, varname string, subary []string) (ui
 		cbuft = errstr.getCPtr()
 	}
 	vargobuft := dbkey.Varnm.getCPtr()
-	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(dbkey.Subary.getCPtr()))
+	subbuftary := dbkey.Subary.getCPtr()
 	rc := C.ydb_data_st(C.uint64_t(tptoken), cbuft, vargobuft, C.int(dbkey.Subary.ElemUsed()), subbuftary, &retval)
 	if YDB_OK != rc {
 		err = NewError(tptoken, errstr, int(rc))
@@ -74,7 +73,7 @@ func DeleteE(tptoken uint64, errstr *BufferT, deltype int, varname string, subar
 		cbuft = errstr.getCPtr()
 	}
 	vargobuft := dbkey.Varnm.getCPtr()
-	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(dbkey.Subary.getCPtr()))
+	subbuftary := dbkey.Subary.getCPtr()
 	rc := C.ydb_delete_st(C.uint64_t(tptoken), cbuft, vargobuft, C.int(dbkey.Subary.ElemUsed()), subbuftary,
 		C.int(deltype))
 	if YDB_OK != rc {
@@ -202,7 +201,7 @@ func IncrE(tptoken uint64, errstr *BufferT, incr, varname string, subary []strin
 	// again) so for this call, whatever happens just happens though the default buffer should be
 	// large enough for any reasonable value being incremented.
 	vargobuft := dbkey.Varnm.getCPtr()
-	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(dbkey.Subary.getCPtr()))
+	subbuftary := dbkey.Subary.getCPtr()
 	if nil != errstr {
 		cbuft = errstr.getCPtr()
 	}
@@ -319,7 +318,7 @@ func LockDecrE(tptoken uint64, errstr *BufferT, varname string, subary []string)
 		cbuft = errstr.getCPtr()
 	}
 	vargobuft := dbkey.Varnm.getCPtr()
-	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(dbkey.Subary.getCPtr()))
+	subbuftary := dbkey.Subary.getCPtr()
 	rc := C.ydb_lock_decr_st(C.uint64_t(tptoken), cbuft, vargobuft, C.int(dbkey.Subary.ElemUsed()), subbuftary)
 	if YDB_OK != rc {
 		err = NewError(tptoken, errstr, int(rc))
@@ -352,7 +351,7 @@ func LockIncrE(tptoken uint64, errstr *BufferT, timeoutNsec uint64, varname stri
 		cbuft = errstr.getCPtr()
 	}
 	vargobuft := dbkey.Varnm.getCPtr()
-	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(dbkey.Subary.getCPtr()))
+	subbuftary := dbkey.Subary.getCPtr()
 	rc := C.ydb_lock_incr_st(C.uint64_t(tptoken), cbuft, C.ulonglong(timeoutNsec), vargobuft,
 		C.int(dbkey.Subary.ElemUsed()), subbuftary)
 	if YDB_OK != rc {
@@ -528,9 +527,8 @@ func SetValE(tptoken uint64, errstr *BufferT, value, varname string, subary []st
 		cbuft = errstr.getCPtr()
 	}
 	vargobuft := dbkey.Varnm.getCPtr()
-	subbuftary := (*C.ydb_buffer_t)(unsafe.Pointer(dbkey.Subary.getCPtr()))
-	rc := C.ydb_set_st(C.uint64_t(tptoken), cbuft, vargobuft, C.int(dbkey.Subary.ElemUsed()), subbuftary,
-		dbvalue.getCPtr())
+	subbuftary := dbkey.Subary.getCPtr()
+	rc := C.ydb_set_st(C.uint64_t(tptoken), cbuft, vargobuft, C.int(dbkey.Subary.ElemUsed()), subbuftary, dbvalue.getCPtr())
 	if YDB_OK != rc {
 		err := NewError(tptoken, errstr, int(rc))
 		return err

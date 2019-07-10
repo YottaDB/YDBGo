@@ -102,8 +102,8 @@ func (buftary *BufferTArray) DumpToWriter(writer io.Writer) {
 	}
 	cbuftary := buftary.getCPtr()
 	if nil != cbuftary {
-		fmt.Fprintf(writer, "BufferTArray.Dump(): cbuftary: %p, elemAlloc: %d, elemUsed: %d\n", cbuftary,
-			buftary.ElemAlloc(), buftary.ElemUsed())
+		fmt.Fprintf(writer, "BufferTArray.Dump(): cbuftary: %p, elemAlloc: %d, elemUsed: %d, elemLenAlloc: %d\n", cbuftary,
+			buftary.ElemAlloc(), buftary.ElemUsed(), buftary.ElemLenAlloc())
 		for i := 0; int(buftary.ElemUsed()) > i; i++ {
 			elemptr := (*C.ydb_buffer_t)(unsafe.Pointer((uintptr(unsafe.Pointer(cbuftary)) +
 				uintptr(C.sizeof_ydb_buffer_t*i))))
@@ -222,8 +222,9 @@ func (buftary *BufferTArray) ElemLenUsed(tptoken uint64, errstr *BufferT, idx ui
 		return 0, &YDBError{(int)(YDB_ERR_INSUFFSUBS), errmsg}
 	}
 	elemptr := (*C.ydb_buffer_t)(unsafe.Pointer(uintptr(unsafe.Pointer(cbuftary)) + uintptr(C.sizeof_ydb_buffer_t*idx)))
+	retlen := uint32(elemptr.len_used)
 	runtime.KeepAlive(buftary)
-	return uint32(elemptr.len_used), nil
+	return retlen, nil
 }
 
 // ElemUsed is a method to return elemUsed from a BufferTArray.
@@ -411,7 +412,7 @@ func (buftary *BufferTArray) SetValBAry(tptoken uint64, errstr *BufferT, idx uin
 	}
 	// Copy the Golang buffer to the C buffer
 	if 0 < vallen {
-		C.memcpy(unsafe.Pointer((*elemptr).buf_addr), unsafe.Pointer(&value[0]), C.size_t(vallen))
+		C.memcpy(unsafe.Pointer(elemptr.buf_addr), unsafe.Pointer(&value[0]), C.size_t(vallen))
 	}
 	elemptr.len_used = C.uint(vallen) // Set the used length of the buffer for this element
 	runtime.KeepAlive(buftary)
@@ -452,8 +453,7 @@ func (buftary *BufferTArray) DeleteExclST(tptoken uint64, errstr *BufferT) error
 	if nil != errstr {
 		cbuft = errstr.getCPtr()
 	}
-	rc := C.ydb_delete_excl_st(C.uint64_t(tptoken), cbuft, C.int(buftary.ElemUsed()),
-		(*C.ydb_buffer_t)(unsafe.Pointer(buftary.getCPtr())))
+	rc := C.ydb_delete_excl_st(C.uint64_t(tptoken), cbuft, C.int(buftary.ElemUsed()), buftary.getCPtr())
 	if YDB_OK != rc {
 		err := NewError(tptoken, errstr, int(rc))
 		return err
@@ -505,9 +505,9 @@ func (buftary *BufferTArray) TpST(tptoken uint64, errstr *BufferT, tpfn func(uin
 	if nil != errstr {
 		cbuft = errstr.getCPtr()
 	}
-	cbuftary := (*C.ydb_buffer_t)(unsafe.Pointer((*buftary).getCPtr()))
+	cbuftary := buftary.getCPtr()
 	rc := C.ydb_tp_st(C.uint64_t(tptoken), cbuft, (C.ydb_tpfnptr_t)(C.ydb_tp_st_wrapper_cgo),
-		unsafe.Pointer(&tpfnparm), tid, C.int((*buftary).ElemUsed()), cbuftary)
+		unsafe.Pointer(&tpfnparm), tid, C.int(buftary.ElemUsed()), cbuftary)
 	tpMap.Delete(tpfnparm)
 	if YDB_OK != rc {
 		err := NewError(tptoken, errstr, int(rc))

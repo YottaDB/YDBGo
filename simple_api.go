@@ -19,9 +19,21 @@ import (
 	"unsafe"
 )
 
+// #include <stdint.h> /* For uint64_t definition on Linux */
 // #include "libyottadb.h"
 // /* Equivalent of gparam_list in callg.h (not available to us) */
 // #define MAXVPARMS 36
+// /* Routines to convert int and uint64_t types to void * for parm storage (Go doesn't allow this so do it in a C stub) */
+// void *intToUnsafePtr(int val);
+// void *intToUnsafePtr(int val)
+// {
+//         return (void *)(uintptr_t)val;
+// }
+// void *uint64ToUnsafePtr(uint64_t val);
+// void *uint64ToUnsafePtr(uint64_t val)
+// {
+//         return (void *)val;
+// }
 // /* C routine to get around the cgo issue and its lack of support for variadic plist routines */
 // void *ydb_get_lockst_funcvp(void);
 // void *ydb_get_lockst_funcvp(void)
@@ -60,7 +72,7 @@ func LockST(tptoken uint64, errstr *BufferT, timeoutNsec uint64, lockname ...*Ke
 	if nil != errstr {
 		cbuft = errstr.getCPtr()
 	}
-	err = vplist.setVPlistParam(tptoken, errstr, parmIndx, uintptr(unsafe.Pointer(cbuft)))
+	err = vplist.setVPlistParam(tptoken, errstr, parmIndx, unsafe.Pointer(cbuft))
 	if nil != err {
 		panic(fmt.Sprintf("YDB: Unknown error with varidicPlist.setVPlistParam(): %s", err))
 	}
@@ -73,7 +85,7 @@ func LockST(tptoken uint64, errstr *BufferT, timeoutNsec uint64, lockname ...*Ke
 	// Add the lock count parameter
 	lockcnt = len(lockname)
 	namecnt = lockcnt
-	err = vplist.setVPlistParam(tptoken, errstr, parmIndx, uintptr(namecnt))
+	err = vplist.setVPlistParam(tptoken, errstr, parmIndx, C.intToUnsafePtr(C.int(namecnt)))
 	if nil != err {
 		panic(fmt.Sprintf("YDB: Unknown error with varidicPlist.setVPlistParam(): %s", err))
 	}
@@ -97,21 +109,22 @@ func LockST(tptoken uint64, errstr *BufferT, timeoutNsec uint64, lockname ...*Ke
 				return &YDBError{(int)(YDB_ERR_NAMECOUNT2HI), errmsg}
 			}
 			// Set the 3 parameters for this lockname
-			err = vplist.setVPlistParam(tptoken, errstr, parmIndx, uintptr(unsafe.Pointer((*lockname[lockindx]).Varnm.getCPtr())))
+			err = vplist.setVPlistParam(tptoken, errstr, parmIndx, unsafe.Pointer(lockname[lockindx].Varnm.getCPtr()))
 			if nil != err {
 				panic(fmt.Sprintf("YDB: Unknown error with varidicPlist.setVPlistParam(): %s", err))
 			}
 			parmIndx++
 			parmsleft--
-			err = vplist.setVPlistParam(tptoken, errstr, parmIndx, uintptr((*lockname[lockindx]).Subary.ElemUsed()))
+			err = vplist.setVPlistParam(tptoken, errstr, parmIndx,
+				C.intToUnsafePtr(C.int(lockname[lockindx].Subary.ElemUsed())))
 			if nil != err {
 				panic(fmt.Sprintf("YDB: Unknown error with varidicPlist.setVPlistParam(): %s", err))
 			}
 			parmIndx++
 			parmsleft--
-			subgobuftary := (*lockname[lockindx]).Subary
+			subgobuftary := lockname[lockindx].Subary
 			subbuftary := unsafe.Pointer(subgobuftary.getCPtr())
-			err = vplist.setVPlistParam(tptoken, errstr, parmIndx, uintptr(subbuftary))
+			err = vplist.setVPlistParam(tptoken, errstr, parmIndx, subbuftary)
 			if nil != err {
 				panic(fmt.Sprintf("YDB: Unknown error with varidicPlist.setVPlistParam(): %s", err))
 			}

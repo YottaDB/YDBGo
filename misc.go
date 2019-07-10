@@ -101,17 +101,6 @@ func freeMem(mem unsafe.Pointer, size C.size_t) {
 	C.free(mem)
 }
 
-// formatINVSTRLEN is a function to do the fetching and formatting of the INVSTRLEN error with both of its
-// substitutable parms filled in.
-func formatINVSTRLEN(tptoken uint64, errstr *BufferT, lenalloc, lenused C.uint) string {
-	errmsg, err := MessageT(tptoken, errstr, (int)(YDB_ERR_INVSTRLEN))
-	if nil != err {
-		panic(fmt.Sprintf("YDB: Error fetching INVSTRLEN: %s", err))
-	}
-	errmsg = errorFormat(errmsg, "!UL", fmt.Sprintf("%d", lenused), "!UL", fmt.Sprintf("%d", lenalloc)) // Substitute parms
-	return errmsg
-}
-
 // errorFormat is a function to replace the FAO codes in YDB error messages with meaningful data. This is normally
 // handled by YDB itself but when this Go wrapper raises the same errors, no substitution is done. This routine can
 // provide that substitution. It takes set of FAO-code and value pairs performing those substitutions on the error
@@ -124,6 +113,17 @@ func errorFormat(errmsg string, subparms ...string) string {
 	for i := 0; i < len(subparms); i = i + 2 {
 		errmsg = strings.Replace(errmsg, subparms[i], subparms[i+1], 1)
 	}
+	return errmsg
+}
+
+// formatINVSTRLEN is a function to do the fetching and formatting of the INVSTRLEN error with both of its
+// substitutable parms filled in.
+func formatINVSTRLEN(tptoken uint64, errstr *BufferT, lenalloc, lenused C.uint) string {
+	errmsg, err := MessageT(tptoken, errstr, (int)(YDB_ERR_INVSTRLEN))
+	if nil != err {
+		panic(fmt.Sprintf("YDB: Error fetching INVSTRLEN: %s", err))
+	}
+	errmsg = errorFormat(errmsg, "!UL", fmt.Sprintf("%d", lenused), "!UL", fmt.Sprintf("%d", lenalloc)) // Substitute parms
 	return errmsg
 }
 
