@@ -125,7 +125,7 @@ func (key *KeyT) DataST(tptoken uint64, errstr *BufferT) (uint32, error) {
 	rc := C.ydb_data_st(C.uint64_t(tptoken), cbuft, vargobuft, C.int(subgobuftary.ElemUsed()), subbuftary, &retval)
 	if YDB_OK != rc {
 		err := NewError(tptoken, errstr, int(rc))
-		return 0, err
+		return uint32(retval), err
 	}
 	runtime.KeepAlive(key) // Make sure key hangs around through the YDB call
 	runtime.KeepAlive(errstr)

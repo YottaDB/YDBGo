@@ -54,7 +54,7 @@ func TestDataSt(t *testing.T) {
 	Assertnoerr(err, t)
 	dval, err = dbkey.DataST(tptoken, nil)
 	Assertnoerr(err, t)
-	if 1 != int(dval) {
+	if yottadb.YDB_DATA_VALUE_NODESC != int(dval) {
 		t.Error("The DataST() value for ^tdaNoSubs expected to be 1 but was", dval)
 	}
 	// Check against a subscripted node with no value but has descendents
@@ -66,7 +66,7 @@ func TestDataSt(t *testing.T) {
 	Assertnoerr(err, t)
 	dval, err = dbkey.DataST(tptoken, nil)
 	Assertnoerr(err, t)
-	if 10 != int(dval) {
+	if yottadb.YDB_DATA_NOVALUE_DESC != int(dval) {
 		t.Error("The DataST() value for ^tdaSubs(\"sub1\") expected to be 10 but was", dval)
 	}
 	// Check against a subscripted node with a value and descendants
@@ -76,8 +76,17 @@ func TestDataSt(t *testing.T) {
 	Assertnoerr(err, t)
 	dval, err = dbkey.DataST(tptoken, nil)
 	Assertnoerr(err, t)
-	if 11 != int(dval) {
+	if yottadb.YDB_DATA_VALUE_DESC != int(dval) {
 		t.Error("The DataST() value for ^tdaSubs(\"sub1\",\"sub2\") expected to be 11 but was", dval)
+	}
+	// Check if return value set correctly on an error by giving it an invalid var name
+	err = dbkey.Varnm.SetValStr(tptoken, nil, "1234") // Set invalid var name
+	Assertnoerr(err, t)
+	err = dbkey.Subary.SetElemUsed(tptoken, nil, 0) // No subscripts
+	Assertnoerr(err, t)
+	dval, err = dbkey.DataST(tptoken, nil)
+	if yottadb.YDB_DATA_ERROR != int(dval) {
+		t.Error("The DataE() return value for an invalid varname expected to be YDB_DATA_NOERROR but was", dval)
 	}
 }
 

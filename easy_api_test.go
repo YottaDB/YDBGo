@@ -43,20 +43,25 @@ func TestDataE(t *testing.T) {
 	// Check node with value but no subscripts - should be 1
 	dval, err = yottadb.DataE(tptoken, &errstr, "^tdaNoSubs", []string{})
 	Assertnoerr(err, t)
-	if 1 != int(dval) {
+	if yottadb.YDB_DATA_VALUE_NODESC != int(dval) {
 		t.Error("The DataE() value for ^tdaNoSubs expected to be 1 but was", dval)
 	}
 	// Check against a subscripted node with no value but has descendants
 	dval, err = yottadb.DataE(tptoken, &errstr, "^tdaSubs", []string{"sub1"})
 	Assertnoerr(err, t)
-	if 10 != int(dval) {
+	if yottadb.YDB_DATA_NOVALUE_DESC != int(dval) {
 		t.Error("The DataE() value for ^tdaSubs(\"sub1\") expected to be 10 but was", dval)
 	}
 	// Check against a subscripted node with a value and descendants
 	dval, err = yottadb.DataE(tptoken, &errstr, "^tdaSubs", []string{"sub1", "sub2"})
 	Assertnoerr(err, t)
-	if 11 != int(dval) {
+	if yottadb.YDB_DATA_VALUE_DESC != int(dval) {
 		t.Error("The DataE() value for ^tdaSubs(\"sub1\",\"sub2\") expected to be 11 but was", dval)
+	}
+	// Check if return value set correctly on an error by giving it an invalid var name
+	dval, err = yottadb.DataE(tptoken, &errstr, "12345", []string{})
+	if yottadb.YDB_DATA_ERROR != int(dval) {
+		t.Error("The DataE() return value for an invalid varname expected to be YDB_DATA_NOERROR but was", dval)
 	}
 }
 

@@ -48,7 +48,7 @@ func DataE(tptoken uint64, errstr *BufferT, varname string, subary []string) (ui
 	rc := C.ydb_data_st(C.uint64_t(tptoken), cbuft, vargobuft, C.int(dbkey.Subary.ElemUsed()), subbuftary, &retval)
 	if YDB_OK != rc {
 		err = NewError(tptoken, errstr, int(rc))
-		return 0, err
+		return uint32(retval), err
 	}
 	runtime.KeepAlive(dbkey) // Make sure dbkey stays in tact through the call into YDB
 	runtime.KeepAlive(errstr)
