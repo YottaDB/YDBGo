@@ -28,11 +28,12 @@ echo "" >> error_codes.go
 grep -E "#define\s+YDB_TP" $ydb_dist/libyottadb.h | awk '{s = ""; for (i = 3; i <= NF; i++) s = s $i " "; print $2,"=",s}' >> error_codes.go
 grep -E "#define\s+YDB_[^\s]*OK" $ydb_dist/libyottadb.h | awk '{s = ""; for (i = 3; i <= NF; i++) s = s $i " "; print $2,"=",s}' >> error_codes.go
 grep -E "#define\s+YDB_LOCK" $ydb_dist/libyottadb.h | awk '{s = ""; for (i = 3; i <= NF; i++) s = s $i " "; print $2,"=",s}' >> error_codes.go
-# We exclude YDB_MAX_TIME_NSEC because it is coded as a constant using data types Go doesn't understand
+# We exclude YDB_MAX_TIME_NSEC here because its expression needs changes to work in go. Handled below.
 grep -E "#define\s+YDB_MAX" $ydb_dist/libyottadb.h | awk '{s = ""; for (i = 3; i <= NF; i++) s = s $i " "; print $2,"=",s}' \
     | grep -v "YDB_MAX_TIME_NSEC" | grep -v "YDB_MAX_YDBERR" | grep -v "YDB_MAX_ERROR" >> error_codes.go
 grep -E "#define\s+YDB_MAX_ERRORMSG" $ydb_dist/libyottadb.h | awk '{print $2,"=",$3,"/* Maximum length of error message */"}' >> error_codes.go
-##grep -E "\sYDB_DATA_" $ydb_dist/libyottadb.h | awk '{s = ""; for (i = 3; i <= NF; i++) s = s $i " "; print $3,"=",s}' >> error_codes.go
+echo "" >> error_codes.go # Add blank line so above doesn't have to format comments way out at end like next one does
+grep -E "#define\sYDB_MAX_TIME_NSEC" $ydb_dist/libyottadb.h | awk '{gsub("0x7fffffffllu","uint64(0x7fffffff)"); gsub("1000llu","uint64(1000)"); s = ""; for (i = 3; i <= NF; i++) s = s $i " "; print $2,"=",s}' >> error_codes.go
 echo "" >> error_codes.go
 gcc -E $ydb_dist/libyottadb.h | grep YDB | tr ',' ' ' >> error_codes.go
 cat <<EOF >> error_codes.go

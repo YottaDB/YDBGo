@@ -1567,6 +1567,8 @@ const (
 	YDB_MAX_SUBS     = 31                /* Maximum subscripts currently supported */
 	YDB_MAX_ERRORMSG = 1024              /* Maximum length of error message */
 
+	YDB_MAX_TIME_NSEC = (uint64(0x7fffffff) * uint64(1000) * uint64(1000)) /* Max specified time in (long long) nanoseconds */
+
 	YDB_DEL_TREE               = 1
 	YDB_DEL_NODE               = 2
 	YDB_SEVERITY_WARNING       = 0
