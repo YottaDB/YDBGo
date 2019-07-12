@@ -1580,5 +1580,5 @@ const (
 	YDB_DATA_VALUE_NODESC      = 1
 	YDB_DATA_NOVALUE_DESC      = 10
 	YDB_DATA_VALUE_DESC        = 11
-	YDB_DATA_ERROR             = 0xffffff00
+	YDB_DATA_ERROR             = 0x7fffff00
 )
