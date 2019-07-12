@@ -31,6 +31,7 @@ func TestStr2ZwrSTAndZwr2StrST(t *testing.T) {
 	var outstr string
 	var tptoken uint64 = yottadb.NOTTP
 	var err error
+	var errcode int
 
 	defer ovalue.Free()
 	ovalue.Alloc(64)
@@ -64,14 +65,17 @@ func TestStr2ZwrSTAndZwr2StrST(t *testing.T) {
 	}
 	// Try calling on a non-allocated value
 	err = noalloc_value.Zwr2StrST(tptoken, nil, &cvalue)
-	assert.NotNil(t, err)
+	errcode = yottadb.ErrorCode(err)
+	assert.Equal(t, yottadb.YDB_ERR_STRUCTNOTALLOCD, errcode)
 
 	// Test Str2ZwrST with an allocated value in the second param
 	err = ovalue.Str2ZwrST(tptoken, nil, &noalloc_value)
-	assert.NotNil(t, err)
+	errcode = yottadb.ErrorCode(err)
+	assert.Equal(t, yottadb.YDB_ERR_STRUCTNOTALLOCD, errcode)
 
 	err = ovalue.Zwr2StrST(tptoken, nil, &noalloc_value)
-	assert.NotNil(t, err)
+	errcode = yottadb.ErrorCode(err)
+	assert.Equal(t, yottadb.YDB_ERR_STRUCTNOTALLOCD, errcode)
 
 	// Test with nil as the second argument
 	(func() {
@@ -80,7 +84,8 @@ func TestStr2ZwrSTAndZwr2StrST(t *testing.T) {
 		})()
 		err = ovalue.Str2ZwrST(tptoken, nil, nil)
 	})()
-	assert.NotNil(t, err)
+	errcode = yottadb.ErrorCode(err)
+	assert.Equal(t, yottadb.YDB_ERR_STRUCTNOTALLOCD, errcode)
 
 	(func() {
 		defer (func() {
@@ -88,16 +93,24 @@ func TestStr2ZwrSTAndZwr2StrST(t *testing.T) {
 		})()
 		err = ovalue.Zwr2StrST(tptoken, nil, nil)
 	})()
-	assert.NotNil(t, err)
+	errcode = yottadb.ErrorCode(err)
+	assert.Equal(t, yottadb.YDB_ERR_STRUCTNOTALLOCD, errcode)
 }
 
 func TestLenAlloc(t *testing.T) {
 	var value yottadb.BufferT
+	var errcode int
 
 	defer value.Free()
+
+	// Test return before Alloc() should return error
+	len, err := value.LenAlloc(yottadb.NOTTP, nil)
+	errcode = yottadb.ErrorCode(err)
+	assert.Equal(t, yottadb.YDB_ERR_STRUCTNOTALLOCD, errcode)
+
 	value.Alloc(128)
 
-	len, err := value.LenAlloc(yottadb.NOTTP, nil)
+	len, err = value.LenAlloc(yottadb.NOTTP, nil)
 	assert.Nil(t, err)
 	assert.Equal(t, len, uint32(128))
 }
@@ -127,9 +140,11 @@ func TestAlloc(t *testing.T) {
 	var ovalue, cvalue, value yottadb.BufferT
 	var tptoken uint64 = yottadb.NOTTP
 	var err error
+	var errcode int
 
 	_, err = value.LenAlloc(yottadb.NOTTP, nil)
-	assert.NotNil(t, err)
+	errcode = yottadb.ErrorCode(err)
+	assert.Equal(t, yottadb.YDB_ERR_STRUCTNOTALLOCD, errcode)
 
 	// Test Free with no Alloc
 	value.Free()
@@ -186,9 +201,12 @@ func TestAlloc(t *testing.T) {
 func TestLen(t *testing.T) {
 	var value, noalloc_value yottadb.BufferT
 	var length = uint32(128)
+	var errcode int
 
+	// Test before Alloc()
 	l, err := value.LenUsed(yottadb.NOTTP, nil)
-	assert.NotNil(t, err)
+	errcode = yottadb.ErrorCode(err)
+	assert.Equal(t, yottadb.YDB_ERR_STRUCTNOTALLOCD, errcode)
 
 	value.Alloc(length)
 
@@ -205,77 +223,114 @@ func TestLen(t *testing.T) {
 	// SetLenUsed to a valid value
 	err = value.SetLenUsed(yottadb.NOTTP, nil, length-2)
 	assert.Nil(t, err)
+	l, err = value.LenUsed(yottadb.NOTTP, nil)
+	assert.Nil(t, err)
+	assert.Equal(t, l, length-2)
 
 	// Set len used to an invalid value
 	err = value.SetLenUsed(yottadb.NOTTP, nil, length+2)
-	assert.NotNil(t, err)
+	errcode = yottadb.ErrorCode(err)
+	assert.Equal(t, yottadb.YDB_ERR_INVSTRLEN, errcode)
+	r, err := value.LenUsed(yottadb.NOTTP, nil)
+	assert.Nil(t, err)
+	assert.Equal(t, r, length-2)
 
 	// Try setting length on non-allocated buffer
 	err = noalloc_value.SetLenUsed(yottadb.NOTTP, nil, length-2)
-	assert.NotNil(t, err)
-}
-
-func TestInvalidAllonLen(t *testing.T) {
-	var value yottadb.BufferT
-	var global_name = "hello"
-	var length = uint32(len(global_name) - 1)
-	// Try allocating a small buffer and overfilling
-
-	defer value.Free()
-	value.Alloc(length)
-
-	err := value.SetValStr(yottadb.NOTTP, nil, global_name)
-	assert.NotNil(t, err)
+	errcode = yottadb.ErrorCode(err)
+	assert.Equal(t, yottadb.YDB_ERR_STRUCTNOTALLOCD, errcode)
 }
 
 func TestValStr(t *testing.T) {
 	var value, value_store yottadb.BufferT
 	var global_name = "hello"
 	var length = uint32(len(global_name))
+	var errcode int
 
 	// Get value before being init'd
 	str, err := value.ValStr(yottadb.NOTTP, nil)
 	assert.Equal(t, str, "")
-	assert.NotNil(t, err)
+	errcode = yottadb.ErrorCode(err)
+	assert.Equal(t, yottadb.YDB_ERR_STRUCTNOTALLOCD, errcode)
+
+	// Test set before Alloc
+	err = value.SetValStr(yottadb.NOTTP, nil, global_name)
+	errcode = yottadb.ErrorCode(err)
+	assert.Equal(t, yottadb.YDB_ERR_STRUCTNOTALLOCD, errcode)
 
 	defer value.Free()
 	value.Alloc(length + 1)
 	defer value_store.Free()
 	value_store.Alloc(length - 2)
 
+	// Test that allocated unset buffer will not error when retreived
+	str, err = value.ValStr(yottadb.NOTTP, nil)
+	assert.Nil(t, err)
+	assert.Equal(t, str, "")
+
+	// Test that set works when buffer is properly sized
 	err = value.SetValStr(yottadb.NOTTP, nil, global_name)
 	assert.Nil(t, err)
+	str, err = value.ValStr(yottadb.NOTTP, nil)
+	assert.Nil(t, err)
+	assert.Equal(t, global_name, str)
 
-	/*str, err = value.ValStr(yottadb.NOTTP)
-	assert.Equal(t, *str, global_name)
-	assert.Nil(t, err)*/
-
-	//	std, err = value.
+	// Test that set returns an error when buffer is not properly sized
+	err = value_store.SetValStr(yottadb.NOTTP, nil, global_name)
+	errcode = yottadb.ErrorCode(err)
+	assert.Equal(t, yottadb.YDB_ERR_INVSTRLEN, errcode)
+	str, err = value_store.ValStr(yottadb.NOTTP, nil)
+	assert.Nil(t, err)
+	assert.Equal(t, str, "")
+	r, err := value_store.LenUsed(yottadb.NOTTP, nil)
+	assert.Nil(t, err)
+	assert.Equal(t, r, uint32(0))
 }
 
 func TestValBAry(t *testing.T) {
-	var value, noalloc_value yottadb.BufferT
-	var tp = yottadb.NOTTP
-	var str = "Hello"
+	var value, value_store yottadb.BufferT
+	var global_name = []byte("hello")
+	var length = uint32(len(global_name))
+	var errcode int
+
+	// Get value before being init'd
+	ary, err := value.ValBAry(yottadb.NOTTP, nil)
+	assert.Nil(t, ary)
+	errcode = yottadb.ErrorCode(err)
+	assert.Equal(t, yottadb.YDB_ERR_STRUCTNOTALLOCD, errcode)
+
+	// Test set before Alloc
+	err = value.SetValBAry(yottadb.NOTTP, nil, global_name)
+	errcode = yottadb.ErrorCode(err)
+	assert.Equal(t, yottadb.YDB_ERR_STRUCTNOTALLOCD, errcode)
 
 	defer value.Free()
-	value.Alloc(64)
+	value.Alloc(length + 1)
+	defer value_store.Free()
+	value_store.Alloc(length - 2)
 
-	err := value.SetValStr(tp, nil, str)
+	// Test that allocated unset buffer will not error when retreived
+	ary, err = value.ValBAry(yottadb.NOTTP, nil)
 	assert.Nil(t, err)
+	assert.Equal(t, ary, []byte{})
 
-	bytes, err := value.ValBAry(tp, nil)
+	// Test that set works when buffer is properly sized
+	err = value.SetValBAry(yottadb.NOTTP, nil, global_name)
 	assert.Nil(t, err)
-	assert.Equal(t, bytes, []byte(str))
+	ary, err = value.ValBAry(yottadb.NOTTP, nil)
+	assert.Nil(t, err)
+	assert.Equal(t, ary, global_name)
 
-	// Try to set value on non-alloc'd value
-	err = noalloc_value.SetValBAry(tp, nil, bytes)
-	assert.NotNil(t, err)
-
-	// Try to get value on non-alloc'd value
-	val, err := noalloc_value.ValBAry(tp, nil)
-	assert.NotNil(t, err)
-	assert.Nil(t, val)
+	// Test that set returns an error when buffer is not properly sized
+	err = value_store.SetValBAry(yottadb.NOTTP, nil, global_name)
+	errcode = yottadb.ErrorCode(err)
+	assert.Equal(t, yottadb.YDB_ERR_INVSTRLEN, errcode)
+	ary, err = value_store.ValBAry(yottadb.NOTTP, nil)
+	assert.Nil(t, err)
+	assert.Equal(t, ary, []byte{})
+	r, err := value_store.LenUsed(yottadb.NOTTP, nil)
+	assert.Nil(t, err)
+	assert.Equal(t, r, uint32(0))
 }
 
 func TestDump(t *testing.T) {

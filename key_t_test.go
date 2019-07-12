@@ -23,7 +23,7 @@ import (
 	"time"
 )
 
-func TestDataSt(t *testing.T) {
+func TestDataST(t *testing.T) {
 	var dbkey yottadb.KeyT
 	var ovalue, cvalue yottadb.BufferT
 	var tptoken uint64 = yottadb.NOTTP
@@ -91,22 +91,66 @@ func TestDataSt(t *testing.T) {
 	}
 }
 
-/*func TestDeleteSTNullKeyT(t *testing.T) {
-	var dbkey yottadb.KeyT
+func TestDataSTErrors(t *testing.T) {
 	var tptoken uint64 = yottadb.NOTTP
 	var err error
+	var errstr yottadb.BufferT
+	var dbkey yottadb.KeyT
 
-	// Hijack dbkey from DataST() testing so we can delete tdaSubs and check if it exists
-	err = dbkey.Subary.SetUsed(tptoken, nil, 0)   // No subs are included
+	errstr.Alloc(128)
+
+	// YDB_ERR_INVVARNAME
+	dbkey.Alloc(1, 0, 0)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "^")
 	Assertnoerr(err, t)
-	err = dbkey.DeleteST(tptoken, nil, YdbDelTree())
-	Assertnoerr(err, t)
-	dval, err := dbkey.DataST(tptoken)
-	Assertnoerr(err, t)
-	if 0 != dval {
-		t.Error("FAIL - The ^tdaSubs node still exists after DeleteST() - DataST() returned:", dval)
+	_, err = dbkey.DataST(tptoken, &errstr)
+	errcode := yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_INVVARNAME != errcode {
+		t.Error("The DataST() errorcode for ^ expected to be", yottadb.YDB_ERR_INVVARNAME , "but was", errcode)
 	}
-}*/
+	// YDB_ERR_UNIMPLOP
+	dbkey.Alloc(8, 0, 0)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "$ZCHSET")
+	Assertnoerr(err, t)
+	_, err = dbkey.DataST(tptoken, &errstr)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_UNIMPLOP != errcode {
+		t.Error("The DataST() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_UNIMPLOP , "but was", errcode)
+	}
+	// YDB_ERR_INVSVN
+	dbkey.Alloc(16, 0, 0)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "$NOTATHING")
+	Assertnoerr(err, t)
+	_, err = dbkey.DataST(tptoken, &errstr)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_INVSVN != errcode {
+		t.Error("The DataST() errorcode for $NOTATHING expected to be", yottadb.YDB_ERR_INVSVN , "but was", errcode)
+	}
+	// YDB_ERR_VARNAME2LONG
+	dbkey.Alloc(64, 0, 0)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "a1a2a3a4a5a6a7a8a9a0b1b2b3b4b5b6b7b8b9b0")
+	Assertnoerr(err, t)
+	_, err = dbkey.DataST(tptoken, &errstr)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_VARNAME2LONG != errcode {
+		t.Error("The DataST() errorcode for a too long VarName expected to be", yottadb.YDB_ERR_VARNAME2LONG, "but was", errcode)
+	}
+	// YDB_ERR_MAXNRSUBSCRIPTS
+	dbkey.Alloc(1, 32, 2)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "a")
+	Assertnoerr(err, t)
+	for i := 0; i < 32; i++ {
+		err = dbkey.Subary.SetValStr(tptoken, &errstr, uint32(i), strconv.Itoa(i))
+		Assertnoerr(err, t)
+	}
+	err = dbkey.Subary.SetElemUsed(tptoken, &errstr, 32)
+	Assertnoerr(err, t)
+	_, err = dbkey.DataST(tptoken, &errstr)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_MAXNRSUBSCRIPTS != errcode {
+		t.Error("The DataST() errorcode for node with 32 subscripts expected to be", yottadb.YDB_ERR_MAXNRSUBSCRIPTS , "but was", errcode)
+	}
+}
 
 func TestDeleteST(t *testing.T) {
 	var dbkey yottadb.KeyT
@@ -124,7 +168,7 @@ func TestDeleteST(t *testing.T) {
 	Assertnoerr(err, t)
 	err = dbkey.Subary.SetElemUsed(tptoken, nil, 0) // No subs are included
 	Assertnoerr(err, t)
-	err = dbkey.DeleteST(tptoken, nil, YdbDelTree())
+	err = dbkey.DeleteST(tptoken, nil, yottadb.YDB_DEL_TREE)
 	Assertnoerr(err, t)
 	dval, err := dbkey.DataST(tptoken, nil)
 	Assertnoerr(err, t)
@@ -133,8 +177,149 @@ func TestDeleteST(t *testing.T) {
 	}
 }
 
+func TestDeleteSTErrors(t *testing.T) {
+	var tptoken uint64 = yottadb.NOTTP
+	var err error
+	var errstr yottadb.BufferT
+	var dbkey yottadb.KeyT
+
+	errstr.Alloc(128)
+
+	// YDB_ERR_INVVARNAME
+	dbkey.Alloc(1, 0, 0)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "^")
+	Assertnoerr(err, t)
+	err = dbkey.DeleteST(tptoken, &errstr, yottadb.YDB_DEL_TREE)
+	errcode := yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_INVVARNAME != errcode {
+		t.Error("The DeleteST() errorcode for ^ expected to be", yottadb.YDB_ERR_INVVARNAME , "but was", errcode)
+	}
+	// YDB_ERR_UNIMPLOP - from special variable
+	dbkey.Alloc(8, 0, 0)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "$ZCHSET")
+	Assertnoerr(err, t)
+	err = dbkey.DeleteST(tptoken, &errstr, yottadb.YDB_DEL_TREE)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_UNIMPLOP != errcode {
+		t.Error("The DeleteST() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_UNIMPLOP , "but was", errcode)
+	}
+	// YDB_ERR_INVSVN
+	dbkey.Alloc(16, 0, 0)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "$NOTATHING")
+	Assertnoerr(err, t)
+	err = dbkey.DeleteST(tptoken, &errstr, yottadb.YDB_DEL_TREE)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_INVSVN != errcode {
+		t.Error("The DeleteST() errorcode for $NOTATHING expected to be", yottadb.YDB_ERR_INVSVN , "but was", errcode)
+	}
+	// YDB_ERR_VARNAME2LONG
+	dbkey.Alloc(64, 0, 0)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "a1a2a3a4a5a6a7a8a9a0b1b2b3b4b5b6b7b8b9b0")
+	Assertnoerr(err, t)
+	err = dbkey.DeleteST(tptoken, &errstr, yottadb.YDB_DEL_TREE)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_VARNAME2LONG != errcode {
+		t.Error("The DeleteST() errorcode for a too long VarName expected to be", yottadb.YDB_ERR_VARNAME2LONG, "but was", errcode)
+	}
+	// YDB_ERR_MAXNRSUBSCRIPTS
+	dbkey.Alloc(1, 32, 2)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "a")
+	Assertnoerr(err, t)
+	for i := 0; i < 32; i++ {
+		err = dbkey.Subary.SetValStr(tptoken, &errstr, uint32(i), strconv.Itoa(i))
+		Assertnoerr(err, t)
+	}
+	err = dbkey.Subary.SetElemUsed(tptoken, &errstr, 32)
+	Assertnoerr(err, t)
+	_, err = dbkey.DataST(tptoken, &errstr)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_MAXNRSUBSCRIPTS != errcode {
+		t.Error("The DeleteST() errorcode for node with 32 subscripts expected to be", yottadb.YDB_ERR_MAXNRSUBSCRIPTS , "but was", errcode)
+	}
+	// YDB_ERR_UNIMPLOP - from bad deltype parm (not YDB_DEL_NODE/TREE)
+	dbkey.Alloc(2, 0, 0)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "^a")
+	Assertnoerr(err, t)
+	err = dbkey.DeleteST(tptoken, &errstr, 999)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_UNIMPLOP != errcode {
+		t.Error("The DeleteST() errorcode for ^ expected to be", yottadb.YDB_ERR_UNIMPLOP , "but was", errcode)
+	}
+}
+
 func TestValST(t *testing.T) {
 	// Not tested because it is already tested in TpST() via ValE()
+}
+
+func TestValSTErrors(t *testing.T) {
+	var tptoken uint64 = yottadb.NOTTP
+	var err error
+	var errstr, retval yottadb.BufferT
+	var dbkey yottadb.KeyT
+
+	errstr.Alloc(128)
+	retval.Alloc(4)
+
+	// YDB_ERR_INVVARNAME
+	dbkey.Alloc(1, 0, 0)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "^")
+	Assertnoerr(err, t)
+	err = dbkey.ValST(tptoken, &errstr, &retval)
+	errcode := yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_INVVARNAME != errcode {
+		t.Error("The ValST() errorcode for ^ expected to be", yottadb.YDB_ERR_INVVARNAME , "but was", errcode)
+	}
+	// YDB_ERR_GVUNDEF
+	dbkey.Alloc(16, 0, 0)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "^doesnotexist")
+	Assertnoerr(err, t)
+	err = dbkey.ValST(tptoken, &errstr, &retval)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_GVUNDEF != errcode {
+		t.Error("The ValST() errorcode for ^doesnotexist expected to be", yottadb.YDB_ERR_GVUNDEF , "but was", errcode)
+	}
+	// YDB_ERR_LVUNDEF
+	dbkey.Alloc(16, 0, 0)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "doesnotexist")
+	Assertnoerr(err, t)
+	err = dbkey.ValST(tptoken, &errstr, &retval)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_LVUNDEF != errcode {
+		t.Error("The ValST() errorcode for doesnotexist expected to be", yottadb.YDB_ERR_LVUNDEF , "but was", errcode)
+	}
+	// YDB_ERR_INVSVN
+	dbkey.Alloc(16, 0, 0)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "$NOTATHING")
+	Assertnoerr(err, t)
+	err = dbkey.ValST(tptoken, &errstr, &retval)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_INVSVN != errcode {
+		t.Error("The SetValE() errorcode for $NOTATHING expected to be", yottadb.YDB_ERR_INVSVN , "but was", errcode)
+	}
+	// YDB_ERR_VARNAME2LONG
+	dbkey.Alloc(64, 0, 0)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "a1a2a3a4a5a6a7a8a9a0b1b2b3b4b5b6b7b8b9b0")
+	Assertnoerr(err, t)
+	err = dbkey.ValST(tptoken, &errstr, &retval)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_VARNAME2LONG != errcode {
+		t.Error("The ValST() errorcode for a too long VarName expected to be", yottadb.YDB_ERR_VARNAME2LONG, "but was", errcode)
+	}
+	// YDB_ERR_MAXNRSUBSCRIPTS
+	dbkey.Alloc(1, 32, 2)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "a")
+	Assertnoerr(err, t)
+	for i := 0; i < 32; i++ {
+		err = dbkey.Subary.SetValStr(tptoken, &errstr, uint32(i), strconv.Itoa(i))
+		Assertnoerr(err, t)
+	}
+	err = dbkey.Subary.SetElemUsed(tptoken, &errstr, 32)
+	Assertnoerr(err, t)
+	err = dbkey.ValST(tptoken, &errstr, &retval)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_MAXNRSUBSCRIPTS != errcode {
+		t.Error("The ValST() errorcode for node with 32 subscripts expected to be", yottadb.YDB_ERR_MAXNRSUBSCRIPTS , "but was", errcode)
+	}
 }
 
 func TestIncrST(t *testing.T) {
@@ -182,6 +367,166 @@ func TestIncrST(t *testing.T) {
 	if newval1 != newval2 {
 		t.Error("Returned and post-increment fetch values not same - db :", newval1,
 			"  returned: ", newval2)
+	}
+	// increment by nil which should increase global by 1
+	err = dbkey.Varnm.SetValStr(tptoken, nil, "^ivar")
+	Assertnoerr(err, t)
+	err = dbkey.Subary.SetValStr(tptoken, nil, 0, "isub1")
+	Assertnoerr(err, t)
+	err = dbkey.Subary.SetElemUsed(tptoken, nil, 1)
+	Assertnoerr(err, t)
+	err = incrval.SetValStr(tptoken, nil, "")
+	Assertnoerr(err, t)
+	err = dbkey.IncrST(tptoken, nil, &incrval, &dbval2)
+	Assertnoerr(err, t)
+	newval2, err = dbval2.ValStr(tptoken, nil)
+	Assertnoerr(err, t)
+	newval2i, err = strconv.Atoi(newval2)
+	Assertnoerr(err, t)
+	if newval2i != 45 {
+		t.Error("The expected increment value is 45 but it is", newval2)
+	}
+	// Fetch the value and verify same as what we got back from IncrST()
+	err = dbkey.ValST(tptoken, nil, &dbval1)
+	Assertnoerr(err, t)
+	newval1, err = dbval1.ValStr(tptoken, nil)
+	if newval1 != newval2 {
+		t.Error("Returned and post-increment fetch values not same - db :", newval1,
+			"  returned: ", newval2)
+	}
+	// Increment a nonexistant node, check that it is set to the increment
+	err = dbkey.Varnm.SetValStr(tptoken, nil, "^ivar")
+	Assertnoerr(err, t)
+	err = dbkey.Subary.SetValStr(tptoken, nil, 0, "isub2")
+	Assertnoerr(err, t)
+	err = dbkey.Subary.SetElemUsed(tptoken, nil, 1)
+	Assertnoerr(err, t)
+	err = incrval.SetValStr(tptoken, nil, "9001")
+	Assertnoerr(err, t)
+	err = dbkey.IncrST(tptoken, nil, &incrval, &dbval2)
+	Assertnoerr(err, t)
+	newval2, err = dbval2.ValStr(tptoken, nil)
+	Assertnoerr(err, t)
+	newval2i, err = strconv.Atoi(newval2)
+	Assertnoerr(err, t)
+	if newval2i != 9001 {
+		t.Error("The expected increment value is 9001 but it is", newval2)
+	}
+	// Fetch the value and verify same as what we got back from IncrST()
+	err = dbkey.ValST(tptoken, nil, &dbval1)
+	Assertnoerr(err, t)
+	newval1, err = dbval1.ValStr(tptoken, nil)
+	if newval1 != newval2 {
+		t.Error("Returned and post-increment fetch values not same - db :", newval1,
+			"  returned: ", newval2)
+	}
+	// Increment a non-cannonical number, check that it is foreced to a number
+	err = dbkey.Varnm.SetValStr(tptoken, nil, "^ivar")
+	Assertnoerr(err, t)
+	err = dbkey.Subary.SetValStr(tptoken, nil, 0, "isub1")
+	Assertnoerr(err, t)
+	err = dbkey.Subary.SetElemUsed(tptoken, nil, 1)
+	Assertnoerr(err, t)
+	err = dbval1.SetValStr(tptoken, nil, "This is not a number")
+	Assertnoerr(err, t)
+	err = dbkey.SetValST(tptoken, nil, &dbval1) // Set the initial value into the node
+	err = incrval.SetValStr(tptoken, nil, "1337")
+	Assertnoerr(err, t)
+	err = dbkey.IncrST(tptoken, nil, &incrval, &dbval2)
+	Assertnoerr(err, t)
+	newval2, err = dbval2.ValStr(tptoken, nil)
+	Assertnoerr(err, t)
+	newval2i, err = strconv.Atoi(newval2)
+	Assertnoerr(err, t)
+	if newval2i != 1337 {
+		t.Error("The expected increment value is 1337 but it is", newval2)
+	}
+	// Fetch the value and verify same as what we got back from IncrST()
+	err = dbkey.ValST(tptoken, nil, &dbval1)
+	Assertnoerr(err, t)
+	newval1, err = dbval1.ValStr(tptoken, nil)
+	if newval1 != newval2 {
+		t.Error("Returned and post-increment fetch values not same - db :", newval1,
+			"  returned: ", newval2)
+	}
+}
+
+func TestIncrSTErrors(t *testing.T) {
+	var tptoken uint64 = yottadb.NOTTP
+	var err error
+	var errstr, incrval, retval yottadb.BufferT
+	var dbkey yottadb.KeyT
+
+	errstr.Alloc(128)
+	incrval.Alloc(16)
+	retval.Alloc(128)
+	err = incrval.SetValStr(tptoken, nil, "")
+	Assertnoerr(err, t)
+
+	// YDB_ERR_INVVARNAME
+	dbkey.Alloc(1, 0, 0)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "^")
+	Assertnoerr(err, t)
+	err = dbkey.IncrST(tptoken, &errstr, &incrval, &retval)
+	errcode := yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_INVVARNAME != errcode {
+		t.Error("The IncrST() errorcode for ^ expected to be", yottadb.YDB_ERR_INVVARNAME , "but was", errcode)
+	}
+	// YDB_ERR_UNIMPLOP
+	dbkey.Alloc(8, 0, 0)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "$ZCHSET")
+	Assertnoerr(err, t)
+	err = dbkey.IncrST(tptoken, &errstr, &incrval, &retval)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_UNIMPLOP != errcode {
+		t.Error("The IncrST() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_UNIMPLOP , "but was", errcode)
+	}
+	// YDB_ERR_INVSVN
+	dbkey.Alloc(16, 0, 0)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "$NOTATHING")
+	Assertnoerr(err, t)
+	err = dbkey.IncrST(tptoken, &errstr, &incrval, &retval)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_INVSVN != errcode {
+		t.Error("The IncrST() errorcode for $NOTATHING expected to be", yottadb.YDB_ERR_INVSVN , "but was", errcode)
+	}
+	// YDB_ERR_VARNAME2LONG
+	dbkey.Alloc(64, 0, 0)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "a1a2a3a4a5a6a7a8a9a0b1b2b3b4b5b6b7b8b9b0")
+	Assertnoerr(err, t)
+	err = dbkey.IncrST(tptoken, &errstr, &incrval, &retval)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_VARNAME2LONG != errcode {
+		t.Error("The IncrST() errorcode for a too long VarName expected to be", yottadb.YDB_ERR_VARNAME2LONG, "but was", errcode)
+	}
+	// YDB_ERR_MAXNRSUBSCRIPTS
+	dbkey.Alloc(1, 32, 2)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "a")
+	for i := 0; i < 32; i++ {
+		err = dbkey.Subary.SetValStr(tptoken, &errstr, uint32(i), strconv.Itoa(i))
+		Assertnoerr(err, t)
+	}
+	err = dbkey.Subary.SetElemUsed(tptoken, &errstr, 32)
+	Assertnoerr(err, t)
+	err = dbkey.IncrST(tptoken, &errstr, &incrval, &retval)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_MAXNRSUBSCRIPTS != errcode {
+		t.Error("The IncrST() errorcode for node with 32 subscripts expected to be", yottadb.YDB_ERR_MAXNRSUBSCRIPTS , "but was", errcode)
+	}
+	// YDB_ERR_NUMOFLOW
+	dbkey.Alloc(8, 1, 8)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "^ivar")
+	Assertnoerr(err, t)
+	err = dbkey.Subary.SetValStr(tptoken, &errstr, 0, "newsub")
+	Assertnoerr(err, t)
+	err = dbkey.Subary.SetElemUsed(tptoken, &errstr, 1)
+	Assertnoerr(err, t)
+	err = incrval.SetValStr(tptoken, &errstr, "1E12345")
+	Assertnoerr(err, t)
+	err = dbkey.IncrST(tptoken, &errstr, &incrval, &retval)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_NUMOFLOW != errcode {
+		t.Error("The IncrE() errorcode for incrementing by 1E12345 expected to be", yottadb.YDB_ERR_NUMOFLOW , "but was", errcode)
 	}
 }
 
@@ -236,6 +581,125 @@ func TestLockIncrSt(t *testing.T) {
 	}
 	err = yottadb.LockST(tptoken, nil, 0) // Release all locks
 	Assertnoerr(err, t)
+}
+
+func TestLockIncrSTErrors(t *testing.T) {
+	var tptoken uint64 = yottadb.NOTTP
+	var err error
+	var errstr yottadb.BufferT
+	var dbkey yottadb.KeyT
+
+	errstr.Alloc(128)
+
+	// YDB_ERR_INVVARNAME
+	dbkey.Alloc(1, 0, 0)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "^")
+	Assertnoerr(err, t)
+	err = dbkey.LockIncrST(tptoken, &errstr, 0)
+	errcode := yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_INVVARNAME != errcode {
+		t.Error("The LockIncrST() errorcode for ^ expected to be", yottadb.YDB_ERR_INVVARNAME , "but was", errcode)
+	}
+	// YDB_ERR_UNIMPLOP
+	dbkey.Alloc(8, 0, 0)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "$ZCHSET")
+	Assertnoerr(err, t)
+	err = dbkey.LockIncrST(tptoken, &errstr, 0)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_UNIMPLOP != errcode {
+		t.Error("The LockIncrST() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_UNIMPLOP , "but was", errcode)
+	}
+	// YDB_ERR_INVSVN
+	dbkey.Alloc(16, 0, 0)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "$NOTATHING")
+	Assertnoerr(err, t)
+	err = dbkey.LockIncrST(tptoken, &errstr, 0)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_INVSVN != errcode {
+		t.Error("The LockIncrST() errorcode for $NOTATHING expected to be", yottadb.YDB_ERR_INVSVN , "but was", errcode)
+	}
+	// YDB_ERR_VARNAME2LONG
+	dbkey.Alloc(64, 0, 0)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "a1a2a3a4a5a6a7a8a9a0b1b2b3b4b5b6b7b8b9b0")
+	Assertnoerr(err, t)
+	err = dbkey.LockIncrST(tptoken, &errstr, 0)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_VARNAME2LONG != errcode {
+		t.Error("The LockIncrST() errorcode for a too long VarName expected to be", yottadb.YDB_ERR_VARNAME2LONG, "but was", errcode)
+	}
+	// YDB_ERR_MAXNRSUBSCRIPTS
+	dbkey.Alloc(1, 35, 2)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "a")
+	Assertnoerr(err, t)
+	for i := 0; i < 35; i++ {
+		err = dbkey.Subary.SetValStr(tptoken, &errstr, uint32(i), strconv.Itoa(i))
+		Assertnoerr(err, t)
+	}
+	err = dbkey.Subary.SetElemUsed(tptoken, &errstr, 35)
+	Assertnoerr(err, t)
+	err = dbkey.LockIncrST(tptoken, &errstr, 0)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_MAXNRSUBSCRIPTS != errcode {
+		t.Error("The LockIncrST() errorcode for node with 35 subscripts expected to be", yottadb.YDB_ERR_MAXNRSUBSCRIPTS , "but was", errcode)
+	}
+	// YDB_ERR_TIME2LONG
+	dbkey.Alloc(1, 0, 0)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "a")
+	Assertnoerr(err, t)
+	err = dbkey.LockIncrST(tptoken, &errstr, yottadb.YDB_MAX_TIME_NSEC + 1)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_TIME2LONG != errcode {
+		t.Error("The LockIncrE() errorcode for timeout of YDB_ERR_MAX_TIME_NSEC+1 expected to be", yottadb.YDB_ERR_TIME2LONG , "but was", errcode)
+	}
+
+	// YDB_ERR_INVVARNAME
+	dbkey.Alloc(1, 0, 0)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "^")
+	Assertnoerr(err, t)
+	err = dbkey.LockDecrST(tptoken, &errstr)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_INVVARNAME != errcode {
+		t.Error("The LockDecrST() errorcode for ^ expected to be", yottadb.YDB_ERR_INVVARNAME , "but was", errcode)
+	}
+	// YDB_ERR_UNIMPLOP
+	dbkey.Alloc(8, 0, 0)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "$ZCHSET")
+	Assertnoerr(err, t)
+	err = dbkey.LockDecrST(tptoken, &errstr)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_UNIMPLOP != errcode {
+		t.Error("The LockDecrST() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_UNIMPLOP , "but was", errcode)
+	}
+	// YDB_ERR_INVSVN
+	dbkey.Alloc(16, 0, 0)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "$NOTATHING")
+	Assertnoerr(err, t)
+	err = dbkey.LockDecrST(tptoken, &errstr)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_INVSVN != errcode {
+		t.Error("The LockDecrST() errorcode for $NOTATHING expected to be", yottadb.YDB_ERR_INVSVN , "but was", errcode)
+	}
+	// YDB_ERR_VARNAME2LONG
+	dbkey.Alloc(64, 0, 0)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "a1a2a3a4a5a6a7a8a9a0b1b2b3b4b5b6b7b8b9b0")
+	Assertnoerr(err, t)
+	err = dbkey.LockDecrST(tptoken, &errstr)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_VARNAME2LONG != errcode {
+		t.Error("The LockDecrST() errorcode for a too long VarName expected to be", yottadb.YDB_ERR_VARNAME2LONG, "but was", errcode)
+	}
+	// YDB_ERR_MAXNRSUBSCRIPTS
+	dbkey.Alloc(1, 35, 2)
+	dbkey.Varnm.SetValStr(tptoken, &errstr, "a")
+	for i := 0; i < 35; i++ {
+		dbkey.Subary.SetValStr(tptoken, &errstr, uint32(i), strconv.Itoa(i))
+	}
+	dbkey.Subary.SetElemUsed(tptoken, &errstr, 35)
+	err = dbkey.LockDecrST(tptoken, &errstr)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_MAXNRSUBSCRIPTS != errcode {
+		t.Error("The LockDecrST() errorcode for node with 35 subscripts expected to be", yottadb.YDB_ERR_MAXNRSUBSCRIPTS , "but was", errcode)
+	}
 }
 
 func TestNodeNextST(t *testing.T) {
@@ -361,8 +825,187 @@ func TestNodeNextST(t *testing.T) {
 
 }
 
+func TestNodeNextSTErrors(t *testing.T) {
+	var tptoken uint64 = yottadb.NOTTP
+	var err error
+	var errstr yottadb.BufferT
+	var retval yottadb.BufferTArray
+	var dbkey yottadb.KeyT
+
+	errstr.Alloc(128)
+	retval.Alloc(1,128)
+
+	// YDB_ERR_INVVARNAME
+	dbkey.Alloc(1, 0, 0)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "^")
+	Assertnoerr(err, t)
+	err = dbkey.NodeNextST(tptoken, &errstr, &retval)
+	errcode := yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_INVVARNAME != errcode {
+		t.Error("The NodeNextST() errorcode for ^ expected to be", yottadb.YDB_ERR_INVVARNAME , "but was", errcode)
+	}
+	// YDB_ERR_UNIMPLOP
+	dbkey.Alloc(8, 0, 0)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "$ZCHSET")
+	Assertnoerr(err, t)
+	err = dbkey.NodeNextST(tptoken, &errstr, &retval)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_UNIMPLOP != errcode {
+		t.Error("The NodeNextST() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_UNIMPLOP , "but was", errcode)
+	}
+	// YDB_ERR_INVSVN
+	dbkey.Alloc(16, 0, 0)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "$NOTATHING")
+	Assertnoerr(err, t)
+	err = dbkey.NodeNextST(tptoken, &errstr, &retval)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_INVSVN != errcode {
+		t.Error("The NodeNextST() errorcode for $NOTATHING expected to be", yottadb.YDB_ERR_INVSVN , "but was", errcode)
+	}
+	// YDB_ERR_VARNAME2LONG
+	dbkey.Alloc(64, 0, 0)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "a1a2a3a4a5a6a7a8a9a0b1b2b3b4b5b6b7b8b9b0")
+	Assertnoerr(err, t)
+	err = dbkey.NodeNextST(tptoken, &errstr, &retval)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_VARNAME2LONG != errcode {
+		t.Error("The NodeNextST() errorcode for a too long VarName expected to be", yottadb.YDB_ERR_VARNAME2LONG, "but was", errcode)
+	}
+	// YDB_ERR_MAXNRSUBSCRIPTS
+	dbkey.Alloc(1, 32, 2)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "a")
+	Assertnoerr(err, t)
+	for i := 0; i < 32; i++ {
+		err = dbkey.Subary.SetValStr(tptoken, &errstr, uint32(i), strconv.Itoa(i))
+		Assertnoerr(err, t)
+	}
+	err = dbkey.Subary.SetElemUsed(tptoken, &errstr, 32)
+	Assertnoerr(err, t)
+	err = dbkey.NodeNextST(tptoken, &errstr, &retval)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_MAXNRSUBSCRIPTS != errcode {
+		t.Error("The NodeNextST() errorcode for node with 32 subscripts expected to be", yottadb.YDB_ERR_MAXNRSUBSCRIPTS , "but was", errcode)
+	}
+
+	// YDB_ERR_INVVARNAME
+	dbkey.Alloc(1, 0, 0)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "^")
+	Assertnoerr(err, t)
+	err = dbkey.NodePrevST(tptoken, &errstr, &retval)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_INVVARNAME != errcode {
+		t.Error("The NodePrevST() errorcode for ^ expected to be", yottadb.YDB_ERR_INVVARNAME , "but was", errcode)
+	}
+	// YDB_ERR_UNIMPLOP
+	dbkey.Alloc(8, 0, 0)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "$ZCHSET")
+	Assertnoerr(err, t)
+	err = dbkey.NodePrevST(tptoken, &errstr, &retval)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_UNIMPLOP != errcode {
+		t.Error("The NodePrevST() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_UNIMPLOP , "but was", errcode)
+	}
+	// YDB_ERR_INVSVN
+	dbkey.Alloc(16, 0, 0)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "$NOTATHING")
+	Assertnoerr(err, t)
+	err = dbkey.NodePrevST(tptoken, &errstr, &retval)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_INVSVN != errcode {
+		t.Error("The NodePrevST() errorcode for $NOTATHING expected to be", yottadb.YDB_ERR_INVSVN , "but was", errcode)
+	}
+	// YDB_ERR_VARNAME2LONG
+	dbkey.Alloc(64, 0, 0)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "a1a2a3a4a5a6a7a8a9a0b1b2b3b4b5b6b7b8b9b0")
+	Assertnoerr(err, t)
+	err = dbkey.NodePrevST(tptoken, &errstr, &retval)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_VARNAME2LONG != errcode {
+		t.Error("The NodePrevST() errorcode for a too long VarName expected to be", yottadb.YDB_ERR_VARNAME2LONG, "but was", errcode)
+	}
+	// YDB_ERR_MAXNRSUBSCRIPTS
+	dbkey.Alloc(1, 32, 2)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "a")
+	Assertnoerr(err, t)
+	for i := 0; i < 32; i++ {
+		err = dbkey.Subary.SetValStr(tptoken, &errstr, uint32(i), strconv.Itoa(i))
+		Assertnoerr(err, t)
+	}
+	err = dbkey.Subary.SetElemUsed(tptoken, &errstr, 32)
+	Assertnoerr(err, t)
+	err = dbkey.NodePrevST(tptoken, &errstr, &retval)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_MAXNRSUBSCRIPTS != errcode {
+		t.Error("The NodePrevST() errorcode for node with 32 subscripts expected to be", yottadb.YDB_ERR_MAXNRSUBSCRIPTS , "but was", errcode)
+	}
+}
+
 func TestSetValST(t *testing.T) {
-	// Already tested in tests for IncrST(), TpST() directly and several other tests using SetValE()
+	// Already tested in tests for IncrST(), TpST() directly and several other tests using SetValST()
+}
+
+func TestSetValSTErrors(t *testing.T) {
+	var tptoken uint64 = yottadb.NOTTP
+	var err error
+	var errstr, value yottadb.BufferT
+	var dbkey yottadb.KeyT
+
+	errstr.Alloc(128)
+	value.Alloc(128)
+	err = value.SetValStr(tptoken, &errstr, "A Value")
+	Assertnoerr(err, t)
+
+	// YDB_ERR_INVVARNAME
+	dbkey.Alloc(1, 0, 0)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "^")
+	Assertnoerr(err, t)
+	err = dbkey.SetValST(tptoken, &errstr, &value)
+	errcode := yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_INVVARNAME != errcode {
+		t.Error("The SetValST() errorcode for ^ expected to be", yottadb.YDB_ERR_INVVARNAME , "but was", errcode)
+	}
+	// YDB_ERR_SVNOSET
+	dbkey.Alloc(8, 0, 0)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "$ZCHSET")
+	Assertnoerr(err, t)
+	err = dbkey.SetValST(tptoken, &errstr, &value)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_SVNOSET != errcode {
+		t.Error("The SetValE() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_SVNOSET , "but was", errcode)
+	}
+	// YDB_ERR_INVSVN
+	dbkey.Alloc(16, 0, 0)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "$NOTATHING")
+	Assertnoerr(err, t)
+	err = dbkey.SetValST(tptoken, &errstr, &value)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_INVSVN != errcode {
+		t.Error("The SetValE() errorcode for $NOTATHING expected to be", yottadb.YDB_ERR_INVSVN , "but was", errcode)
+	}
+	// YDB_ERR_VARNAME2LONG
+	dbkey.Alloc(64, 0, 0)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "a1a2a3a4a5a6a7a8a9a0b1b2b3b4b5b6b7b8b9b0")
+	Assertnoerr(err, t)
+	err = dbkey.SetValST(tptoken, &errstr, &value)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_VARNAME2LONG != errcode {
+		t.Error("The SetValST() errorcode for a too long VarName expected to be", yottadb.YDB_ERR_VARNAME2LONG, "but was", errcode)
+	}
+	// YDB_ERR_MAXNRSUBSCRIPTS
+	dbkey.Alloc(1, 32, 2)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "a")
+	Assertnoerr(err, t)
+	for i := 0; i < 32; i++ {
+		err = dbkey.Subary.SetValStr(tptoken, &errstr, uint32(i), strconv.Itoa(i))
+		Assertnoerr(err, t)
+	}
+	err = dbkey.Subary.SetElemUsed(tptoken, &errstr, 32)
+	Assertnoerr(err, t)
+	err = dbkey.SetValST(tptoken, &errstr, &value)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_MAXNRSUBSCRIPTS != errcode {
+		t.Error("The SetValST() errorcode for node with 32 subscripts expected to be", yottadb.YDB_ERR_MAXNRSUBSCRIPTS , "but was", errcode)
+	}
 }
 
 func TestSubNextST(t *testing.T) {
@@ -471,6 +1114,120 @@ func TestSubNextST(t *testing.T) {
 	}
 }
 
+func TestSubNextSTErrors(t *testing.T) {
+	var tptoken uint64 = yottadb.NOTTP
+	var err error
+	var errstr, retval yottadb.BufferT
+	var dbkey yottadb.KeyT
+
+	errstr.Alloc(128)
+	retval.Alloc(128)
+
+	// YDB_ERR_INVVARNAME
+	dbkey.Alloc(1, 0, 0)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "^")
+	Assertnoerr(err, t)
+	err = dbkey.SubNextST(tptoken, &errstr, &retval)
+	errcode := yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_INVVARNAME != errcode {
+		t.Error("The SubNextST() errorcode for ^ expected to be", yottadb.YDB_ERR_INVVARNAME , "but was", errcode)
+	}
+	// YDB_ERR_UNIMPLOP
+	dbkey.Alloc(8, 0, 0)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "$ZCHSET")
+	Assertnoerr(err, t)
+	err = dbkey.SubNextST(tptoken, &errstr, &retval)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_UNIMPLOP != errcode {
+		t.Error("The SubNextST() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_UNIMPLOP , "but was", errcode)
+	}
+	// YDB_ERR_INVSVN
+	dbkey.Alloc(16, 0, 0)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "$NOTATHING")
+	Assertnoerr(err, t)
+	err = dbkey.SubNextST(tptoken, &errstr, &retval)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_INVSVN != errcode {
+		t.Error("The SubNextST() errorcode for $NOTATHING expected to be", yottadb.YDB_ERR_INVSVN , "but was", errcode)
+	}
+	// YDB_ERR_VARNAME2LONG
+	dbkey.Alloc(64, 0, 0)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "a1a2a3a4a5a6a7a8a9a0b1b2b3b4b5b6b7b8b9b0")
+	Assertnoerr(err, t)
+	err = dbkey.SubNextST(tptoken, &errstr, &retval)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_VARNAME2LONG != errcode {
+		t.Error("The SubNextST() errorcode for a too long VarName expected to be", yottadb.YDB_ERR_VARNAME2LONG, "but was", errcode)
+	}
+	// YDB_ERR_MAXNRSUBSCRIPTS
+	dbkey.Alloc(1, 32, 2)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "a")
+	Assertnoerr(err, t)
+	for i := 0; i < 32; i++ {
+		err = dbkey.Subary.SetValStr(tptoken, &errstr, uint32(i), strconv.Itoa(i))
+		Assertnoerr(err, t)
+	}
+	err = dbkey.Subary.SetElemUsed(tptoken, &errstr, 32)
+	Assertnoerr(err, t)
+	err = dbkey.SubNextST(tptoken, &errstr, &retval)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_MAXNRSUBSCRIPTS != errcode {
+		t.Error("The SubNextST() errorcode for node with 32 subscripts expected to be", yottadb.YDB_ERR_MAXNRSUBSCRIPTS , "but was", errcode)
+	}
+
+	// YDB_ERR_INVVARNAME
+	dbkey.Alloc(1, 0, 0)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "^")
+	Assertnoerr(err, t)
+	err = dbkey.SubPrevST(tptoken, &errstr, &retval)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_INVVARNAME != errcode {
+		t.Error("The SubPrevST() errorcode for ^ expected to be", yottadb.YDB_ERR_INVVARNAME , "but was", errcode)
+	}
+	// YDB_ERR_UNIMPLOP
+	dbkey.Alloc(8, 0, 0)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "$ZCHSET")
+	Assertnoerr(err, t)
+	err = dbkey.SubPrevST(tptoken, &errstr, &retval)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_UNIMPLOP != errcode {
+		t.Error("The SubPrevST() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_UNIMPLOP , "but was", errcode)
+	}
+	// YDB_ERR_INVSVN
+	dbkey.Alloc(16, 0, 0)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "$NOTATHING")
+	Assertnoerr(err, t)
+	err = dbkey.SubPrevST(tptoken, &errstr, &retval)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_INVSVN != errcode {
+		t.Error("The SubPrevST() errorcode for $NOTATHING expected to be", yottadb.YDB_ERR_INVSVN , "but was", errcode)
+	}
+	// YDB_ERR_VARNAME2LONG
+	dbkey.Alloc(64, 0, 0)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "a1a2a3a4a5a6a7a8a9a0b1b2b3b4b5b6b7b8b9b0")
+	Assertnoerr(err, t)
+	err = dbkey.SubPrevST(tptoken, &errstr, &retval)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_VARNAME2LONG != errcode {
+		t.Error("The SubPrevST() errorcode for a too long VarName expected to be", yottadb.YDB_ERR_VARNAME2LONG, "but was", errcode)
+	}
+	// YDB_ERR_MAXNRSUBSCRIPTS
+	dbkey.Alloc(1, 32, 2)
+	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "a")
+	Assertnoerr(err, t)
+	for i := 0; i < 32; i++ {
+		err = dbkey.Subary.SetValStr(tptoken, &errstr, uint32(i), strconv.Itoa(i))
+		Assertnoerr(err, t)
+	}
+	err = dbkey.Subary.SetElemUsed(tptoken, &errstr, 32)
+	Assertnoerr(err, t)
+	err = dbkey.SubPrevST(tptoken, &errstr, &retval)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_MAXNRSUBSCRIPTS != errcode {
+		t.Error("The SubPrevST() errorcode for node with 32 subscripts expected to be", yottadb.YDB_ERR_MAXNRSUBSCRIPTS , "but was", errcode)
+	}
+}
+
 func TestKeyTDumpToWriter(t *testing.T) {
 	var value yottadb.KeyT
 	var buf1 bytes.Buffer
@@ -534,25 +1291,22 @@ func TestKeyTGetValueThatWontFitInBuffer(t *testing.T) {
 
 	// Get the value
 	err = key.ValST(tptoken, nil, &buff)
-	assert.NotNil(t, err)
 	errcode := yottadb.ErrorCode(err)
 	assert.Equal(t, yottadb.YDB_ERR_INVSTRLEN, errcode)
 
-	// Verify that getting len on the buffer results in error
+	// Check LenUsed() returns length attempted to store
 	lenneeded, err := buff.LenUsed(tptoken, nil)
 	assert.Nil(t, err)
 	assert.Equal(t, lenneeded, uint32(11))
 
 	// Verify that getting val on the buffer results in error
 	_, err = buff.ValBAry(tptoken, nil)
-	assert.NotNil(t, err)
 	errcode = yottadb.ErrorCode(err)
 	assert.Equal(t, yottadb.YDB_ERR_INVSTRLEN, errcode)
 	assert.Equal(t, "%YDB-E-INVSTRLEN, Invalid string length 11: max 10", err.Error())
 
 	// Verify that getting len on the buffer results in error
 	_, err = buff.ValStr(tptoken, nil)
-	assert.NotNil(t, err)
 	errcode = yottadb.ErrorCode(err)
 	assert.Equal(t, yottadb.YDB_ERR_INVSTRLEN, errcode)
 	assert.Equal(t, "%YDB-E-INVSTRLEN, Invalid string length 11: max 10", err.Error())
@@ -586,26 +1340,22 @@ func TestKeyTNodeNextWithSmallBufAry(t *testing.T) {
 
 	buftary.Alloc(1, 5) // Make buffer too small
 	err = key.NodeNextST(tptoken, nil, &buftary)
-	assert.NotNil(t, err)
 	errcode = yottadb.ErrorCode(err)
 	assert.Equal(t, yottadb.YDB_ERR_INVSTRLEN, errcode)
 
 	_, err = buftary.ValStr(tptoken, nil, 0)
-	assert.NotNil(t, err)
 	errcode = yottadb.ErrorCode(err)
 	assert.Equal(t, yottadb.YDB_ERR_INVSTRLEN, errcode)
 	assert.Equal(t, "%YDB-E-INVSTRLEN, Invalid string length 12: max 5", err.Error())
 	buftary.SetElemUsed(tptoken, nil, 1)
 
 	_, err = buftary.ValBAry(tptoken, nil, 0)
-	assert.NotNil(t, err)
 	errcode = yottadb.ErrorCode(err)
 	assert.Equal(t, yottadb.YDB_ERR_INVSTRLEN, errcode)
 	assert.Equal(t, "%YDB-E-INVSTRLEN, Invalid string length 12: max 5", err.Error())
 	buftary.SetElemUsed(tptoken, nil, 1)
 
 	err = buftary.SetValStr(tptoken, nil, 0, "Hello world")
-	assert.NotNil(t, err)
 	errcode = yottadb.ErrorCode(err)
 	assert.Equal(t, yottadb.YDB_ERR_INVSTRLEN, errcode)
 	assert.Equal(t, "%YDB-E-INVSTRLEN, Invalid string length 11: max 5", err.Error())
@@ -615,6 +1365,7 @@ func TestKeyTNodeNextWithSmallBufAry(t *testing.T) {
 func TestKeyTGetWithUndefGlobal(t *testing.T) {
 	var key yottadb.KeyT
 	var errstr, out yottadb.BufferT
+	var errcode int
 
 	tptoken := yottadb.NOTTP
 
@@ -628,8 +1379,8 @@ func TestKeyTGetWithUndefGlobal(t *testing.T) {
 	out.Alloc(64)
 
 	err := key.ValST(tptoken, &errstr, &out)
-	assert.NotNil(t, err)
-	assert.Contains(t, err.Error(), "YDB-E-GVUNDEF")
+	errcode = yottadb.ErrorCode(err)
+	assert.Equal(t, yottadb.YDB_ERR_GVUNDEF, errcode)
 }
 
 func TestKeyTSetWithDifferentErrors(t *testing.T) {

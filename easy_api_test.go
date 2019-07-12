@@ -65,6 +65,45 @@ func TestDataE(t *testing.T) {
 	}
 }
 
+func TestDataEErrors(t *testing.T) {
+	var tptoken uint64 = yottadb.NOTTP
+	var err error
+	var errstr yottadb.BufferT
+
+	errstr.Alloc(128)
+
+	// YDB_ERR_INVVARNAME
+	_, err = yottadb.DataE(tptoken, &errstr, "^", []string{})
+	errcode := yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_INVVARNAME != errcode {
+		t.Error("The DataE() errorcode for ^ expected to be", yottadb.YDB_ERR_INVVARNAME, "but was", errcode)
+	}
+	// YDB_ERR_UNIMPLOP
+	_, err = yottadb.DataE(tptoken, &errstr, "$ZCHSET", []string{})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_UNIMPLOP != errcode {
+		t.Error("The DataE() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_UNIMPLOP, "but was", errcode)
+	}
+	// YDB_ERR_INVSVN
+	_, err = yottadb.DataE(tptoken, &errstr, "$NOTATHING", []string{})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_INVSVN != errcode {
+		t.Error("The DataE() errorcode for $NOTATHING expected to be", yottadb.YDB_ERR_INVSVN, "but was", errcode)
+	}
+	// YDB_ERR_VARNAME2LONG
+	_, err = yottadb.DataE(yottadb.NOTTP, &errstr, "a1a2a3a4a5a6a7a8a9a0b1b2b3b4b5b6b7b8b9b0", []string{})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_VARNAME2LONG != errcode {
+		t.Error("The DataE() errorcode for a too long VarName expected to be", yottadb.YDB_ERR_VARNAME2LONG, "but was", errcode)
+	}
+	// YDB_ERR_MAXNRSUBSCRIPTS
+	_, err = yottadb.DataE(yottadb.NOTTP, &errstr, "a", []string{"1","2","3","4","5","6","7","8","9","10","11","12","13","14","15","16","17","18","19","20","21","22","23","24","25","26","27","28","29","30","31","32"})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_MAXNRSUBSCRIPTS != errcode {
+		t.Error("The DataE() errorcode for node with 32 subscripts expected to be", yottadb.YDB_ERR_MAXNRSUBSCRIPTS, "but was", errcode)
+	}
+}
+
 func TestDeleteE(t *testing.T) {
 	var tptoken uint64 = yottadb.NOTTP
 	var err error
@@ -80,18 +119,71 @@ func TestDeleteE(t *testing.T) {
 	Assertnoerr(err, t)
 	err = yottadb.SetValE(tptoken, &errstr, "val3", "^tdaSubs", []string{"sub1", "sub2", "sub3"})
 	Assertnoerr(err, t)
-	err = yottadb.DeleteE(tptoken, &errstr, GetYDB_DEL_TREE(), "^tdaSubs", []string{})
+	err = yottadb.DeleteE(tptoken, &errstr, yottadb.YDB_DEL_TREE, "^tdaSubs", []string{})
 	Assertnoerr(err, t)
 	dval, err = yottadb.DataE(tptoken, &errstr, "^tdaSubs", []string{})
 	Assertnoerr(err, t)
 	if 0 != dval {
 		t.Error("The ^tdaSubs node still exists after DeleteE() - DataE() returned:", dval)
 	}
+	err = yottadb.DeleteE(tptoken, &errstr, yottadb.YDB_DEL_NODE, "^tdaNoSubs", []string{})
+	Assertnoerr(err, t)
+	dval, err = yottadb.DataE(tptoken, &errstr, "^tdaNoSubs", []string{})
+	Assertnoerr(err, t)
+	if 0 != dval {
+		t.Error("The ^tdaNoSubs node still exists after DeleteE() - DataE() returned:", dval)
+	}
+}
+
+func TestDeleteEErrors(t *testing.T) {
+	var tptoken uint64 = yottadb.NOTTP
+	var err error
+	var errstr yottadb.BufferT
+
+	errstr.Alloc(128)
+
+	// YDB_ERR_INVVARNAME
+	err = yottadb.DeleteE(tptoken, &errstr, yottadb.YDB_DEL_TREE, "^", []string{})
+	errcode := yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_INVVARNAME != errcode {
+		t.Error("The DeleteE() errorcode for ^ expected to be", yottadb.YDB_ERR_INVVARNAME, "but was", errcode)
+	}
+	// YDB_ERR_UNIMPLOP - from special variable
+	err = yottadb.DeleteE(tptoken, &errstr, yottadb.YDB_DEL_TREE, "$ZCHSET", []string{})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_UNIMPLOP != errcode {
+		t.Error("The DeleteE() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_UNIMPLOP, "but was", errcode)
+	}
+	// YDB_ERR_INVSVN
+	err = yottadb.DeleteE(tptoken, &errstr, yottadb.YDB_DEL_TREE, "$NOTATHING", []string{})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_INVSVN != errcode {
+		t.Error("The DeleteE() errorcode for $NOTATHING expected to be", yottadb.YDB_ERR_INVSVN, "but was", errcode)
+	}
+	// YDB_ERR_VARNAME2LONG
+	err = yottadb.DeleteE(yottadb.NOTTP, &errstr, yottadb.YDB_DEL_TREE, "a1a2a3a4a5a6a7a8a9a0b1b2b3b4b5b6b7b8b9b0", []string{})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_VARNAME2LONG != errcode {
+		t.Error("The DeleteE() errorcode for a too long VarName expected to be", yottadb.YDB_ERR_VARNAME2LONG, "but was", errcode)
+	}
+	// YDB_ERR_MAXNRSUBSCRIPTS
+	err = yottadb.DeleteE(yottadb.NOTTP, &errstr, yottadb.YDB_DEL_TREE, "a", []string{"1","2","3","4","5","6","7","8","9","10","11","12","13","14","15","16","17","18","19","20","21","22","23","24","25","26","27","28","29","30","31","32"})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_MAXNRSUBSCRIPTS != errcode {
+		t.Error("The DeleteE() errorcode for node with 32 subscripts expected to be", yottadb.YDB_ERR_MAXNRSUBSCRIPTS, "but was", errcode)
+	}
+	// YDB_ERR_UNIMPLOP - from bad deltype parm (not YDB_DEL_NODE/TREE)
+	err = yottadb.DeleteE(tptoken, &errstr, 999, "^deletethis", []string{})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_UNIMPLOP != errcode {
+		t.Error("The DeleteE() errorcode for deltype 999 expected to be", yottadb.YDB_ERR_UNIMPLOP, "but was", errcode)
+	}
 }
 
 func TestDeleteExclE(t *testing.T) {
 	var tptoken uint64 = yottadb.NOTTP
 	var err error
+	var errcode int
 	var errstr yottadb.BufferT
 
 	errstr.Alloc(128)
@@ -106,13 +198,17 @@ func TestDeleteExclE(t *testing.T) {
 	err = yottadb.SetValE(tptoken, &errstr, "I AM A VALUE", "var4", []string{})
 	Assertnoerr(err, t)
 	_, err = yottadb.ValE(tptoken, &errstr, "var1", []string{"sub1", "sub2"})
-	// Now delete var1 and var3 by exclusively keeping var2 and var 4
+	// Now delete var1 and var3 by exclusively keeping var2 and var4
 	err = yottadb.DeleteExclE(tptoken, &errstr, []string{"var2", "var4"})
 	Assertnoerr(err, t)
 	// OK, delete done, see which vars exist
 	_, err = yottadb.ValE(tptoken, &errstr, "var1", []string{"sub1", "sub2"}) // Expect this var to be gone
 	if nil == err {
 		t.Error("var1 found when it should have been deleted (no error occurred when fetched")
+	}
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_LVUNDEF != errcode { // YDB_ERR_LVUNDEF
+		t.Error("The ValE() errorcode for var1(\"sub1\",\"sub2\") expected to be", yottadb.YDB_ERR_LVUNDEF, "but was", errcode)
 	}
 	_, err = yottadb.ValE(tptoken, &errstr, "var2", []string{})
 	if nil != err {
@@ -122,14 +218,121 @@ func TestDeleteExclE(t *testing.T) {
 	if nil == err {
 		t.Error("var3 found when it should have been deleted (no error occurred when fetched")
 	}
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_LVUNDEF != errcode { // YDB_ERR_LVUNDEF
+		t.Error("The ValE() errorcode for var3(\"sub1\") expected to be", yottadb.YDB_ERR_LVUNDEF, "but was", errcode)
+	}
 	_, err = yottadb.ValE(tptoken, &errstr, "var4", []string{})
 	if nil != err {
 		t.Error("var4 not found when it should still exist (if ever existed)")
+	}
+	// Pass an empty array check that it deletes var2 and var4
+	err = yottadb.DeleteExclE(tptoken, &errstr, []string{})
+	Assertnoerr(err, t)
+	_, err = yottadb.ValE(tptoken, &errstr, "var2", []string{}) // Expect this var to be gone
+	if nil == err {
+		t.Error("var2 found when it should have been deleted (no error occurred when fetched")
+	}
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_LVUNDEF != errcode { // YDB_ERR_LVUNDEF
+		t.Error("The ValE() errorcode for var2 expected to be", yottadb.YDB_ERR_LVUNDEF, "but was", errcode)
+	}
+	_, err = yottadb.ValE(tptoken, &errstr, "var4", []string{}) // Expect this var to be gone
+	if nil == err {
+		t.Error("var4 found when it should have been deleted (no error occurred when fetched")
+	}
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_LVUNDEF != errcode { // YDB_ERR_LVUNDEF
+		t.Error("The ValE() errorcode for var4 expected to be", yottadb.YDB_ERR_LVUNDEF, "but was", errcode)
+	}
+}
+
+func TestDeleteExclEErrors(t *testing.T) {
+	var tptoken uint64 = yottadb.NOTTP
+	var err error
+	var errstr yottadb.BufferT
+
+	errstr.Alloc(128)
+
+	// YDB_ERR_INVVARNAME - from passing a bad M name
+	err = yottadb.DeleteExclE(tptoken, &errstr, []string{"1"})
+	errcode := yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_INVVARNAME != errcode {
+		t.Error("The DeleteExclE() errorcode for 1 expected to be", yottadb.YDB_ERR_INVVARNAME ,"but was", errcode)
+	}
+	// YDB_ERR_INVVARNAME - from special variable
+	err = yottadb.DeleteExclE(tptoken, &errstr, []string{"$ZCHSET"})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_INVVARNAME != errcode {
+		t.Error("The DeleteExclE() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_INVVARNAME ,"but was", errcode)
+	}
+	// YDB_ERR_INVVARNAME - from passing a global
+	err = yottadb.DeleteExclE(tptoken, &errstr, []string{"^a"})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_INVVARNAME != errcode {
+		t.Error("The DeleteExclE() errorcode for ^a expected to be", yottadb.YDB_ERR_INVVARNAME ,"but was", errcode)
+	}
+	// YDB_ERR_VARNAME2LONG
+	err = yottadb.DeleteExclE(yottadb.NOTTP, &errstr, []string{"a1a2a3a4a5a6a7a8a9a0b1b2b3b4b5b6b7b8b9b0"})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_VARNAME2LONG != errcode {
+		t.Error("The DeleteExclE() errorcode for a too long VarName expected to be", yottadb.YDB_ERR_VARNAME2LONG, "but was", errcode)
+	}
+	// YDB_ERR_NAMECOUNT2HI
+	err = yottadb.DeleteExclE(yottadb.NOTTP, &errstr, []string{"a1","a2","a3","a4","a5","a6","a7","a8","a9","a10","a11","a12","a13","a14","a15","a16","a17","a18","a19","a20","a21","a22","a23","a24","a25","a26","a27","a28","a29","a30","a31","a32","a33","a34","a35","a36"})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_NAMECOUNT2HI != errcode {
+		t.Error("The DeleteExclE() errorcode for node with 36 subscripts expected to be", yottadb.YDB_ERR_NAMECOUNT2HI ,"but was", errcode)
 	}
 }
 
 func TestValE(t *testing.T) {
 	// Already tested in tests for TpST() and DeleteExclE()
+}
+
+func TestValEErrors(t *testing.T) {
+	var tptoken uint64 = yottadb.NOTTP
+	var err error
+	var errstr yottadb.BufferT
+
+	errstr.Alloc(128)
+
+	// YDB_ERR_INVVARNAME
+	_, err = yottadb.ValE(tptoken, &errstr, "^", []string{})
+	errcode := yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_INVVARNAME != errcode {
+		t.Error("The ValE() errorcode for ^ expected to be", yottadb.YDB_ERR_INVVARNAME ,"but was", errcode)
+	}
+	// YDB_ERR_GVUNDEF
+	_, err = yottadb.ValE(tptoken, &errstr, "^doesnotexist", []string{})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_GVUNDEF != errcode {
+		t.Error("The ValE() errorcode for ^doesnotexist expected to be", yottadb.YDB_ERR_GVUNDEF ,"but was", errcode)
+	}
+	// YDB_ERR_LVUNDEF
+	_, err = yottadb.ValE(tptoken, &errstr, "doesnotexist", []string{})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_LVUNDEF != errcode {
+		t.Error("The ValE() errorcode for doesnotexist expected to be", yottadb.YDB_ERR_LVUNDEF ,"but was", errcode)
+	}
+	// YDB_ERR_INVSVN
+	_, err = yottadb.ValE(tptoken, &errstr, "$NOTATHING", []string{})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_INVSVN != errcode {
+		t.Error("The ValE() errorcode for $NOTATHING expected to be", yottadb.YDB_ERR_INVSVN ,"but was", errcode)
+	}
+	// YDB_ERR_VARNAME2LONG
+	_, err = yottadb.ValE(yottadb.NOTTP, &errstr, "a1a2a3a4a5a6a7a8a9a0b1b2b3b4b5b6b7b8b9b0", []string{})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_VARNAME2LONG != errcode {
+		t.Error("The ValE() errorcode for a too long VarName expected to be", yottadb.YDB_ERR_VARNAME2LONG, "but was", errcode)
+	}
+	// YDB_ERR_MAXNRSUBSCRIPTS
+	_, err = yottadb.ValE(yottadb.NOTTP, &errstr, "a", []string{"1","2","3","4","5","6","7","8","9","10","11","12","13","14","15","16","17","18","19","20","21","22","23","24","25","26","27","28","29","30","31","32"})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_MAXNRSUBSCRIPTS != errcode {
+		t.Error("The ValE() errorcode for node with 32 subscripts expected to be", yottadb.YDB_ERR_MAXNRSUBSCRIPTS ,"but was", errcode)
+	}
 }
 
 func TestIncrE(t *testing.T) {
@@ -142,6 +345,7 @@ func TestIncrE(t *testing.T) {
 	errstr.Alloc(128)
 
 	// Create a simple subscripted node, then increment it, then fetch it and compare to returned value
+	// increment by a value (2)
 	err = yottadb.SetValE(tptoken, &errstr, "42", "^ivar", []string{"isub1"})
 	Assertnoerr(err, t)
 	newvalB, err = yottadb.IncrE(tptoken, &errstr, "2", "^ivar", []string{"isub1"})
@@ -157,6 +361,98 @@ func TestIncrE(t *testing.T) {
 	if newvalA != newvalB {
 		t.Error("Returned and post-increment fetch values not same - db :", newvalA,
 			"  returned: ", newvalB)
+	}
+	// increment by nil which should increase global by 1
+	newvalB, err = yottadb.IncrE(tptoken, &errstr, "", "^ivar", []string{"isub1"})
+	Assertnoerr(err, t)
+	newvalBi, err = strconv.Atoi(newvalB)
+	Assertnoerr(err, t)
+	if 45 != newvalBi {
+		t.Error("The expected increment value is 45 but it is", newvalB)
+	}
+	// Fetch the value and verify same as what we got back from IncrST()
+	newvalA, err = yottadb.ValE(tptoken, &errstr, "^ivar", []string{"isub1"})
+	Assertnoerr(err, t)
+	if newvalA != newvalB {
+		t.Error("Returned and post-increment fetch values not same - db :", newvalA,
+			"  returned: ", newvalB)
+	}
+	// Increment a nonexistant node, check that it is set to the increment
+	newvalB, err = yottadb.IncrE(tptoken, &errstr, "9001", "^ivar", []string{"isub2"})
+	Assertnoerr(err, t)
+	newvalBi, err = strconv.Atoi(newvalB)
+	Assertnoerr(err, t)
+	if 9001 != newvalBi {
+		t.Error("The expected increment value is 9001 but it is", newvalB)
+	}
+	// Fetch the value and verify same as what we got back from IncrST()
+	newvalA, err = yottadb.ValE(tptoken, &errstr, "^ivar", []string{"isub2"})
+	Assertnoerr(err, t)
+	if newvalA != newvalB {
+		t.Error("Returned and post-increment fetch values not same - db :", newvalA,
+			"  returned: ", newvalB)
+	}
+	// Increment a non-cannonical number, check that it is foreced to a number
+	err = yottadb.SetValE(tptoken, &errstr, "This is not a number", "^ivar", []string{"isub3"})
+	Assertnoerr(err, t)
+	newvalB, err = yottadb.IncrE(tptoken, &errstr, "1337", "^ivar", []string{"isub3"})
+	Assertnoerr(err, t)
+	newvalBi, err = strconv.Atoi(newvalB)
+	Assertnoerr(err, t)
+	if 1337 != newvalBi {
+		t.Error("The expected increment value is 1337 but it is", newvalB)
+	}
+	// Fetch the value and verify same as what we got back from IncrST()
+	newvalA, err = yottadb.ValE(tptoken, &errstr, "^ivar", []string{"isub3"})
+	Assertnoerr(err, t)
+	if newvalA != newvalB {
+		t.Error("Returned and post-increment fetch values not same - db :", newvalA,
+			"  returned: ", newvalB)
+	}
+}
+
+func TestIncrEErrors(t *testing.T) {
+	var tptoken uint64 = yottadb.NOTTP
+	var err error
+	var errstr yottadb.BufferT
+
+	errstr.Alloc(128)
+
+	// YDB_ERR_INVVARNAME
+	_, err = yottadb.IncrE(tptoken, &errstr, "", "^", []string{})
+	errcode := yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_INVVARNAME != errcode {
+		t.Error("The IncrE() errorcode for ^ expected to be", yottadb.YDB_ERR_INVVARNAME ,"but was", errcode)
+	}
+	// YDB_ERR_UNIMPLOP
+	_, err = yottadb.IncrE(tptoken, &errstr, "", "$ZCHSET", []string{})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_UNIMPLOP != errcode {
+		t.Error("The IncrE() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_UNIMPLOP ,"but was", errcode)
+	}
+	// YDB_ERR_INVSVN
+	_, err = yottadb.IncrE(tptoken, &errstr, "", "$NOTATHING", []string{})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_INVSVN != errcode {
+		t.Error("The IncrE() errorcode for $NOTATHING expected to be", yottadb.YDB_ERR_INVSVN ,"but was", errcode)
+	}
+	// YDB_ERR_VARNAME2LONG
+	_, err = yottadb.IncrE(yottadb.NOTTP, &errstr, "", "a1a2a3a4a5a6a7a8a9a0b1b2b3b4b5b6b7b8b9b0", []string{})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_VARNAME2LONG != errcode {
+		t.Error("The IncrE() errorcode for a too long VarName expected to be", yottadb.YDB_ERR_VARNAME2LONG, "but was", errcode)
+	}
+	// YDB_ERR_MAXNRSUBSCRIPTS
+	_, err = yottadb.IncrE(yottadb.NOTTP, &errstr, "", "a", []string{"1","2","3","4","5","6","7","8","9","10","11","12","13","14","15","16","17","18","19","20","21","22","23","24","25","26","27","28","29","30","31","32"})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_MAXNRSUBSCRIPTS != errcode {
+		t.Error("The IncrE() errorcode for node with 32 subscripts expected to be", yottadb.YDB_ERR_MAXNRSUBSCRIPTS ,"but was", errcode)
+	}
+	// YDB_ERR_NUMOFLOW
+	_, err = yottadb.IncrE(tptoken, &errstr, "1E12345", "^ivar", []string{"newsub"})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_NUMOFLOW != errcode {
+		t.Error("The IncrE() errorcode for incrementing by 1E12345 expected to be", yottadb.YDB_ERR_NUMOFLOW ,"but was", errcode)
 	}
 }
 
@@ -175,6 +471,63 @@ func TestLockE(t *testing.T) {
 	VerifyLockExists([]byte("^lock1(\"sub11\",\"sub12\")"), &errors, true, t)
 	VerifyLockExists([]byte("lock2"), &errors, true, t)
 	VerifyLockExists([]byte("^lock3(\"sub21\")"), &errors, true, t)
+}
+
+func TestLockEErrors(t *testing.T) {
+	var tptoken uint64 = yottadb.NOTTP
+	var err error
+	var errstr yottadb.BufferT
+
+	errstr.Alloc(128)
+
+	// YDB_ERR_INVVARNAME
+	err = yottadb.LockE(tptoken, &errstr, 0, "^", []string{})
+	errcode := yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_INVVARNAME != errcode {
+		t.Error("The LockE() errorcode for ^ expected to be", yottadb.YDB_ERR_INVVARNAME ,"but was", errcode)
+	}
+	// YDB_ERR_UNIMPLOP
+	err = yottadb.LockE(tptoken, &errstr, 0, "$ZCHSET", []string{})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_UNIMPLOP != errcode {
+		t.Error("The LockE() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_UNIMPLOP ,"but was", errcode)
+	}
+	// YDB_ERR_INVSVN
+	err = yottadb.LockE(tptoken, &errstr, 0, "$NOTATHING", []string{})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_INVSVN != errcode {
+		t.Error("The LockE() errorcode for $NOTATHING expected to be", yottadb.YDB_ERR_INVSVN ,"but was", errcode)
+	}
+	// YDB_ERR_VARNAME2LONG
+	err = yottadb.LockE(yottadb.NOTTP, &errstr, 0, "a1a2a3a4a5a6a7a8a9a0b1b2b3b4b5b6b7b8b9b0", []string{})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_VARNAME2LONG != errcode {
+		t.Error("The LockE() errorcode for a too long VarName expected to be", yottadb.YDB_ERR_VARNAME2LONG, "but was", errcode)
+	}
+	// YDB_ERR_MAXNRSUBSCRIPTS
+	err = yottadb.LockE(yottadb.NOTTP, &errstr, 0, "a", []string{"1","2","3","4","5","6","7","8","9","10","11","12","13","14","15","16","17","18","19","20","21","22","23","24","25","26","27","28","29","30","31","32","a33","a34","a35"})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_MAXNRSUBSCRIPTS != errcode {
+		t.Error("The LockE() errorcode for node with 35 subscripts expected to be", yottadb.YDB_ERR_MAXNRSUBSCRIPTS ,"but was", errcode)
+	}
+	// YDB_ERR_TIME2LONG
+	err = yottadb.LockE(tptoken, &errstr, yottadb.YDB_MAX_TIME_NSEC + 1, "a", []string{})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_TIME2LONG != errcode {
+		t.Error("The LockE() errorcode for timeout of YDB_MAX_TIME_NSEC+1 expected to be", yottadb.YDB_ERR_TIME2LONG ,"but was", errcode)
+	}
+	// YDB_ERR_NAMECOUNT2HI
+	err = yottadb.LockE(tptoken, &errstr, 0, "a1", []string{}, "a2", []string{}, "a3", []string{}, "a4", []string{}, "a5", []string{}, "a6", []string{}, "a7", []string{}, "a8", []string{}, "a9", []string{}, "a10", []string{}, "a11", []string{}, "a12", []string{})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_NAMECOUNT2HI != errcode {
+		t.Error("The LockE() errorcode for 12 lock pairs expected to be", yottadb.YDB_ERR_NAMECOUNT2HI ,"but was", errcode)
+	}
+	// YDB_ERR_INVLNPAIRLIST
+	err = yottadb.LockE(tptoken, &errstr, 0, "a")
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_INVLNPAIRLIST != errcode {
+		t.Error("The LockE() errorcode for an incorrect pair expected to be", yottadb.YDB_ERR_INVLNPAIRLIST ,"but was", errcode)
+	}
 }
 
 func TestLockIncrE(t *testing.T) {
@@ -212,6 +565,82 @@ func TestLockIncrE(t *testing.T) {
 	}
 	err = yottadb.LockST(tptoken, &errstr, 0) // Release all locks
 	Assertnoerr(err, t)
+}
+
+func TestLockIncrEErrors(t *testing.T) {
+	var tptoken uint64 = yottadb.NOTTP
+	var err error
+	var errstr yottadb.BufferT
+
+	errstr.Alloc(128)
+
+	// YDB_ERR_INVVARNAME
+	err = yottadb.LockIncrE(tptoken, &errstr, 0, "^", []string{})
+	errcode := yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_INVVARNAME != errcode {
+		t.Error("The LockIncrE() errorcode for ^ expected to be", yottadb.YDB_ERR_INVVARNAME ,"but was", errcode)
+	}
+	// YDB_ERR_UNIMPLOP
+	err = yottadb.LockIncrE(tptoken, &errstr, 0, "$ZCHSET", []string{})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_UNIMPLOP != errcode {
+		t.Error("The LockIncrE() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_UNIMPLOP ,"but was", errcode)
+	}
+	// YDB_ERR_INVSVN
+	err = yottadb.LockIncrE(tptoken, &errstr, 0, "$NOTATHING", []string{})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_INVSVN != errcode {
+		t.Error("The LockIncrE() errorcode for $NOTATHING expected to be", yottadb.YDB_ERR_INVSVN ,"but was", errcode)
+	}
+	// YDB_ERR_VARNAME2LONG
+	err = yottadb.LockIncrE(yottadb.NOTTP, &errstr, 0, "a1a2a3a4a5a6a7a8a9a0b1b2b3b4b5b6b7b8b9b0", []string{})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_VARNAME2LONG != errcode {
+		t.Error("The LockIncrE() errorcode for a too long VarName expected to be", yottadb.YDB_ERR_VARNAME2LONG, "but was", errcode)
+	}
+	// YDB_ERR_MAXNRSUBSCRIPTS
+	err = yottadb.LockIncrE(yottadb.NOTTP, &errstr, 0, "a", []string{"1","2","3","4","5","6","7","8","9","10","11","12","13","14","15","16","17","18","19","20","21","22","23","24","25","26","27","28","29","30","31","32","a33","a34","a35"})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_MAXNRSUBSCRIPTS != errcode {
+		t.Error("The LockIncrE() errorcode for node with 35 subscripts expected to be", yottadb.YDB_ERR_MAXNRSUBSCRIPTS ,"but was", errcode)
+	}
+	// YDB_ERR_TIME2LONG
+	err = yottadb.LockIncrE(tptoken, &errstr, yottadb.YDB_MAX_TIME_NSEC + 1, "a", []string{})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_TIME2LONG != errcode {
+		t.Error("The LockIncrE() errorcode for timeout of YDB_MAX_TIME_NSEC+1 expected to be", yottadb.YDB_ERR_TIME2LONG ,"but was", errcode)
+	}
+
+	// YDB_ERR_INVVARNAME
+	err = yottadb.LockDecrE(tptoken, &errstr, "^", []string{})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_INVVARNAME != errcode {
+		t.Error("The LockDecrE() errorcode for ^ expected to be", yottadb.YDB_ERR_INVVARNAME ,"but was", errcode)
+	}
+	// YDB_ERR_UNIMPLOP
+	err = yottadb.LockDecrE(tptoken, &errstr, "$ZCHSET", []string{})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_UNIMPLOP != errcode {
+		t.Error("The LockDecrE() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_UNIMPLOP ,"but was", errcode)
+	}
+	// YDB_ERR_INVSVN
+	err = yottadb.LockDecrE(tptoken, &errstr, "$NOTATHING", []string{})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_INVSVN != errcode {
+		t.Error("The LockDecrE() errorcode for $NOTATHING expected to be", yottadb.YDB_ERR_INVSVN ,"but was", errcode)
+	}
+	// YDB_ERR_VARNAME2LONG
+	err = yottadb.LockDecrE(yottadb.NOTTP, &errstr, "a1a2a3a4a5a6a7a8a9a0b1b2b3b4b5b6b7b8b9b0", []string{})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_VARNAME2LONG != errcode {
+		t.Error("The LockDecrE() errorcode for a too long VarName expected to be", yottadb.YDB_ERR_VARNAME2LONG, "but was", errcode)
+	}
+	// YDB_ERR_MAXNRSUBSCRIPTS
+	err = yottadb.LockDecrE(yottadb.NOTTP, &errstr, "a", []string{"1","2","3","4","5","6","7","8","9","10","11","12","13","14","15","16","17","18","19","20","21","22","23","24","25","26","27","28","29","30","31","32","a33","a34","a35"})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_MAXNRSUBSCRIPTS != errcode {
+		t.Error("The LockDecrE() errorcode for node with 35 subscripts expected to be", yottadb.YDB_ERR_MAXNRSUBSCRIPTS ,"but was", errcode)
+	}
 }
 
 func TestMessageE(t *testing.T) {
@@ -313,8 +742,117 @@ func TestNodeNextE(t *testing.T) {
 	}
 }
 
+func TestNodeNextEErrors(t *testing.T) {
+	var tptoken uint64 = yottadb.NOTTP
+	var err error
+	var errstr yottadb.BufferT
+
+	errstr.Alloc(128)
+
+	// YDB_ERR_INVVARNAME
+	_, err = yottadb.NodeNextE(tptoken, &errstr, "^", []string{})
+	errcode := yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_INVVARNAME != errcode {
+		t.Error("The NodeNextE() errorcode for ^ expected to be", yottadb.YDB_ERR_INVVARNAME ,"but was", errcode)
+	}
+	// YDB_ERR_UNIMPLOP
+	_, err = yottadb.NodeNextE(tptoken, &errstr, "$ZCHSET", []string{})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_UNIMPLOP != errcode {
+		t.Error("The NodeNextE() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_UNIMPLOP ,"but was", errcode)
+	}
+	// YDB_ERR_INVSVN
+	_, err = yottadb.NodeNextE(tptoken, &errstr, "$NOTATHING", []string{})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_INVSVN != errcode {
+		t.Error("The NodeNextE() errorcode for $NOTATHING expected to be", yottadb.YDB_ERR_INVSVN ,"but was", errcode)
+	}
+	// YDB_ERR_VARNAME2LONG
+	_, err = yottadb.NodeNextE(yottadb.NOTTP, &errstr, "a1a2a3a4a5a6a7a8a9a0b1b2b3b4b5b6b7b8b9b0", []string{})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_VARNAME2LONG != errcode {
+		t.Error("The NodeNextE() errorcode for a too long VarName expected to be", yottadb.YDB_ERR_VARNAME2LONG, "but was", errcode)
+	}
+	// YDB_ERR_MAXNRSUBSCRIPTS
+	_, err = yottadb.NodeNextE(yottadb.NOTTP, &errstr, "a", []string{"1","2","3","4","5","6","7","8","9","10","11","12","13","14","15","16","17","18","19","20","21","22","23","24","25","26","27","28","29","30","31","32"})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_MAXNRSUBSCRIPTS != errcode {
+		t.Error("The NodeNextE() errorcode for node with 32 subscripts expected to be", yottadb.YDB_ERR_MAXNRSUBSCRIPTS ,"but was", errcode)
+	}
+
+	// YDB_ERR_INVVARNAME
+	_, err = yottadb.NodePrevE(tptoken, &errstr, "^", []string{})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_INVVARNAME != errcode {
+		t.Error("The NodePrevE() errorcode for ^ expected to be", yottadb.YDB_ERR_INVVARNAME ,"but was", errcode)
+	}
+	// YDB_ERR_UNIMPLOP
+	_, err = yottadb.NodePrevE(tptoken, &errstr, "$ZCHSET", []string{})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_UNIMPLOP != errcode {
+		t.Error("The NodePrevE() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_UNIMPLOP ,"but was", errcode)
+	}
+	// YDB_ERR_INVSVN
+	_, err = yottadb.NodePrevE(tptoken, &errstr, "$NOTATHING", []string{})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_INVSVN != errcode {
+		t.Error("The NodePrevE() errorcode for $NOTATHING expected to be", yottadb.YDB_ERR_INVSVN ,"but was", errcode)
+	}
+	// YDB_ERR_VARNAME2LONG
+	_, err = yottadb.NodePrevE(yottadb.NOTTP, &errstr, "a1a2a3a4a5a6a7a8a9a0b1b2b3b4b5b6b7b8b9b0", []string{})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_VARNAME2LONG != errcode {
+		t.Error("The NodePrevE() errorcode for a too long VarName expected to be", yottadb.YDB_ERR_VARNAME2LONG, "but was", errcode)
+	}
+	// YDB_ERR_MAXNRSUBSCRIPTS
+	_, err = yottadb.NodePrevE(yottadb.NOTTP, &errstr, "a", []string{"1","2","3","4","5","6","7","8","9","10","11","12","13","14","15","16","17","18","19","20","21","22","23","24","25","26","27","28","29","30","31","32"})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_MAXNRSUBSCRIPTS != errcode {
+		t.Error("The NodePrevE() errorcode for node with 32 subscripts expected to be", yottadb.YDB_ERR_MAXNRSUBSCRIPTS ,"but was", errcode)
+	}
+}
+
 func TestSetValE(t *testing.T) {
 	// Already tested in *MANY* tests above
+}
+
+func TestSetValEErrors(t *testing.T) {
+	var tptoken uint64 = yottadb.NOTTP
+	var err error
+	var errstr yottadb.BufferT
+
+	errstr.Alloc(128)
+
+	// YDB_ERR_INVVARNAME
+	err = yottadb.SetValE(tptoken, &errstr, "A Value", "^", []string{})
+	errcode := yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_INVVARNAME != errcode {
+		t.Error("The SetValE() errorcode for ^ expected to be", yottadb.YDB_ERR_INVVARNAME ,"but was", errcode)
+	}
+	// YDB_ERR_SVNOSET
+	err = yottadb.SetValE(tptoken, &errstr, "A Value", "$ZCHSET", []string{})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_SVNOSET != errcode {
+		t.Error("The SetValE() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_SVNOSET ,"but was", errcode)
+	}
+	// YDB_ERR_INVSVN
+	err = yottadb.SetValE(tptoken, &errstr, "A Value", "$NOTATHING", []string{})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_INVSVN != errcode {
+		t.Error("The SetValE() errorcode for $NOTATHING expected to be", yottadb.YDB_ERR_INVSVN ,"but was", errcode)
+	}
+	// YDB_ERR_VARNAME2LONG
+	err = yottadb.SetValE(yottadb.NOTTP, &errstr, "A Value", "a1a2a3a4a5a6a7a8a9a0b1b2b3b4b5b6b7b8b9b0", []string{})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_VARNAME2LONG != errcode {
+		t.Error("The SetValE() errorcode for a too long VarName expected to be", yottadb.YDB_ERR_VARNAME2LONG, "but was", errcode)
+	}
+	// YDB_ERR_MAXNRSUBSCRIPTS
+	err = yottadb.SetValE(yottadb.NOTTP, &errstr, "A Value", "a", []string{"1","2","3","4","5","6","7","8","9","10","11","12","13","14","15","16","17","18","19","20","21","22","23","24","25","26","27","28","29","30","31","32"})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_MAXNRSUBSCRIPTS != errcode {
+		t.Error("The SetValE() errorcode for node with 32 subscripts expected to be", yottadb.YDB_ERR_MAXNRSUBSCRIPTS ,"but was", errcode)
+	}
 }
 
 func TestSubNextE(t *testing.T) {
@@ -399,6 +937,76 @@ func TestSubNextE(t *testing.T) {
 	// Verify loop termination conditions
 	if -1 != i {
 		t.Error("Unexpected SubPrevE() loop count - expected -1 but got", i)
+	}
+}
+
+func TestSubNextEErrors(t *testing.T) {
+	var tptoken uint64 = yottadb.NOTTP
+	var err error
+	var errstr yottadb.BufferT
+
+	errstr.Alloc(128)
+
+	// YDB_ERR_INVVARNAME
+	_, err = yottadb.SubNextE(tptoken, &errstr, "^", []string{})
+	errcode := yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_INVVARNAME != errcode {
+		t.Error("The SubNextE() errorcode for ^ expected to be", yottadb.YDB_ERR_INVVARNAME ,"but was", errcode)
+	}
+	// YDB_ERR_UNIMPLOP
+	_, err = yottadb.SubNextE(tptoken, &errstr, "$ZCHSET", []string{})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_UNIMPLOP != errcode {
+		t.Error("The SubNextE() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_UNIMPLOP ,"but was", errcode)
+	}
+	// YDB_ERR_INVSVN
+	_, err = yottadb.SubNextE(tptoken, &errstr, "$NOTATHING", []string{})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_INVSVN != errcode {
+		t.Error("The SubNextE() errorcode for $NOTATHING expected to be", yottadb.YDB_ERR_INVSVN ,"but was", errcode)
+	}
+	// YDB_ERR_VARNAME2LONG
+	_, err = yottadb.SubNextE(yottadb.NOTTP, &errstr, "a1a2a3a4a5a6a7a8a9a0b1b2b3b4b5b6b7b8b9b0", []string{})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_VARNAME2LONG != errcode {
+		t.Error("The SubNextE() errorcode for a too long VarName expected to be", yottadb.YDB_ERR_VARNAME2LONG, "but was", errcode)
+	}
+	// YDB_ERR_MAXNRSUBSCRIPTS
+	_, err = yottadb.SubNextE(yottadb.NOTTP, &errstr, "a", []string{"1","2","3","4","5","6","7","8","9","10","11","12","13","14","15","16","17","18","19","20","21","22","23","24","25","26","27","28","29","30","31","32"})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_MAXNRSUBSCRIPTS != errcode {
+		t.Error("The SubNextE() errorcode for node with 32 subscripts expected to be", yottadb.YDB_ERR_MAXNRSUBSCRIPTS ,"but was", errcode)
+	}
+
+	// YDB_ERR_INVVARNAME
+	_, err = yottadb.SubPrevE(tptoken, &errstr, "^", []string{})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_INVVARNAME != errcode {
+		t.Error("The SubPrevE() errorcode for ^ expected to be", yottadb.YDB_ERR_INVVARNAME ,"but was", errcode)
+	}
+	// YDB_ERR_UNIMPLOP
+	_, err = yottadb.SubPrevE(tptoken, &errstr, "$ZCHSET", []string{})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_UNIMPLOP != errcode {
+		t.Error("The SubPrevE() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_UNIMPLOP ,"but was", errcode)
+	}
+	// YDB_ERR_INVSVN
+	_, err = yottadb.SubPrevE(tptoken, &errstr, "$NOTATHING", []string{})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_INVSVN != errcode {
+		t.Error("The SubPrevE() errorcode for $NOTATHING expected to be", yottadb.YDB_ERR_INVSVN ,"but was", errcode)
+	}
+	// YDB_ERR_VARNAME2LONG
+	_, err = yottadb.SubPrevE(yottadb.NOTTP, &errstr, "a1a2a3a4a5a6a7a8a9a0b1b2b3b4b5b6b7b8b9b0", []string{})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_VARNAME2LONG != errcode {
+		t.Error("The SubPrevE() errorcode for a too long VarName expected to be", yottadb.YDB_ERR_VARNAME2LONG, "but was", errcode)
+	}
+	// YDB_ERR_MAXNRSUBSCRIPTS
+	_, err = yottadb.SubPrevE(yottadb.NOTTP, &errstr, "a", []string{"1","2","3","4","5","6","7","8","9","10","11","12","13","14","15","16","17","18","19","20","21","22","23","24","25","26","27","28","29","30","31","32"})
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_MAXNRSUBSCRIPTS != errcode {
+		t.Error("The SubPrevE() errorcode for node with 32 subscripts expected to be", yottadb.YDB_ERR_MAXNRSUBSCRIPTS ,"but was", errcode)
 	}
 }
 

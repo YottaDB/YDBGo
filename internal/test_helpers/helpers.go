@@ -200,10 +200,6 @@ func TestTpRtn(tptoken uint64, errstr unsafe.Pointer, tpfnparm unsafe.Pointer) i
 	return rc
 }
 
-func YdbDelTree() int {
-	return int(C.YDB_DEL_TREE)
-}
-
 func CheckErrorExpectYDB_ERR_NODEEND(errorcode int) bool {
 	if int(C.YDB_ERR_NODEEND) == errorcode {
 		return true
@@ -223,10 +219,6 @@ func CheckErrorExpectYDB_ERR_INSUFFSUBS(errorcode int) bool {
 		return true
 	}
 	return false
-}
-
-func GetYDB_DEL_TREE() int {
-	return int(C.YDB_DEL_TREE)
 }
 
 //export MyGoCallBack

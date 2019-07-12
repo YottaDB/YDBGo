@@ -21,6 +21,7 @@ import (
 	"runtime"
 	"testing"
 	"time"
+	"fmt"
 )
 
 // TestBufTAryDeleteExclST tests the DeleteExclST() method.
@@ -28,8 +29,10 @@ func TestBufTAryDeleteExclST(t *testing.T) {
 	var namelst yottadb.BufferTArray
 	var tptoken uint64 = yottadb.NOTTP
 	var err error
+	var errcode int
 
 	namelst.Alloc(2, 10) // Need an array of two names not more than 10 bytes
+	defer namelst.Free()
 	// We need to create 4 local variables to test this so do that first (thus also testing KeyT.SetValE()
 	err = yottadb.SetValE(tptoken, nil, "I have a value", "var1", []string{"sub1", "sub2"})
 	Assertnoerr(err, t)
@@ -53,6 +56,10 @@ func TestBufTAryDeleteExclST(t *testing.T) {
 	if nil == err {
 		t.Errorf("var1 found when it should have been deleted (no error occurred when fetched")
 	}
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_LVUNDEF != errcode {
+		t.Error("The ValE() errorcode for val3(\"sub1\",\"sub2\") expected to be", yottadb.YDB_ERR_LVUNDEF, "but was", errcode)
+	}
 	_, err = yottadb.ValE(tptoken, nil, "var2", []string{})
 	if nil != err {
 		t.Errorf("var2 not found when it should still exist (if ever existed)")
@@ -61,9 +68,93 @@ func TestBufTAryDeleteExclST(t *testing.T) {
 	if nil == err {
 		t.Errorf("var3 found when it should have been deleted (no error occurred when fetched")
 	}
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_LVUNDEF != errcode {
+		t.Error("The ValE() errorcode for val3(\"sub1\") expected to be", yottadb.YDB_ERR_LVUNDEF, "but was", errcode)
+	}
 	_, err = yottadb.ValE(tptoken, nil, "var4", []string{})
 	if nil != err {
 		t.Errorf("var4 not found when it should still exist (if ever existed)")
+	}
+
+	// Delete with an empty list which should clear var2 and var4
+	namelst.SetElemUsed(tptoken, nil, 0)
+	Assertnoerr(err, t)
+	err = namelst.DeleteExclST(tptoken, nil)
+	Assertnoerr(err, t)
+	_, err = yottadb.ValE(tptoken, nil, "var2", []string{})
+	errcode = yottadb.ErrorCode(err)
+	if nil == err {
+		t.Errorf("var2 found when it should have been deleted (no error occurred when fetched")
+	}
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_LVUNDEF != errcode {
+		t.Error("The ValE() errorcode for val2 expected to be", yottadb.YDB_ERR_LVUNDEF, "but was", errcode)
+	}
+	_, err = yottadb.ValE(tptoken, nil, "var4", []string{})
+	if nil == err {
+		t.Errorf("var4 found when it should have been deleted (no error occurred when fetched")
+	}
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_LVUNDEF != errcode {
+		t.Error("The ValE() errorcode for val4 expected to be", yottadb.YDB_ERR_LVUNDEF, "but was", errcode)
+	}
+}
+
+func TestBufTAryDeleteExclSTErrors(t *testing.T) {
+	var namelst yottadb.BufferTArray
+	var tptoken uint64 = yottadb.NOTTP
+	var err error
+	var errcode int
+
+	defer namelst.Free()
+	namelst.Alloc(yottadb.YDB_MAX_NAMES + 1, 64)
+	err = namelst.SetElemUsed(tptoken, nil, 1)
+	Assertnoerr(err, t)
+
+	// YDB_ERR_INVVARNAME - from passing a bad M name
+	err = namelst.SetValStr(tptoken, nil, 0, "1")
+	Assertnoerr(err, t)
+	err = namelst.DeleteExclST(tptoken, nil)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_INVVARNAME != errcode {
+		t.Error("The DeleteExclST() errorcode for 1 expected to be", yottadb.YDB_ERR_INVVARNAME, "but was", errcode)
+	}
+	// YDB_ERR_INVVARNAME - from special variable
+	err = namelst.SetValStr(tptoken, nil, 0, "$ZCHSET")
+	Assertnoerr(err, t)
+	err = namelst.DeleteExclST(tptoken, nil)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_INVVARNAME != errcode {
+		t.Error("The DeleteExclST() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_INVVARNAME, "but was", errcode)
+	}
+	// YDB_ERR_INVVARNAME - from passing a global
+	err = namelst.SetValStr(tptoken, nil, 0, "^a")
+	Assertnoerr(err, t)
+	err = namelst.DeleteExclST(tptoken, nil)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_INVVARNAME != errcode {
+		t.Error("The DeleteExclST() errorcode for ^a expected to be", yottadb.YDB_ERR_INVVARNAME, "but was", errcode)
+	}
+	// YDB_ERR_VARNAME2LONG
+	err = namelst.SetValStr(tptoken, nil, 0, "a1a2a3a4a5a6a7a8a9a0b1b2b3b4b5b6b7b8b9b0")
+	Assertnoerr(err, t)
+	err = namelst.DeleteExclST(tptoken, nil)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_VARNAME2LONG != errcode {
+		t.Error("The DeleteExclST() errorcode for a too long VarName expected to be", yottadb.YDB_ERR_VARNAME2LONG, "but was", errcode)
+	}
+	// YDB_ERR_NAMECOUNT2HI
+	for i := 0; i < yottadb.YDB_MAX_NAMES + 1; i++ {
+		err = namelst.SetValStr(tptoken, nil, uint32(i), fmt.Sprintf("a%d", i))
+		Assertnoerr(err, t)
+	}
+	err = namelst.SetElemUsed(tptoken, nil, yottadb.YDB_MAX_NAMES + 1)
+	Assertnoerr(err, t)
+	err = namelst.DeleteExclST(tptoken, nil)
+	errcode = yottadb.ErrorCode(err)
+	if yottadb.YDB_ERR_NAMECOUNT2HI != errcode {
+		t.Error("The DeleteExclST() errorcode for node with 32 subscripts expected to be", yottadb.YDB_ERR_NAMECOUNT2HI, "but was", errcode)
 	}
 }
 
@@ -93,7 +184,6 @@ func TestBufTAryDump(t *testing.T) {
 
 func TestBufTAryAlloc(t *testing.T) {
 	var value, noalloc_value yottadb.BufferTArray
-	//var tp = yottadb.NOTTP
 
 	// Try freeing a never Alloc'd buffer
 	value.Free()
@@ -142,18 +232,22 @@ func TestBufTAryLenAlloc(t *testing.T) {
 func TestBufTAryBAry(t *testing.T) {
 	var value yottadb.BufferTArray
 	var tp = yottadb.NOTTP
+	var errcode int
 
 	v := []byte("Hello")
+	toolong := []byte("This byte array is too long")
 
 	// Get value from non-allocd value
 	r, err := value.ValBAry(tp, nil, 0)
-	assert.NotNil(t, err)
+	errcode = yottadb.ErrorCode(err)
+	assert.Equal(t, yottadb.YDB_ERR_INSUFFSUBS, errcode)
 	assert.Nil(t, r)
 
 	// Alloc, but get value past the end
-	value.Alloc(10, 64)
+	value.Alloc(10, 16)
 	r, err = value.ValBAry(tp, nil, 11)
-	assert.NotNil(t, err)
+	errcode = yottadb.ErrorCode(err)
+	assert.Equal(t, yottadb.YDB_ERR_INSUFFSUBS, errcode)
 	assert.Nil(t, r)
 
 	// Get a valid value with no content
@@ -169,40 +263,53 @@ func TestBufTAryBAry(t *testing.T) {
 
 	// Try set a value on out of bounds element
 	err = value.SetValBAry(tp, nil, 11, v)
-	assert.NotNil(t, err)
+	errcode = yottadb.ErrorCode(err)
+	assert.Equal(t, yottadb.YDB_ERR_INSUFFSUBS, errcode)
+
+	// Try set a value longer than the buffer
+	err = value.SetValBAry(tp, nil, 2, toolong)
+	errcode = yottadb.ErrorCode(err)
+	assert.Equal(t, yottadb.YDB_ERR_INVSTRLEN, errcode)
+	l, err := value.ElemLenUsed(tp, nil, 2)
+	assert.Nil(t, err)
+	assert.Equal(t, l, uint32(0))
 
 	// Try to set a value on a freed structure
 	value.Free()
 	err = value.SetValBAry(tp, nil, 0, v)
-	assert.NotNil(t, err)
-	errcode := yottadb.ErrorCode(err)
-	//t.Skipf("We need to figure out what the expected result is")
-	assert.True(t, CheckErrorExpectYDB_ERR_INSUFFSUBS(errcode))
+	errcode = yottadb.ErrorCode(err)
+	assert.Equal(t, yottadb.YDB_ERR_INSUFFSUBS, errcode)
 }
 
 func TestBufTAryElemLenUsed(t *testing.T) {
 	var value yottadb.BufferTArray
 	var tp = yottadb.NOTTP
+	var errcode int
 
 	// Test non alloc'd structure
 	err := value.SetElemLenUsed(tp, nil, 0, 0)
-	assert.NotNil(t, err)
+	errcode = yottadb.ErrorCode(err)
+	assert.Equal(t, yottadb.YDB_ERR_INSUFFSUBS, errcode)
 	r, err := value.ElemLenUsed(tp, nil, 0)
-	assert.NotNil(t, err)
+	errcode = yottadb.ErrorCode(err)
+	assert.Equal(t, yottadb.YDB_ERR_STRUCTNOTALLOCD, errcode)
 	assert.Equal(t, r, uint32(0))
 
 	// Allocate, then test with an element past the end
 	value.Alloc(10, 64)
 
 	err = value.SetElemLenUsed(tp, nil, 11, 5)
-	assert.NotNil(t, err)
+	errcode = yottadb.ErrorCode(err)
+	assert.Equal(t, yottadb.YDB_ERR_INSUFFSUBS, errcode)
 	r, err = value.ElemLenUsed(tp, nil, 11)
-	assert.NotNil(t, err)
+	errcode = yottadb.ErrorCode(err)
+	assert.Equal(t, yottadb.YDB_ERR_INSUFFSUBS, errcode)
 	assert.Equal(t, r, uint32(0))
 
 	// Set a valid subscript to an invalid length
 	err = value.SetElemLenUsed(tp, nil, 0, 100)
-	assert.NotNil(t, err)
+	errcode = yottadb.ErrorCode(err)
+	assert.Equal(t, yottadb.YDB_ERR_INVSTRLEN, errcode)
 	r, err = value.ElemLenUsed(tp, nil, 0)
 	assert.Nil(t, err)
 	assert.Equal(t, r, uint32(0))
@@ -218,17 +325,20 @@ func TestBufTAryElemLenUsed(t *testing.T) {
 func TestBufTAryValStr(t *testing.T) {
 	var value yottadb.BufferTArray
 	var tp = yottadb.NOTTP
+	var errcode int
 
 	// Test before Alloc
 	r, err := value.ValStr(tp, nil, 0)
-	assert.NotNil(t, err)
+	errcode = yottadb.ErrorCode(err)
+	assert.Equal(t, yottadb.YDB_ERR_INSUFFSUBS, errcode)
 	assert.Equal(t, r, "")
 
-	value.Alloc(10, 50)
+	value.Alloc(10, 16)
 
 	// Test after alloc, before setting value outside of range
 	r, err = value.ValStr(tp, nil, 11)
-	assert.NotNil(t, err)
+	errcode = yottadb.ErrorCode(err)
+	assert.Equal(t, yottadb.YDB_ERR_INSUFFSUBS, errcode)
 	assert.Equal(t, r, "")
 
 	// Test after alloc, valid except not defined
@@ -236,11 +346,38 @@ func TestBufTAryValStr(t *testing.T) {
 	assert.Nil(t, err)
 	assert.NotNil(t, r)
 	assert.Equal(t, r, "")
+
+	// Set a value and check that it is defined
+	err = value.SetValStr(tp, nil, 1, "Hello")
+	assert.Nil(t, err)
+	r, err = value.ValStr(tp, nil, 1)
+	assert.Nil(t, err)
+	assert.Equal(t, r, "Hello")
+
+	// Try set a value on out of bounds element
+	err = value.SetValStr(tp, nil, 11, "Out of Bounds")
+	errcode = yottadb.ErrorCode(err)
+	assert.Equal(t, yottadb.YDB_ERR_INSUFFSUBS, errcode)
+
+	// Try set a value longer than the buffer
+	err = value.SetValStr(tp, nil, 2, "This string is too long")
+	errcode = yottadb.ErrorCode(err)
+	assert.Equal(t, yottadb.YDB_ERR_INVSTRLEN, errcode)
+	l, err := value.ElemLenUsed(tp, nil, 2)
+	assert.Nil(t, err)
+	assert.Equal(t, l, uint32(0))
+
+	// Try to set a value on a freed structure
+	value.Free()
+	err = value.SetValStr(tp, nil, 0, "Hello")
+	errcode = yottadb.ErrorCode(err)
+	assert.Equal(t, yottadb.YDB_ERR_INSUFFSUBS, errcode)
 }
 
 func TestBufTAryElemUsed(t *testing.T) {
 	var value yottadb.BufferTArray
 	var tp = yottadb.NOTTP
+	var errcode int
 
 	// Test before Alloc
 	r := value.ElemUsed()
@@ -253,15 +390,20 @@ func TestBufTAryElemUsed(t *testing.T) {
 	// Alloc, and test
 	value.Alloc(10, 50)
 
+	// Test that ElemUsed() is 0 after alloc
 	r = value.ElemUsed()
 	assert.Equal(t, uint32(0), r)
 
+	// Test that setting ElemUsed > Alloc'ed returns error
 	err = value.SetElemUsed(tp, nil, 100)
-	assert.NotNil(t, err)
+	errcode = yottadb.ErrorCode(err)
+	assert.Equal(t, yottadb.YDB_ERR_INSUFFSUBS, errcode)
 
+	// Test that setting ElemUsed < Alloc'ed returns nil
 	err = value.SetElemUsed(tp, nil, 5)
 	assert.Nil(t, err)
 
+	// Test that ElemUsed is correct after set
 	r = value.ElemUsed()
 	assert.Equal(t, uint32(5), r)
 
