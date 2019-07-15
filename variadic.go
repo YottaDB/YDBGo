@@ -25,13 +25,8 @@ import (
 // #define MAXVPARMS 36
 // typedef struct {
 //         intptr_t  n;
-//         void      *arg[MAXVPARMS];
+//         uintptr_t arg[MAXVPARMS];
 // } gparam_list;
-// typedef struct {
-//         void      *ptr;
-// } saveUnsafePtr;
-// void *intToUnsafePtr(int val);
-// void *uint64ToUnsafePtr(uint64_t val);
 import "C"
 
 const maxARM32RegParms uint32 = 4 // Max number of parms passed in registers in ARM32 (affects passing of 64 bit parms)
@@ -73,7 +68,8 @@ func (vplist *variadicPlist) callVariadicPlistFunc(vpfunc unsafe.Pointer) int {
 	if nil == vplist {
 		panic("*variadicPlist receiver of callVariadicPlistFunc() cannot be nil")
 	}
-	retval := int(C.ydb_call_variadic_plist_func((C.ydb_vplist_func)(vpfunc), unsafe.Pointer(vplist.cvplist)))
+	retval := int(C.ydb_call_variadic_plist_func((C.ydb_vplist_func)(vpfunc),
+		(C.uintptr_t)(uintptr((unsafe.Pointer(vplist.cvplist))))))
 	runtime.KeepAlive(vplist)
 	return retval
 }
@@ -139,7 +135,7 @@ func (vplist *variadicPlist) setUsed(tptoken uint64, errstr *BufferT, newUsed ui
 // setVPlistParam is a variadicPlist method to set an entry to the variable plist - note any addresses being passed in
 // here MUST point to C allocated memory and NOT Golang allocated memory or cgo will cause a panic. Note parameter
 // indexes are 0 based.
-func (vplist *variadicPlist) setVPlistParam(tptoken uint64, errstr *BufferT, paramindx uint32, paramaddr unsafe.Pointer) error {
+func (vplist *variadicPlist) setVPlistParam(tptoken uint64, errstr *BufferT, paramindx uint32, paramaddr uintptr) error {
 	printEntry("variadicPlist.setVPlistParm")
 	if nil == vplist {
 		panic("*variadicPlist receiver of setVPlistParam() cannot be nil")
@@ -157,9 +153,9 @@ func (vplist *variadicPlist) setVPlistParam(tptoken uint64, errstr *BufferT, par
 		panic(fmt.Sprintf("YDB: setVPlistParam item count %d exceeds maximum count of %d", paramindx, C.MAXVPARMS))
 	}
 	// Compute address of indexed element
-	elemptr := (*C.saveUnsafePtr)(unsafe.Pointer((uintptr(unsafe.Pointer(&cvplist.arg[0])) +
-		(uintptr(paramindx) * unsafe.Sizeof(paramaddr)))))
-	elemptr.ptr = paramaddr
+	elemptr := (*uintptr)(unsafe.Pointer(uintptr(unsafe.Pointer(&cvplist.arg[0])) +
+		uintptr(paramindx*uint32(unsafe.Sizeof(paramaddr)))))
+	*elemptr = paramaddr
 	runtime.KeepAlive(vplist)
 	return nil
 }
@@ -189,7 +185,7 @@ func (vplist *variadicPlist) setVPlistParam64Bit(tptoken uint64, errstr *BufferT
 	}
 	// Compute address of indexed element(s)
 	if 64 == strconv.IntSize {
-		err = vplist.setVPlistParam(tptoken, errstr, *paramindx, C.uint64ToUnsafePtr(C.uint64_t(parm64bit)))
+		err = vplist.setVPlistParam(tptoken, errstr, *paramindx, uintptr(parm64bit))
 		if nil != err {
 			panic(fmt.Sprintf("YDB: Unknown error with varidicPlist.setVPlistParam(): %s", err))
 		}
@@ -212,7 +208,7 @@ func (vplist *variadicPlist) setVPlistParam64Bit(tptoken uint64, errstr *BufferT
 						paramindx, C.MAXVPARMS))
 				}
 			}
-			err = vplist.setVPlistParam(tptoken, errstr, *paramindx, C.intToUnsafePtr(C.int(parm64bit&0xffffffff)))
+			err = vplist.setVPlistParam(tptoken, errstr, *paramindx, uintptr(parm64bit&0xffffffff))
 			if nil != err {
 				panic(fmt.Sprintf("YDB: Unknown error with varidicPlist.setVPlistParam(): %s", err))
 			}
@@ -221,12 +217,12 @@ func (vplist *variadicPlist) setVPlistParam64Bit(tptoken uint64, errstr *BufferT
 				panic(fmt.Sprintf("YDB: setVPlistParam64Bit item count %d exceeds maximum count of %d",
 					paramindx, C.MAXVPARMS))
 			}
-			err = vplist.setVPlistParam(tptoken, errstr, *paramindx, C.intToUnsafePtr(C.int(parm64bit>>32)))
+			err = vplist.setVPlistParam(tptoken, errstr, *paramindx, uintptr(parm64bit>>32))
 			if nil != err {
 				panic(fmt.Sprintf("YDB: Unknown error with varidicPlist.setVPlistParam(): %s", err))
 			}
 		} else {
-			err = vplist.setVPlistParam(tptoken, errstr, *paramindx, C.intToUnsafePtr(C.int(parm64bit>>32)))
+			err = vplist.setVPlistParam(tptoken, errstr, *paramindx, uintptr(parm64bit>>32))
 			if nil != err {
 				panic(fmt.Sprintf("YDB: Unknown error with varidicPlist.setVPlistParam(): %s", err))
 			}
@@ -235,7 +231,7 @@ func (vplist *variadicPlist) setVPlistParam64Bit(tptoken uint64, errstr *BufferT
 				panic(fmt.Sprintf("YDB: setVPlistParam64Bit item count %d exceeds maximum count of %d",
 					paramindx, C.MAXVPARMS))
 			}
-			err = vplist.setVPlistParam(tptoken, errstr, *paramindx, C.intToUnsafePtr(C.int(parm64bit&0xffffffff)))
+			err = vplist.setVPlistParam(tptoken, errstr, *paramindx, uintptr(parm64bit&0xffffffff))
 			if nil != err {
 				panic(fmt.Sprintf("YDB: Unknown error with varidicPlist.setVPlistParam(): %s", err))
 			}
