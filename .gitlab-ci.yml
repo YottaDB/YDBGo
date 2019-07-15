@@ -52,61 +52,38 @@ before_script:
     paths:
       - artifacts
     expire_in: 7 days
-
+#
+# In general, test first and last minor version of each major version
+#
 unit_tests1.10:
   extends: .unit_tests
   variables:
     GOLANG_VERSION: "1.10"
 
-unit_tests1.10.1:
+unit_tests1.10.8:
   extends: .unit_tests
   variables:
-    GOLANG_VERSION: 1.10.1
-
-unit_tests1.10.2:
-  extends: .unit_tests
-  variables:
-    GOLANG_VERSION: 1.10.2
-
-unit_tests1.10.3:
-  extends: .unit_tests
-  variables:
-    GOLANG_VERSION: 1.10.3
-
-unit_tests1.10.4:
-  extends: .unit_tests
-  variables:
-    GOLANG_VERSION: 1.10.4
-
-unit_tests1.10.5:
-  extends: .unit_tests
-  variables:
-    GOLANG_VERSION: 1.10.5
+    GOLANG_VERSION: "1.10.8"
 
 unit_tests1.11:
   extends: .unit_tests
   variables:
     GOLANG_VERSION: "1.11"
 
-unit_tests1.11.1:
+unit_tests1.11.12:
   extends: .unit_tests
   variables:
-    GOLANG_VERSION: 1.11.1
+    GOLANG_VERSION: "1.11.12"
 
-unit_tests1.11.2:
+unit_tests1.12:
   extends: .unit_tests
   variables:
-    GOLANG_VERSION: 1.11.2
+    GOLANG_VERSION: "1.12"
 
-unit_tests1.11.3:
+unit_tests1.12.7:
   extends: .unit_tests
   variables:
-    GOLANG_VERSION: 1.11.3
-
-unit_tests1.11.4:
-  extends: .unit_tests
-  variables:
-    GOLANG_VERSION: 1.11.4
+    GOLANG_VERSION: "1.12.7"
 
 race_detector:
   stage: test
