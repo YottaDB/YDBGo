@@ -20,6 +20,7 @@ import (
 	"strconv"
 	"sync"
 	"testing"
+	"time"
 )
 
 func TestDataSt(t *testing.T) {
@@ -635,6 +636,7 @@ func TestKeyTGetWithUndefGlobal(t *testing.T) {
 
 func TestKeyTSetWithDifferentErrors(t *testing.T) {
 	var wg sync.WaitGroup
+	timeout := make(chan bool)
 
 	tptoken := yottadb.NOTTP
 
@@ -644,6 +646,7 @@ func TestKeyTSetWithDifferentErrors(t *testing.T) {
 		go func() {
 			var errstr, out yottadb.BufferT
 			var key1 yottadb.KeyT
+			defer wg.Done()
 
 			// GVUNDEF error
 			key1.Alloc(10, 1, 10)
@@ -655,12 +658,16 @@ func TestKeyTSetWithDifferentErrors(t *testing.T) {
 			defer out.Free()
 			out.Alloc(5)
 
-			for j := 0; j < 1000; j++ {
-				err := key1.ValST(tptoken, &errstr, &out)
-				assert.NotNil(t, err)
-				assert.Contains(t, err.Error(), "YDB-E-GVUNDEF")
+			for  {
+				select {
+				case <-timeout:
+					return
+				default:
+					err := key1.ValST(tptoken, &errstr, &out)
+					assert.NotNil(t, err)
+					assert.Contains(t, err.Error(), "YDB-E-GVUNDEF")
+				}
 			}
-			wg.Done()
 		}()
 	}
 	for i := 0; i < 10; i++ {
@@ -668,6 +675,7 @@ func TestKeyTSetWithDifferentErrors(t *testing.T) {
 		go func() {
 			var errstr, tmp, out yottadb.BufferT
 			var key2 yottadb.KeyT
+			defer wg.Done()
 
 			// INVSTRLEN error
 			key2.Alloc(10, 1, 64)
@@ -683,15 +691,23 @@ func TestKeyTSetWithDifferentErrors(t *testing.T) {
 			defer out.Free()
 			out.Alloc(5)
 
-			for j := 0; j < 1000; j++ {
-				err := key2.ValST(tptoken, &errstr, &out)
-				assert.NotNil(t, err)
-				assert.Contains(t, err.Error(), "YDB-E-INVSTRLEN")
+			for  {
+				select {
+				case <-timeout:
+					return
+				default:
+					err := key2.ValST(tptoken, &errstr, &out)
+					assert.NotNil(t, err)
+					assert.Contains(t, err.Error(), "YDB-E-INVSTRLEN")
+				}
 			}
-			wg.Done()
 		}()
 	}
 
+	time.Sleep(5 * time.Second)
+	for i := 0; i < 20; i++ {
+		timeout <- false
+	}
 	wg.Wait()
 }
 
