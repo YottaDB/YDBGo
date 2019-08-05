@@ -40,11 +40,21 @@ type internalCallMDesc struct {
 	cmdesc *C.ci_name_descriptor // Descriptor for M routine with fastpath for calls after first
 }
 
+// CallMTable is a struct that defines a call table (see
+// https://docs.yottadb.com/ProgrammersGuide/extrout.html#calls-from-external-routines-call-ins).
+// The methods associated with this struct allow call tables to be opened and to switch between them
+// to give access to routines in multiple call tables.
+type CallMTable struct {
+	handle uintptr // Handle used to access the call table
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // Utility methods
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// First up - methods for CallMDesc struct.
 
 // Free is a method to release both the routine name buffer and the descriptor block associated with
 // the CallMDesc block.
@@ -217,6 +227,30 @@ func (mdesc *CallMDesc) CallMDescT(tptoken uint64, errstr *BufferT, retvallen ui
 	return retval, nil
 }
 
+// Methods for CallMTable struct
+
+// CallMTableSwitchT method switches whatever the current call table is (only one active at a time) with the supplied
+// call table and returns the call table that was in effect (or nil if none).
+func (newcmtable *CallMTable) CallMTableSwitchT(tptoken uint64, errstr *BufferT) (*CallMTable, error) {
+	var cbuft *C.ydb_buffer_t
+	var callmtabret CallMTable
+
+	if nil == newcmtable {
+		panic("Non-nil CallMTable structure must be specified")
+	}
+	if nil != errstr {
+		cbuft = errstr.getCPtr()
+	}
+	rc := C.ydb_ci_tab_switch_t(C.uint64_t(tptoken), cbuft, C.uintptr_t(newcmtable.handle),
+		(*C.uintptr_t)(unsafe.Pointer(&callmtabret.handle)))
+	if YDB_OK != rc {
+		err := NewError(tptoken, errstr, int(rc))
+		return nil, err
+	}
+	runtime.KeepAlive(errstr)
+	return &callmtabret, nil
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // Utility functions
@@ -236,6 +270,26 @@ func CallMT(tptoken uint64, errstr *BufferT, retvallen uint32, rtnname string, r
 	}
 	mdesc.SetRtnName(rtnname)
 	return mdesc.CallMDescT(tptoken, errstr, retvallen, rtnargs...)
+}
+
+// CallMTableOpenT function opens a new call table or one for which the process had no handle and returns a
+// CallMTable for it.
+func CallMTableOpenT(tptoken uint64, errstr *BufferT, tablename string) (*CallMTable, error) {
+	var callmtab CallMTable
+	var cbuft *C.ydb_buffer_t
+
+	cstr := C.CString(tablename)
+	defer C.free(unsafe.Pointer(cstr))
+	if nil != errstr {
+		cbuft = errstr.getCPtr()
+	}
+	rc := C.ydb_ci_tab_open_t(C.uint64_t(tptoken), cbuft, cstr, (*C.uintptr_t)(unsafe.Pointer(&callmtab.handle)))
+	if YDB_OK != rc {
+		err := NewError(tptoken, errstr, int(rc))
+		return nil, err
+	}
+	runtime.KeepAlive(errstr)
+	return &callmtab, nil
 }
 
 // MessageT is a STAPI utility function to return the error message (sans argument substitution) of a given error number.

@@ -148,7 +148,7 @@ func TestCallMDescT(t *testing.T) {
 	callin.SetRtnName("CallMTStrTest")
 
 	/* M callin that returns 20 characters, using a 20 character buffer */
-	retval, err := callin.CallMDescT(yottadb.NOTTP, nil, 20)
+	retval, err := callin.CallMDescT(yottadb.NOTTP, &errstr, 20)
 	if nil != err {
 		panic(err)
 	}
@@ -161,7 +161,7 @@ func TestCallMDescT(t *testing.T) {
 
 	/* M callin that returns 20 characters, using a 15 character buffer; should return INVSTRLEN */
 	retval, err = callin.CallMDescT(yottadb.NOTTP, &errstr, 15)
-	out, _ := errstr.ValStr(yottadb.NOTTP, nil)
+	out, _ := errstr.ValStr(yottadb.NOTTP, &errstr)
 	errCode := yottadb.ErrorCode(err)
 	if -yottadb.YDB_ERR_INVSTRLEN != errCode {
 		panic(fmt.Sprintf("CallMT() returned wrong ErrorCode. Got: %d; Expected: %d", errCode, yottadb.YDB_ERR_INVSTRLEN))
@@ -169,4 +169,44 @@ func TestCallMDescT(t *testing.T) {
 	if out != cmpstr {
 		panic(fmt.Sprintf("CallMT() returned wrong errstr. Got: %s; Expected: %s", out, cmpstr))
 	}
+}
+
+func TestCallMTab(t *testing.T) {
+	var errstr yottadb.BufferT
+	var err error
+
+	// Environment setup
+	envvarSave := make(map[string]string)
+	saveEnvvars(t, &envvarSave, "ydb_ci", "ydb_routines")
+	//err = os.Setenv("ydb_ci", "calltab.ci")
+	includeInEnvvar(t, "ydb_routines", "./m_routines")
+	defer restoreEnvvars(t, &envvarSave, "ydb_ci", "ydb_routines")
+
+	// Note, we did not set ydb_ci - open first calltable directly
+	calltabTable, err := yottadb.CallMTableOpenT(yottadb.NOTTP, &errstr, "calltab.ci")
+	assert.Nil(t, err)
+	_, err = calltabTable.CallMTableSwitchT(yottadb.NOTTP, &errstr)
+	assert.Nil(t, err)
+	retval, err := yottadb.CallMT(yottadb.NOTTP, nil, 64, "HelloWorld1")
+	assert.Nil(t, err)
+	assert.Equal(t, "entry called", retval)
+	// Try to invoke our test routine but expect error since it does not exist in this calltab
+	retval, err = yottadb.CallMT(yottadb.NOTTP, nil, 64, "HelloWorld99")
+	assert.NotNil(t, err)
+	assert.Equal(t, -yottadb.YDB_ERR_CINOENTRY, yottadb.ErrorCode(err))
+	// Now open the new package and make it current
+	newtabTable, err := yottadb.CallMTableOpenT(yottadb.NOTTP, &errstr, "testcalltab.ci")
+	assert.Nil(t, err)
+	savedTable, err := newtabTable.CallMTableSwitchT(yottadb.NOTTP, &errstr)
+	assert.Nil(t, err)
+	// And try running our program again
+	retval, err = yottadb.CallMT(yottadb.NOTTP, nil, 64, "HelloWorld99")
+	assert.Nil(t, err)
+	assert.Equal(t, "entry was called", retval)
+	// Validate we can switch back and re-run HelloWorld1
+	_, err = savedTable.CallMTableSwitchT(yottadb.NOTTP, &errstr)
+	assert.Nil(t, err)
+	retval, err = yottadb.CallMT(yottadb.NOTTP, nil, 64, "HelloWorld1")
+	assert.Nil(t, err)
+	assert.Equal(t, "entry called", retval)
 }

@@ -658,7 +658,7 @@ func TestKeyTSetWithDifferentErrors(t *testing.T) {
 			defer out.Free()
 			out.Alloc(5)
 
-			for  {
+			for {
 				select {
 				case <-timeout:
 					return
@@ -691,7 +691,7 @@ func TestKeyTSetWithDifferentErrors(t *testing.T) {
 			defer out.Free()
 			out.Alloc(5)
 
-			for  {
+			for {
 				select {
 				case <-timeout:
 					return
