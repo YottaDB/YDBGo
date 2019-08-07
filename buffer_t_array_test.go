@@ -14,6 +14,7 @@ package yottadb_test
 
 import (
 	"bytes"
+	"fmt"
 	"github.com/stretchr/testify/assert"
 	"lang.yottadb.com/go/yottadb"
 	. "lang.yottadb.com/go/yottadb/internal/test_helpers"
@@ -21,7 +22,6 @@ import (
 	"runtime"
 	"testing"
 	"time"
-	"fmt"
 )
 
 // TestBufTAryDeleteExclST tests the DeleteExclST() method.
@@ -108,7 +108,7 @@ func TestBufTAryDeleteExclSTErrors(t *testing.T) {
 	var errcode int
 
 	defer namelst.Free()
-	namelst.Alloc(yottadb.YDB_MAX_NAMES + 1, 64)
+	namelst.Alloc(yottadb.YDB_MAX_NAMES+1, 64)
 	err = namelst.SetElemUsed(tptoken, nil, 1)
 	Assertnoerr(err, t)
 
@@ -145,11 +145,11 @@ func TestBufTAryDeleteExclSTErrors(t *testing.T) {
 		t.Error("The DeleteExclST() errorcode for a too long VarName expected to be", yottadb.YDB_ERR_VARNAME2LONG, "but was", errcode)
 	}
 	// YDB_ERR_NAMECOUNT2HI
-	for i := 0; i < yottadb.YDB_MAX_NAMES + 1; i++ {
+	for i := 0; i < yottadb.YDB_MAX_NAMES+1; i++ {
 		err = namelst.SetValStr(tptoken, nil, uint32(i), fmt.Sprintf("a%d", i))
 		Assertnoerr(err, t)
 	}
-	err = namelst.SetElemUsed(tptoken, nil, yottadb.YDB_MAX_NAMES + 1)
+	err = namelst.SetElemUsed(tptoken, nil, yottadb.YDB_MAX_NAMES+1)
 	Assertnoerr(err, t)
 	err = namelst.DeleteExclST(tptoken, nil)
 	errcode = yottadb.ErrorCode(err)

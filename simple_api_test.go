@@ -60,7 +60,7 @@ func TestSimpleAPILockSTErrors(t *testing.T) {
 	err = yottadb.LockST(tptoken, nil, 0, &dbkey)
 	errcode := yottadb.ErrorCode(err)
 	if yottadb.YDB_ERR_INVVARNAME != errcode {
-		t.Error("The LockST() errorcode for ^ expected to be", yottadb.YDB_ERR_INVVARNAME , "but was", errcode)
+		t.Error("The LockST() errorcode for ^ expected to be", yottadb.YDB_ERR_INVVARNAME, "but was", errcode)
 	}
 	// YDB_ERR_UNIMPLOP
 	dbkey.Alloc(8, 0, 0)
@@ -69,7 +69,7 @@ func TestSimpleAPILockSTErrors(t *testing.T) {
 	err = yottadb.LockST(tptoken, nil, 0, &dbkey)
 	errcode = yottadb.ErrorCode(err)
 	if yottadb.YDB_ERR_UNIMPLOP != errcode {
-		t.Error("The LockST() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_UNIMPLOP , "but was", errcode)
+		t.Error("The LockST() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_UNIMPLOP, "but was", errcode)
 	}
 	// YDB_ERR_INVSVN
 	dbkey.Alloc(16, 0, 0)
@@ -78,7 +78,7 @@ func TestSimpleAPILockSTErrors(t *testing.T) {
 	err = yottadb.LockST(tptoken, nil, 0, &dbkey)
 	errcode = yottadb.ErrorCode(err)
 	if yottadb.YDB_ERR_INVSVN != errcode {
-		t.Error("The LockST() errorcode for $NOTATHING expected to be", yottadb.YDB_ERR_INVSVN , "but was", errcode)
+		t.Error("The LockST() errorcode for $NOTATHING expected to be", yottadb.YDB_ERR_INVSVN, "but was", errcode)
 	}
 	// YDB_ERR_VARNAME2LONG
 	dbkey.Alloc(64, 0, 0)
@@ -102,16 +102,16 @@ func TestSimpleAPILockSTErrors(t *testing.T) {
 	err = yottadb.LockST(tptoken, nil, 0, &dbkey)
 	errcode = yottadb.ErrorCode(err)
 	if yottadb.YDB_ERR_MAXNRSUBSCRIPTS != errcode {
-		t.Error("The LockST() errorcode for node with 35 subscripts expected to be", yottadb.YDB_ERR_MAXNRSUBSCRIPTS , "but was", errcode)
+		t.Error("The LockST() errorcode for node with 35 subscripts expected to be", yottadb.YDB_ERR_MAXNRSUBSCRIPTS, "but was", errcode)
 	}
 	// YDB_ERR_TIME2LONG
 	dbkey.Alloc(1, 0, 0)
 	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "a")
 	Assertnoerr(err, t)
-	err = yottadb.LockST(tptoken, nil, yottadb.YDB_MAX_TIME_NSEC + 1, &dbkey)
+	err = yottadb.LockST(tptoken, nil, yottadb.YDB_MAX_TIME_NSEC+1, &dbkey)
 	errcode = yottadb.ErrorCode(err)
 	if yottadb.YDB_ERR_TIME2LONG != errcode {
-		t.Error("The LockST() errorcode for timeout of YDB_MAX_TIME_NSEC+1 expected to be", yottadb.YDB_ERR_TIME2LONG , "but was", errcode)
+		t.Error("The LockST() errorcode for timeout of YDB_MAX_TIME_NSEC+1 expected to be", yottadb.YDB_ERR_TIME2LONG, "but was", errcode)
 	}
 	// YDB_ERR_NAMECOUNT2HI
 	dbkey.Alloc(1, 0, 0)
@@ -120,7 +120,7 @@ func TestSimpleAPILockSTErrors(t *testing.T) {
 	err = yottadb.LockST(tptoken, nil, 0, &dbkey, &dbkey, &dbkey, &dbkey, &dbkey, &dbkey, &dbkey, &dbkey, &dbkey, &dbkey, &dbkey, &dbkey)
 	errcode = yottadb.ErrorCode(err)
 	if yottadb.YDB_ERR_NAMECOUNT2HI != errcode {
-		t.Error("The LockE() errorcode for 12 locks expected to be", yottadb.YDB_ERR_NAMECOUNT2HI , "but was", errcode)
+		t.Error("The LockE() errorcode for 12 locks expected to be", yottadb.YDB_ERR_NAMECOUNT2HI, "but was", errcode)
 	}
 }
 
