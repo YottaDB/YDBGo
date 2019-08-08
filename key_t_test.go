@@ -539,11 +539,9 @@ func TestKeyTGetValueThatWontFitInBuffer(t *testing.T) {
 	assert.Equal(t, yottadb.YDB_ERR_INVSTRLEN, errcode)
 
 	// Verify that getting len on the buffer results in error
-	_, err = buff.LenUsed(tptoken, nil)
-	assert.NotNil(t, err)
-	errcode = yottadb.ErrorCode(err)
-	assert.Equal(t, yottadb.YDB_ERR_INVSTRLEN, errcode)
-	assert.Equal(t, "%YDB-E-INVSTRLEN, Invalid string length 11: max 10", err.Error())
+	lenneeded, err := buff.LenUsed(tptoken, nil)
+	assert.Nil(t, err)
+	assert.Equal(t, lenneeded, uint32(11))
 
 	// Verify that getting val on the buffer results in error
 	_, err = buff.ValBAry(tptoken, nil)

@@ -201,9 +201,7 @@ func (buft *BufferT) LenAlloc(tptoken uint64, errstr *BufferT) (uint32, error) {
 // that if len_used > len_alloc, thus indicating a previous issue, an INVSTRLEN error is raised.
 //
 // If the C.ydb_buffer_t structure referenced by cbuft has not yet been allocated, return the STRUCTNOTALLOCD error.
-// If the len_used field of the C.ydb_buffer_t structure is greater than its len_alloc field (owing to a
-// prior INVSTRLEN error), return an INVSTRLEN error and the len_used field of the C.ydb_buffer_t structure
-// referenced by cbuft. Otherwise, return the len_used field of the C.ydb_buffer_t structure referenced by cbuft.
+// Otherwise, return the len_used field of the C.ydb_buffer_t structure referenced by cbuft.
 func (buft *BufferT) LenUsed(tptoken uint64, errstr *BufferT) (uint32, error) {
 	printEntry("BufferT.LenUsed()")
 	if nil == buft {
@@ -218,12 +216,7 @@ func (buft *BufferT) LenUsed(tptoken uint64, errstr *BufferT) (uint32, error) {
 		}
 		return 0, &YDBError{(int)(YDB_ERR_STRUCTNOTALLOCD), errmsg}
 	}
-	lenalloc := cbuftptr.len_alloc
 	lenused := cbuftptr.len_used
-	if lenused > lenalloc {
-		errmsg := formatINVSTRLEN(tptoken, errstr, lenalloc, lenused)
-		return 0, &YDBError{(int)(YDB_ERR_INVSTRLEN), errmsg}
-	}
 	runtime.KeepAlive(buft)
 	return uint32(lenused), nil
 }
