@@ -11,7 +11,7 @@ This package uses pkg-config to find libyottadb.so. The appropriate file is gene
 
 If you need to manually generate the yottadb.pc file the contents should look something similar to:
 
-```
+```sh
 prefix=/usr/local/lib/yottadb/r124
 
 exec_prefix=${prefix}
@@ -33,26 +33,26 @@ You can also override the path used by pkg-config to find yottadb.pc with the en
 
 Using the package:
 
-```
+```sh
 go get lang.yottadb.com/go/yottadb
 ```
 
 Build the package:
 
-```
+```sh
 go build lang.yottadb.com/go/yottadb
 ```
 
 Before running code using YottaDB or running the YottaDB tests, you need to make sure you have all the needed environment variables configured.
 The best way to do this is by sourcing ydb_env_set:
 
-```
+```sh
 source $(pkg-config --variable=prefix yottadb)/ydb_env_set
 ```
 
 Run the tests:
 
-```
+```sh
 go get -t lang.yottadb.com/go/yottadb
 go test lang.yottadb.com/go/yottadb
 ```
@@ -61,7 +61,43 @@ go test lang.yottadb.com/go/yottadb
 
 To use a local development version of YDBGo
 
-```
+```sh
 mkdir -p $GOPATH/src/lang.yottadb.com/go/yottadb
 git clone https://gitlab.com/YottaDB/Lang/YDBGo.git $GOPATH/src/lang.yottadb.com/go/yottadb
+```
+
+## Docker Container
+
+The Dockerfile/container included in this repo pre-installs YottaDB and the Go language and runs on an Ubuntu image. Some basic development tools are also pre-installed (git, gcc, make, etc).
+
+If there is a better way to create the Docker container that suits the community's needs, please file an issue.
+
+There are two modes that you can use the Docker container in:
+
+1. Use a database created by using the defaults created by running the YottaDB `ydb_env_set` script which sets up some sane defaults.
+2. Use a database manually created upon running the container - this still runs `ydb_env_set`, but runs in such a way that some control is still given to the user
+
+### Building the Container
+
+To build the container run:
+
+```sh
+docker build . -t ydbgo
+```
+
+### To use a database created using the defaults
+
+This example command will map the current directory into the container under the /data directory and will run a sample three n plus 1 application that contains a Go based webserver. This requires that you have built the docker container already and have cloned the [threenp1-viewer](https://gitlab.com/YottaDB/Demo/threenp1-viewer) repository and your current directory is the `threenp1-viewer` subdirectory of the cloned repo.
+
+```sh
+docker run -it -p3001:3000 -v `pwd`:/data ydbgo /bin/bash -c "echo h | \$ydb_dist/ydb && source \$ydb_dist/ydb_env_set && go get -d . && go build && env && \$ydb_dist/mumps -r simpleapithreen1f && echo pausing && sleep 2 && ./data"
+```
+
+### To manually create the database
+
+This example command will map the current directory into the container under the /data directory, create a new database using some manually provided defaults, and will run a sample three n plus 1 application that contains a Go based webserver. This requires that you have built the docker container already and have cloned the [threenp1-viewer](https://gitlab.com/YottaDB/Demo/threenp1-viewer) repository and your current directory is the `threenp1-viewer` subdirectory of the cloned repo.
+
+```sh
+docker run -it -p3001:3000 -v `pwd`:/data ydbgo /bin/bash -c "unset ydb_routines && source \$ydb_dist/ydb
+_env_set && echo change -s DEFAULt -FILE=/data/mumps.dat | /opt/yottadb/current/mumps -run ^GDE && \$ydb_dist/mupip create && go get -d . && go build && \$ydb_dist/mumps -r simpleapithreen1f && echo pausing && sleep 2 && ./data"
 ```
