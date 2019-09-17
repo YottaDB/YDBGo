@@ -80,10 +80,15 @@ unit_tests1.12:
   variables:
     GOLANG_VERSION: "1.12"
 
-unit_tests1.12.7:
+unit_tests1.12.9:
   extends: .unit_tests
   variables:
-    GOLANG_VERSION: "1.12.7"
+    GOLANG_VERSION: "1.12.9"
+
+unit_tests1.13:
+  extends: .unit_tests
+  variables:
+    GOLANG_VERSION: "1.13"
 
 race_detector:
   stage: test
