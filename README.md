@@ -90,7 +90,7 @@ docker build . -t ydbgo
 This example command will map the current directory into the container under the /data directory and will run a sample three n plus 1 application that contains a Go based webserver. This requires that you have built the docker container already and have cloned the [threenp1-viewer](https://gitlab.com/YottaDB/Demo/threenp1-viewer) repository and your current directory is the `threenp1-viewer` subdirectory of the cloned repo.
 
 ```sh
-docker run -it -p3001:3000 -v `pwd`:/data ydbgo /bin/bash -c "echo h | \$ydb_dist/ydb && source \$ydb_dist/ydb_env_set && go get -d . && go build && env && \$ydb_dist/mumps -r simpleapithreen1f && echo pausing && sleep 2 && ./data"
+docker run -it -p3000:3000 -v `pwd`:/data ydbgo /bin/bash -c "source \$ydb_dist/ydb_env_set && go get -d . && go build && echo 'Type a number then press <ENTER> twice' && \$ydb_dist/mumps -r simpleapithreen1f && echo 'Open a web browser to http://localhost:3000/static' && sleep 2 && ./data"
 ```
 
 ### To manually create the database
@@ -98,6 +98,5 @@ docker run -it -p3001:3000 -v `pwd`:/data ydbgo /bin/bash -c "echo h | \$ydb_dis
 This example command will map the current directory into the container under the /data directory, create a new database using some manually provided defaults, and will run a sample three n plus 1 application that contains a Go based webserver. This requires that you have built the docker container already and have cloned the [threenp1-viewer](https://gitlab.com/YottaDB/Demo/threenp1-viewer) repository and your current directory is the `threenp1-viewer` subdirectory of the cloned repo.
 
 ```sh
-docker run -it -p3001:3000 -v `pwd`:/data ydbgo /bin/bash -c "unset ydb_routines && source \$ydb_dist/ydb
-_env_set && echo change -s DEFAULt -FILE=/data/mumps.dat | /opt/yottadb/current/mumps -run ^GDE && \$ydb_dist/mupip create && go get -d . && go build && \$ydb_dist/mumps -r simpleapithreen1f && echo pausing && sleep 2 && ./data"
+docker run -it -p3000:3000 -v `pwd`:/data ydbgo /bin/bash -c "unset ydb_routines && source \$ydb_dist/ydb_env_set && echo change -s DEFAULT -FILE=/data/mumps.dat | /opt/yottadb/current/mumps -run ^GDE && \$ydb_dist/mupip create && go get -d . && go build && echo 'Type a number then press <ENTER> twice' && \$ydb_dist/mumps -r simpleapithreen1f && echo 'Open a web browser to http://localhost:3000/static' && sleep 2 && ./data"
 ```

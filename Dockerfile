@@ -40,4 +40,3 @@ RUN wget -O go.tgz -q https://golang.org/dl/go${GOLANG_VERSION}.linux-amd64.tar.
 # Setup YottaDB
 ENV ydb_dir /data
 ENV ydb_dist /opt/yottadb/current
-ENV ydb_gbldir /data/mumps.gld
