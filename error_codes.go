@@ -1567,6 +1567,7 @@ const (
 	YDB_MAX_NAMES    = 35                /* Maximum number of variable names can be specified in a single ydb_*_s() call */
 	YDB_MAX_STR      = (1 * 1024 * 1024) /* Maximum YottaDB string length */
 	YDB_MAX_SUBS     = 31                /* Maximum subscripts currently supported */
+	YDB_MAX_PARMS    = 32                /* Maximum parameters to an M call (call-in) */
 	YDB_MAX_ERRORMSG = 1024              /* Maximum length of error message */
 
 	YDB_MAX_TIME_NSEC = (uint64(0x7fffffff) * uint64(1000) * uint64(1000)) /* Max specified time in (long long) nanoseconds */

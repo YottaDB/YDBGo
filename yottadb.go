@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	//
+// Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -24,16 +24,16 @@ const NOTTP uint64 = 0
 // Release version constants - be sure to change all of them appropriately
 
 // WrapperRelease - (string) The Golang wrapper release value for YottaDB SimpleAPI
-const WrapperRelease string = "v1.0.0"
+const WrapperRelease string = "v1.1.0"
 
 // MinimumYDBReleaseMajor - (int) Minimum major release number required by this wrapper of the linked YottaDB
 const MinimumYDBReleaseMajor int = 1
 
 // MinimumYDBReleaseMinor - (int) Minimum minor release number required by this wrapper of the linked YottaDB
-const MinimumYDBReleaseMinor int = 28
+const MinimumYDBReleaseMinor int = 30
 
 // MinimumYDBRelease - (string) Minimum YottaDB release name required by this wrapper
-const MinimumYDBRelease string = "r1.28"
+const MinimumYDBRelease string = "r1.30"
 
 const dbgPrintEPHdrs bool = false    // Print entry point headers when routine is entered
 const dbgInitMalloc bool = false     // Initialize C malloc'd storage (already initialized to zeroes)

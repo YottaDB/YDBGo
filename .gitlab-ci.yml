@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -90,10 +90,15 @@ unit_tests1.13:
   variables:
     GOLANG_VERSION: "1.13"
 
-unit_tests1.13.1:
+unit_tests1.13.8:
   extends: .unit_tests
   variables:
-    GOLANG_VERSION: "1.13.1"
+    GOLANG_VERSION: "1.13.8"
+
+unit_tests1.14:
+  extends: .unit_tests
+  variables:
+    GOLANG_VERSION: "1.14"
 
 race_detector:
   stage: test

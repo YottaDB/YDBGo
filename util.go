@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	//
+// Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -37,7 +37,10 @@ type CallMDesc struct {
 }
 
 type internalCallMDesc struct {
-	cmdesc *C.ci_name_descriptor // Descriptor for M routine with fastpath for calls after first
+	rtnname  string                // Copy of rtn name in descriptor - easier for use in panic error msgs
+	filledin bool                  // Indicates call has been made to fill-in parmtyps struct
+	cmdesc   *C.ci_name_descriptor // Descriptor for M routine with fastpath for calls after first
+	parmtyps *C.ci_parm_type       // Where we hang the information we receive about the entry point
 }
 
 // CallMTable is a struct that defines a call table (see
@@ -82,11 +85,17 @@ func (imdesc *internalCallMDesc) Free() {
 		// The below keeps imdesc around long enough to get rid of this block's C memory. No KeepAlive() necessary.
 		imdesc.cmdesc = nil
 	}
+	ctypPtr := imdesc.parmtyps
+	if nil != ctypPtr {
+		freeMem(unsafe.Pointer(ctypPtr), C.size_t(C.sizeof_ci_parm_type))
+		imdesc.parmtyps = nil
+	}
 }
 
 // SetRtnName is a method for CallMDesc that sets the routine name into the descriptor.
 func (mdesc *CallMDesc) SetRtnName(rtnname string) {
 	var cindPtr *C.ci_name_descriptor
+	var ctypPtr *C.ci_parm_type
 
 	printEntry("CallMDesc.SetRtnName()")
 	if nil == mdesc {
@@ -110,13 +119,15 @@ func (mdesc *CallMDesc) SetRtnName(rtnname string) {
 		cindPtr.rtn_name.address = nil
 	} else {
 		cindPtr = (*C.ci_name_descriptor)(allocMem(C.size_t(C.sizeof_ci_name_descriptor)))
-		mdesc.cmdesc = &internalCallMDesc{cindPtr}
+		ctypPtr = (*C.ci_parm_type)(allocMem(C.size_t(C.sizeof_ci_parm_type)))
+		mdesc.cmdesc = &internalCallMDesc{rtnname, false, cindPtr, ctypPtr}
 		// Set a finalizer so this block is released when garbage collected
 		runtime.SetFinalizer(mdesc.cmdesc, func(o *internalCallMDesc) { o.Free() })
 	}
 	cindPtr.rtn_name.address = C.CString(rtnname) // Allocates new memory we need to release when done (done by finalizer)
 	cindPtr.rtn_name.length = C.ulong(rtnnamelen)
 	cindPtr.handle = nil
+	mdesc.cmdesc.filledin = false // Mark parm type struct as having been NOT filled in yet
 	runtime.KeepAlive(mdesc)
 }
 
@@ -124,19 +135,49 @@ func (mdesc *CallMDesc) SetRtnName(rtnname string) {
 // and a return value is described in the call-in definition. Else return is nil.
 func (mdesc *CallMDesc) CallMDescT(tptoken uint64, errstr *BufferT, retvallen uint32, rtnargs ...interface{}) (string, error) {
 	var vplist variadicPlist
-	var parmIndx uint32
+	var parmIndx, inmask, outmask, imask, omask uint32
 	var err error
-	var retvalptr *C.ydb_string_t
+	var retvalPtr *C.ydb_string_t
 	var cbuft *C.ydb_buffer_t
 	var i int
 	var strparm, retval string
+	var strPtr *string
+	var intPtr *int
+	var int32Ptr *int32
+	var int64Ptr *int64
+	var uintPtr *uint
+	var uint32Ptr *uint32
+	var uint64Ptr *uint64
+	var boolPtr *bool
+	var float32Ptr *float32
+	var float64Ptr *float64
+	var cmplx64Ptr *complex64
+	var cmplx128Ptr *complex128
+	var parmOK bool
 
 	printEntry("CallMDesc.CallMDescT()")
 	if nil == mdesc {
 		panic("YDB: *CallMDesc receiver of CallMDescT() cannot be nil")
 	}
-	if (nil == mdesc.cmdesc) || (nil == (mdesc.cmdesc.cmdesc)) {
+	if (nil == mdesc.cmdesc) || (nil == (mdesc.cmdesc.cmdesc)) || (nil == mdesc.cmdesc.parmtyps) {
 		panic("YDB: SetRtnName() method has not been invoked on this descriptor")
+	}
+	// If we haven't already fetched the call description from YDB, do that now
+	if !mdesc.cmdesc.filledin {
+		if nil != errstr {
+			cbuft = errstr.getCPtr()
+		}
+		rc := C.ydb_ci_get_info_t(C.uint64_t(tptoken), cbuft, mdesc.cmdesc.cmdesc.rtn_name.address, mdesc.cmdesc.parmtyps)
+		if YDB_OK != rc {
+			if 0 > rc {
+				// Since this is only used in ydb_ci[p]_t() calls which do NOT return negative values,
+				// just un-negate rc
+				rc = -rc
+			}
+			err := NewError(tptoken, errstr, int(rc))
+			return "", err
+		}
+		mdesc.cmdesc.filledin = true
 	}
 	defer vplist.free() // Initialize variadic plist we need to use to call ydb_cip_helper()
 	vplist.alloc()
@@ -161,12 +202,12 @@ func (mdesc *CallMDesc) CallMDescT(tptoken uint64, errstr *BufferT, retvallen ui
 	parmIndx++
 	// Setup return value if any (first variable parm)
 	if 0 != retvallen {
-		retvalptr = (*C.ydb_string_t)(allocMem(C.size_t(C.sizeof_ydb_string_t)))
-		defer freeMem(unsafe.Pointer(retvalptr), C.size_t(C.sizeof_ydb_string_t)) // Free this when we are done
-		retvalptr.address = (*C.char)(allocMem(C.size_t(retvallen)))
-		defer freeMem(unsafe.Pointer(retvalptr.address), C.size_t(retvallen))
-		retvalptr.length = (C.ulong)(retvallen)
-		err = vplist.setVPlistParam(tptoken, errstr, parmIndx, uintptr(unsafe.Pointer(retvalptr)))
+		retvalPtr = (*C.ydb_string_t)(allocMem(C.size_t(C.sizeof_ydb_string_t)))
+		defer freeMem(unsafe.Pointer(retvalPtr), C.size_t(C.sizeof_ydb_string_t)) // Free this when we are done
+		retvalPtr.address = (*C.char)(allocMem(C.size_t(retvallen)))
+		defer freeMem(unsafe.Pointer(retvalPtr.address), C.size_t(retvallen))
+		retvalPtr.length = (C.ulong)(retvallen)
+		err = vplist.setVPlistParam(tptoken, errstr, parmIndx, uintptr(unsafe.Pointer(retvalPtr)))
 		if nil != err {
 			return "", err
 		}
@@ -180,27 +221,116 @@ func (mdesc *CallMDesc) CallMDescT(tptoken uint64, errstr *BufferT, retvallen ui
 	// Parameters can be various types supported by external calls. They are all converted to strings for now as
 	// golang does not have access to the call descriptor that defines argument types.
 	parmcnt := len(rtnargs)
+	if parmcnt > int(C.YDB_MAX_PARMS) {
+		panic(fmt.Sprintf("YDB: parm count of %d exceeds maximum parm count of %d", parmcnt, int(C.YDB_MAX_PARMS)))
+	}
 	allocLen := C.size_t(C.sizeof_ydb_string_t * parmcnt)
-	parmblkptr := (*C.ydb_string_t)(allocMem(allocLen))
-	defer freeMem(unsafe.Pointer(parmblkptr), allocLen)
-	parmptr := parmblkptr
+	parmblkPtr := (*C.ydb_string_t)(allocMem(allocLen))
+	defer freeMem(unsafe.Pointer(parmblkPtr), allocLen)
+	parmPtr := parmblkPtr
+	inmask = uint32(mdesc.cmdesc.parmtyps.input_mask)
+	outmask = uint32(mdesc.cmdesc.parmtyps.output_mask)
 	// Turn each parameter into a ydb_string_t buffer descriptor and load it into our variadic plist
-	for i = 0; i < parmcnt; i++ {
-		// Fetch next parm and validate type to get a string out of it
-		strparm = fmt.Sprintf("%v", rtnargs[i])
-		// First initialize our ydb_string_t
-		parmptr.length = C.ulong(len(strparm))
-		if 0 < parmptr.length {
-			parmptr.address = C.CString(strparm)
-			defer freeMem(unsafe.Pointer(parmptr.address), C.size_t(parmptr.length))
+	for i, imask, omask = 0, inmask, outmask; i < parmcnt; i, imask, omask = (i + 1), (imask >> 1), (omask >> 1) {
+		// If this parm is an input parm (versus output only), rebuffer it in C memory, else just allocate the buffer
+		// without copying anything. For input parms, we take special care with pass-by-reference types since they
+		// need to be de-referenced to get to the value so each type must be handled separately.
+		if 1 == (1 & imask) { // This is an input parameter (note this includes IO parms
+			if 0 == (1 & omask) { // The only input parms that can also currently be output parms are *string
+				parmOK = true
+			} else {
+				parmOK = false
+			}
+			// The rtnargs[i] array of parameters is an interface array because it is not a homogeneous type with
+			// each parm possibly a different type. Also, rtnargs[i] cannot be dereferenced without using a
+			// type-assersion (the stmt above the fmt.Sprintf in each block) to convert the interface value to
+			// the proper type. But to know what type to convert to, we first need to use the big type-switch
+			// below to specifically test for values passed as addresses so they can be dereferenced. All of the
+			// basic Go types are represented here.
+			switch rtnargs[i].(type) {
+			case *string:
+				parmOK = true
+				strPtr = rtnargs[i].(*string)
+				strparm = fmt.Sprintf("%v", *strPtr)
+			case *int:
+				intPtr = rtnargs[i].(*int)
+				strparm = fmt.Sprintf("%v", *intPtr)
+			case *int32:
+				int32Ptr = rtnargs[i].(*int32)
+				strparm = fmt.Sprintf("%v", *int32Ptr)
+			case *int64:
+				int64Ptr = rtnargs[i].(*int64)
+				strparm = fmt.Sprintf("%v", *int64Ptr)
+			case *uint:
+				uintPtr = rtnargs[i].(*uint)
+				strparm = fmt.Sprintf("%v", *uintPtr)
+			case *uint32:
+				uint32Ptr = rtnargs[i].(*uint32)
+				strparm = fmt.Sprintf("%v", *uint32Ptr)
+			case *uint64:
+				uint64Ptr = rtnargs[i].(*uint64)
+				strparm = fmt.Sprintf("%v", *uint64Ptr)
+			case *bool:
+				boolPtr = rtnargs[i].(*bool)
+				strparm = fmt.Sprintf("%v", *boolPtr)
+			case *float32:
+				float32Ptr = rtnargs[i].(*float32)
+				strparm = fmt.Sprintf("%v", *float32Ptr)
+			case *float64:
+				float64Ptr = rtnargs[i].(*float64)
+				strparm = fmt.Sprintf("%v", *float64Ptr)
+			case *complex64:
+				cmplx64Ptr = rtnargs[i].(*complex64)
+				strparm = fmt.Sprintf("%v", *cmplx64Ptr)
+			case *complex128:
+				cmplx128Ptr = rtnargs[i].(*complex128)
+				strparm = fmt.Sprintf("%v", *cmplx128Ptr)
+			default:
+				// Assume passed by value - this generic string conversion suffices
+				strparm = fmt.Sprintf("%v", rtnargs[i])
+			}
+			if !parmOK {
+				panic(fmt.Sprintf("Call-in routine %s parm %d is an output parm and must be *string but is not",
+					mdesc.cmdesc.rtnname, i+1))
+			}
+			// Initialize our ydb_string_t (parmPtr) that describes the parm
+			parmPtr.length = C.ulong(len(strparm))
+			if 0 < parmPtr.length {
+				// Check if parm is pass-by-value or pass-by-reference by checking ci info
+				parmPtr.address = C.CString(strparm)
+				defer freeMem(unsafe.Pointer(parmPtr.address), C.size_t(parmPtr.length))
+			} else {
+				parmPtr.address = nil
+			}
+		} else { // Otherwise, this is an output-only parameter - allocate a C buffer for it but otherwise leave it alone
+			// Note this parm is always passed by reference (verify it).
+			switch rtnargs[i].(type) {
+			case *string: // passed-by-reference string parameter
+				parmOK = true
+			default:
+				parmOK = false
+			}
+			if !parmOK {
+				panic(fmt.Sprintf("Call-in routine %s parm %d is an output parm and must be *string but is not",
+					mdesc.cmdesc.rtnname, i+1))
+			}
+			pval := rtnargs[i].(*string)
+			// Setup ydb_string_t (parmPtr) to point to our string
+			parmPtr.length = C.ulong(len(*pval))
+			if 0 < parmPtr.length {
+				parmPtr.address = (*C.char)(allocMem(parmPtr.length))
+				defer freeMem(unsafe.Pointer(parmPtr.address), C.size_t(parmPtr.length))
+			} else {
+				parmPtr.address = nil
+			}
 		}
-		// Now add parmptr to the variadic plist
-		err = vplist.setVPlistParam(tptoken, errstr, parmIndx, uintptr(unsafe.Pointer(parmptr)))
+		// Now add parmPtr to the variadic plist
+		err = vplist.setVPlistParam(tptoken, errstr, parmIndx, uintptr(unsafe.Pointer(parmPtr)))
 		if nil != err {
 			return "", err
 		}
-		// Increment parmptr to next ydb_buffer_t and the variadic list to its next slot
-		parmptr = (*C.ydb_string_t)(unsafe.Pointer(uintptr(unsafe.Pointer(parmptr)) + uintptr(C.sizeof_ydb_string_t)))
+		// Increment parmPtr to next ydb_buffer_t and the variadic list to its next slot
+		parmPtr = (*C.ydb_string_t)(unsafe.Pointer(uintptr(unsafe.Pointer(parmPtr)) + uintptr(C.sizeof_ydb_string_t)))
 		parmIndx++
 	}
 	err = vplist.setUsed(tptoken, errstr, uint32(parmIndx))
@@ -216,9 +346,19 @@ func (mdesc *CallMDesc) CallMDescT(tptoken uint64, errstr *BufferT, retvallen ui
 	}
 	if 0 != retvallen { // If we have a return value
 		// Build a string of the length of the return value
-		retval = C.GoStringN(retvalptr.address, C.int(retvalptr.length))
+		retval = C.GoStringN(retvalPtr.address, C.int(retvalPtr.length))
 	} else {
 		retval = ""
+	}
+	// Go through the parameters again to locate the output parameters and copy their values back into Go space
+	parmPtr = parmblkPtr
+	for i, omask = 0, outmask; i < parmcnt; i, omask = i+1, omask>>1 {
+		if 1 == (1 & omask) { // This is an output parameter
+			rtnargPtr := rtnargs[i].(*string)
+			*rtnargPtr = C.GoStringN(parmPtr.address, C.int(parmPtr.length))
+		}
+		// Increment parmPtr to next ydb_buffer_t and the variadic list to its next slot
+		parmPtr = (*C.ydb_string_t)(unsafe.Pointer(uintptr(unsafe.Pointer(parmPtr)) + uintptr(C.sizeof_ydb_string_t)))
 	}
 	runtime.KeepAlive(mdesc) // Make sure mdesc hangs around through the YDB call
 	runtime.KeepAlive(vplist)
