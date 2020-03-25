@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	//
+// Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -43,7 +43,7 @@ func miscGoTimersHelper(t *testing.T, wg *sync.WaitGroup, loops int) {
 	go func() {
 		for i := 0; i < loops; i++ {
 			start := time.Now()
-			r, err := yottadb.CallMT(yottadb.NOTTP, nil, 0, "TestMGoTimers", []string{})
+			r, err := yottadb.CallMT(yottadb.NOTTP, nil, 0, "TestMGoTimers")
 			assert.Nil(t, err)
 			elapsed := time.Since(start)
 			// This test failed on a loaded system with a 11% insteasd

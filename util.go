@@ -304,6 +304,10 @@ func (mdesc *CallMDesc) CallMDescT(tptoken uint64, errstr *BufferT, retvallen ui
 			}
 		} else { // Otherwise, this is an output-only parameter - allocate a C buffer for it but otherwise leave it alone
 			// Note this parm is always passed by reference (verify it).
+			if 0 == (1 & omask) { // Check for unexpected parameter
+				panic(fmt.Sprintf("YDB: Call-in routine %s parm %d is not a parameter defined in the call-in table",
+					mdesc.cmdesc.rtnname, i+1))
+			}
 			switch rtnargs[i].(type) {
 			case *string: // passed-by-reference string parameter
 				parmOK = true
@@ -311,7 +315,7 @@ func (mdesc *CallMDesc) CallMDescT(tptoken uint64, errstr *BufferT, retvallen ui
 				parmOK = false
 			}
 			if !parmOK {
-				panic(fmt.Sprintf("Call-in routine %s parm %d is an output parm and must be *string but is not",
+				panic(fmt.Sprintf("YDB: Call-in routine %s parm %d is an output parm and must be *string but is not",
 					mdesc.cmdesc.rtnname, i+1))
 			}
 			pval := rtnargs[i].(*string)

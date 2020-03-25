@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	//
+// Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -124,7 +124,7 @@ func (vplist *variadicPlist) setUsed(tptoken uint64, errstr *BufferT, newUsed ui
 		}
 		return &YDBError{(int)(YDB_ERR_STRUCTNOTALLOCD), errmsg}
 	}
-	if C.MAXVPARMS <= newUsed {
+	if C.MAXVPARMS < newUsed {
 		panic(fmt.Sprintf("YDB: setUsed item count %d exceeds maximum count of %d", newUsed, C.MAXVPARMS))
 	}
 	cvplist.n = C.intptr_t(newUsed)
