@@ -318,7 +318,7 @@ func (mdesc *CallMDesc) CallMDescT(tptoken uint64, errstr *BufferT, retvallen ui
 			// Setup ydb_string_t (parmPtr) to point to our string
 			parmPtr.length = C.ulong(len(*pval))
 			if 0 < parmPtr.length {
-				parmPtr.address = (*C.char)(allocMem(parmPtr.length))
+				parmPtr.address = (*C.char)(allocMem(C.size_t(parmPtr.length)))
 				defer freeMem(unsafe.Pointer(parmPtr.address), C.size_t(parmPtr.length))
 			} else {
 				parmPtr.address = nil
