@@ -1,7 +1,7 @@
 #!/bin/sh
 #################################################################
 #								#
-# Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -28,6 +28,7 @@ echo "" >> error_codes.go
 grep -E "#define\s+YDB_TP" $ydb_dist/libyottadb.h | awk '{s = ""; for (i = 3; i <= NF; i++) s = s $i " "; print $2,"=",s}' >> error_codes.go
 grep -E "#define\s+YDB_[^\s]*OK" $ydb_dist/libyottadb.h | awk '{s = ""; for (i = 3; i <= NF; i++) s = s $i " "; print $2,"=",s}' >> error_codes.go
 grep -E "#define\s+YDB_LOCK" $ydb_dist/libyottadb.h | awk '{s = ""; for (i = 3; i <= NF; i++) s = s $i " "; print $2,"=",s}' >> error_codes.go
+grep -E "#define\s+YDB_DEFER" $ydb_dist/libyottadb.h | awk '{s = ""; for (i = 3; i <= NF; i++) s = s $i " "; print $2,"=",s}' >> error_codes.go
 # We exclude YDB_MAX_TIME_NSEC here because its expression needs changes to work in go. Handled below.
 grep -E "#define\s+YDB_MAX" $ydb_dist/libyottadb.h | awk '{s = ""; for (i = 3; i <= NF; i++) s = s $i " "; print $2,"=",s}' \
     | grep -v "YDB_MAX_TIME_NSEC" | grep -v "YDB_MAX_YDBERR" | grep -v "YDB_MAX_ERROR" >> error_codes.go

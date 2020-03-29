@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	//
+// Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -16,6 +16,7 @@ import (
 	"io"
 	"os"
 	"runtime"
+	"sync/atomic"
 	"unsafe"
 )
 
@@ -110,6 +111,9 @@ func (key *KeyT) DataST(tptoken uint64, errstr *BufferT) (uint32, error) {
 	if nil == key {
 		panic("YDB: *KeyT receiver of DataST() cannot be nil")
 	}
+	if 1 != atomic.LoadUint32(&ydbInitialized) {
+		initializeYottaDB()
+	}
 	if nil != errstr {
 		cbuft = errstr.getCPtr()
 	}
@@ -143,6 +147,9 @@ func (key *KeyT) DeleteST(tptoken uint64, errstr *BufferT, deltype int) error {
 	printEntry("KeyT.DeleteST()")
 	if nil == key {
 		panic("YDB: *KeyT receiver of DeleteST() cannot be nil")
+	}
+	if 1 != atomic.LoadUint32(&ydbInitialized) {
+		initializeYottaDB()
 	}
 	if nil != errstr {
 		cbuft = errstr.getCPtr()
@@ -182,6 +189,9 @@ func (key *KeyT) ValST(tptoken uint64, errstr *BufferT, retval *BufferT) error {
 	printEntry("KeyT.ValST()")
 	if nil == key {
 		panic("YDB: *KeyT receiver of ValST() cannot be nil")
+	}
+	if 1 != atomic.LoadUint32(&ydbInitialized) {
+		initializeYottaDB()
 	}
 	if nil != errstr {
 		cbuft = errstr.getCPtr()
@@ -226,6 +236,9 @@ func (key *KeyT) IncrST(tptoken uint64, errstr *BufferT, incr, retval *BufferT) 
 	if nil == key {
 		panic("YDB: *KeyT receiver of IncrST() cannot be nil")
 	}
+	if 1 != atomic.LoadUint32(&ydbInitialized) {
+		initializeYottaDB()
+	}
 	if nil != errstr {
 		cbuft = errstr.getCPtr()
 	}
@@ -265,6 +278,9 @@ func (key *KeyT) LockDecrST(tptoken uint64, errstr *BufferT) error {
 	if nil == key {
 		panic("YDB: *KeyT receiver of LockDecrST() cannot be nil")
 	}
+	if 1 != atomic.LoadUint32(&ydbInitialized) {
+		initializeYottaDB()
+	}
 	if nil != errstr {
 		cbuft = errstr.getCPtr()
 	}
@@ -302,6 +318,9 @@ func (key *KeyT) LockIncrST(tptoken uint64, errstr *BufferT, timeoutNsec uint64)
 	printEntry("KeyT.LockIncrST()")
 	if nil == key {
 		panic("YDB: *KeyT receiver of LockIncrST() cannot be nil")
+	}
+	if 1 != atomic.LoadUint32(&ydbInitialized) {
+		initializeYottaDB()
 	}
 	if nil != errstr {
 		cbuft = errstr.getCPtr()
@@ -349,6 +368,9 @@ func (key *KeyT) NodeNextST(tptoken uint64, errstr *BufferT, next *BufferTArray)
 	printEntry("KeyT.NodeNextST()")
 	if nil == key {
 		panic("YDB: *KeyT receiver of NodeNextST() cannot be nil")
+	}
+	if 1 != atomic.LoadUint32(&ydbInitialized) {
+		initializeYottaDB()
 	}
 	if nil != errstr {
 		cbuft = errstr.getCPtr()
@@ -410,6 +432,9 @@ func (key *KeyT) NodePrevST(tptoken uint64, errstr *BufferT, prev *BufferTArray)
 	if nil == key {
 		panic("YDB: *KeyT receiver of NodePrevST() cannot be nil")
 	}
+	if 1 != atomic.LoadUint32(&ydbInitialized) {
+		initializeYottaDB()
+	}
 	if nil != errstr {
 		cbuft = errstr.getCPtr()
 	}
@@ -457,6 +482,9 @@ func (key *KeyT) SetValST(tptoken uint64, errstr *BufferT, value *BufferT) error
 	if nil == key {
 		panic("YDB: *KeyT receiver of SetValST() cannot be nil")
 	}
+	if 1 != atomic.LoadUint32(&ydbInitialized) {
+		initializeYottaDB()
+	}
 	if nil != errstr {
 		cbuft = errstr.getCPtr()
 	}
@@ -500,6 +528,9 @@ func (key *KeyT) SubNextST(tptoken uint64, errstr *BufferT, retval *BufferT) err
 	if nil == key {
 		panic("YDB: *KeyT receiver of SubNextST() cannot be nil")
 	}
+	if 1 != atomic.LoadUint32(&ydbInitialized) {
+		initializeYottaDB()
+	}
 	if nil != errstr {
 		cbuft = errstr.getCPtr()
 	}
@@ -541,6 +572,9 @@ func (key *KeyT) SubPrevST(tptoken uint64, errstr *BufferT, retval *BufferT) err
 	printEntry("KeyT.SubPrevST()")
 	if nil == key {
 		panic("YDB: *KeyT receiver of SubPrevST() cannot be nil")
+	}
+	if 1 != atomic.LoadUint32(&ydbInitialized) {
+		initializeYottaDB()
 	}
 	if nil != errstr {
 		cbuft = errstr.getCPtr()

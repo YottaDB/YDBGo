@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	//
+// Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -72,21 +72,35 @@ func NewError(tptoken uint64, errstr *BufferT, errnum int) error {
 	}
 	if (nil != errstr) && (nil != errstr.getCPtr()) {
 		errmsg = C.GoString((*C.char)(errstr.getCPtr().buf_addr))
+	}
+	if 0 == len(errmsg) {
+		// No message was supplied for the error - see if we can find one via MessageT()
+		errmsg, err = MessageT(tptoken, errstr, errnum)
+		if nil != err {
+			if YDB_ERR_CALLINAFTERXIT != ErrorCode(err) {
+				panic(fmt.Sprintf("YDB: Unable to find error text for error code %d with error %s", errnum, err))
+			}
+			// We had a CALLINAFTERXIT error from MessageT() - treat it as a nil message
+			errmsg = ""
+		}
 		if 0 == len(errmsg) {
-			// No message was supplied for the error - see if we can find one via MessageT(). We use MessageT()
-			// here and not $ZSTATUS because all of the errors that this might happen to have simple text with
-			// no substitution parms that MessageT() can fetch without overlay concerns like can happen with $ZSTATUS.
-			errmsg, err = MessageT(tptoken, errstr, errnum)
-			if nil != err {
-				panic(fmt.Sprintf("Unable to find error text for error code %d with error %s", errnum, err))
+			// MessageT() did not return anything interesting so Fetch $ZSTATUS to return as the error string.
+			// This has the advantage that CALLINAFTERXIT cannot happen but we are pulling from $ZSTATUS which is
+			// a global value in the YottaDB engine that can be changed by any thread so this is last choice. The
+			// advantage is that its message would be fully populated with parameter substituions of error codes,
+			// filenames, etc.
+			//
+			// Note that MessageT() would have taken care of making sure the engine is initialized before this call.
+			msgptr = (*C.char)(allocMem(C.size_t(YDB_MAX_ERRORMSG)))
+			C.ydb_zstatus(msgptr, C.int(YDB_MAX_ERRORMSG))
+			errmsg = C.GoString((*C.char)(msgptr))
+			freeMem(unsafe.Pointer(msgptr), C.size_t(YDB_MAX_ERRORMSG))
+			if 0 == len(errmsg) {
+				// We couldn't find text to do with this message so at least make sure we know what the error
+				// code is.
+				errmsg = fmt.Sprintf("YDB-E-UNKNOWNMSG Unknown error message code: %d", errnum)
 			}
 		}
-		return &YDBError{errnum, errmsg}
 	}
-	// Fetch $ZSTATUS to return as the error string
-	msgptr = (*C.char)(allocMem(C.size_t(YDB_MAX_ERRORMSG)))
-	C.ydb_zstatus(msgptr, C.int(YDB_MAX_ERRORMSG))
-	errmsg = C.GoString((*C.char)(msgptr))
-	freeMem(unsafe.Pointer(msgptr), C.size_t(YDB_MAX_ERRORMSG))
 	return &YDBError{errnum, errmsg}
 }

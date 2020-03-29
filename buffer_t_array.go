@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	//
+// Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -33,7 +33,7 @@ var tpIndex uint64
 var tpMap sync.Map
 
 // BufferTArray is an array of ydb_buffer_t structures. The reason this is not an array of BufferT structures is because
-// we can't pass a pointer to those Golang structures to a C routine (cgo restriction) so we have to have this separate
+// we can't pass a pointer to those Go structures to a C routine (cgo restriction) so we have to have this separate
 // array of the C structures instead. Also, cgo doesn't support indexing of C structures so we have to do that ourselves
 // as well. Because this structure's contents contain pointers to C allocated storage, this structure is NOT safe for
 // concurrent access unless those accesses are to different array elements and do not affect the overall structure.
@@ -410,7 +410,7 @@ func (buftary *BufferTArray) SetValBAry(tptoken uint64, errstr *BufferT, idx uin
 		errmsg := formatINVSTRLEN(tptoken, errstr, C.uint(lenalloc), C.uint(vallen))
 		return &YDBError{(int)(YDB_ERR_INVSTRLEN), errmsg}
 	}
-	// Copy the Golang buffer to the C buffer
+	// Copy the Go buffer to the C buffer
 	if 0 < vallen {
 		C.memcpy(unsafe.Pointer(elemptr.buf_addr), unsafe.Pointer(&value[0]), C.size_t(vallen))
 	}
@@ -449,6 +449,9 @@ func (buftary *BufferTArray) DeleteExclST(tptoken uint64, errstr *BufferT) error
 	printEntry("BufferTArray.DeleteExclST()")
 	if nil == buftary {
 		panic("YDB: *BufferTArray receiver of DeleteExclST() cannot be nil")
+	}
+	if 1 != atomic.LoadUint32(&ydbInitialized) {
+		initializeYottaDB()
 	}
 	if nil != errstr {
 		cbuft = errstr.getCPtr()
@@ -497,6 +500,9 @@ func (buftary *BufferTArray) TpST(tptoken uint64, errstr *BufferT, tpfn func(uin
 	printEntry("TpST()")
 	if nil == buftary {
 		panic("YDB: *BufferTArray receiver of TpST() cannot be nil")
+	}
+	if 1 != atomic.LoadUint32(&ydbInitialized) {
+		initializeYottaDB()
 	}
 	tid := C.CString(transid)
 	defer freeMem(unsafe.Pointer(tid), C.size_t(len(transid)))

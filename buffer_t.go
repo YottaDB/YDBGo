@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	//
+// Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -17,6 +17,7 @@ import (
 	"io"
 	"os"
 	"runtime"
+	"sync/atomic"
 	"unsafe"
 )
 
@@ -25,7 +26,7 @@ import (
 // #include "libyottadb.h"
 import "C"
 
-// BufferT is a golang structure that serves as an anchor point for a C allocated ydb_buffer_t structure used
+// BufferT is a Go structure that serves as an anchor point for a C allocated ydb_buffer_t structure used
 // to call the YottaDB C Simple APIs. Because this structure's contents contain pointers to C allocated storage,
 // this structure is NOT safe for concurrent access.
 type BufferT struct {
@@ -352,7 +353,7 @@ func (buft *BufferT) SetValBAry(tptoken uint64, errstr *BufferT, value []byte) e
 		errmsg := formatINVSTRLEN(tptoken, errstr, lenalloc, vallen)
 		return &YDBError{(int)(YDB_ERR_INVSTRLEN), errmsg}
 	}
-	// Copy the Golang buffer to the C buffer
+	// Copy the Go buffer to the C buffer
 	if 0 < vallen {
 		C.memcpy(unsafe.Pointer(cbuftptr.buf_addr), unsafe.Pointer(&value[0]), C.size_t(vallen))
 	}
@@ -398,6 +399,9 @@ func (buft *BufferT) Str2ZwrST(tptoken uint64, errstr *BufferT, zwr *BufferT) er
 	if nil == zwr {
 		panic("YDB: *BufferT 'zwr' parameter to Str2ZwrST() cannot be nil")
 	}
+	if 1 != atomic.LoadUint32(&ydbInitialized) {
+		initializeYottaDB()
+	}
 	if nil == buft.getCPtr() || nil == zwr.getCPtr() {
 		// Create an error to return
 		errmsg, err := MessageT(tptoken, errstr, (int)(YDB_ERR_STRUCTNOTALLOCD))
@@ -438,6 +442,9 @@ func (buft *BufferT) Zwr2StrST(tptoken uint64, errstr *BufferT, str *BufferT) er
 	}
 	if nil == str {
 		panic("YDB: *BufferT 'str' parameter to Zwr2StrST() cannot be nil")
+	}
+	if 1 != atomic.LoadUint32(&ydbInitialized) {
+		initializeYottaDB()
 	}
 	if nil == buft.getCPtr() || nil == str.getCPtr() {
 		// Create an error to return

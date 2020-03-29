@@ -1562,18 +1562,20 @@ const (
 	YDB_ERR_ZYSQLNULLNOTVALID     = -151027986
 	YDB_ERR_BOOLEXPRTOODEEP       = -151027994
 	YDB_ERR_TPCALLBACKINVRETVAL   = -151028002
+	YDB_ERR_INVMAINLANG           = -151028010
 
-	YDB_TP_RESTART   = (YDB_INT_MAX - 1) /* 0x7ffffffe */
-	YDB_TP_ROLLBACK  = (YDB_INT_MAX - 2) /* 0x7ffffffd */
-	YDB_OK           = 0                 /* Successful return code */
-	YDB_NOTOK        = (YDB_INT_MAX - 3) /* 0x7ffffffc */
-	YDB_LOCK_TIMEOUT = (YDB_INT_MAX - 4) /* 0x7ffffffb */
-	YDB_MAX_IDENT    = 31                /* Maximum size of global/local name (not including '^') */
-	YDB_MAX_NAMES    = 35                /* Maximum number of variable names can be specified in a single ydb_*_s() call */
-	YDB_MAX_STR      = (1 * 1024 * 1024) /* Maximum YottaDB string length */
-	YDB_MAX_SUBS     = 31                /* Maximum subscripts currently supported */
-	YDB_MAX_PARMS    = 32                /* Maximum parameters to an M call (call-in) */
-	YDB_MAX_ERRORMSG = 1024              /* Maximum length of error message */
+	YDB_TP_RESTART    = (YDB_INT_MAX - 1) /* 0x7ffffffe */
+	YDB_TP_ROLLBACK   = (YDB_INT_MAX - 2) /* 0x7ffffffd */
+	YDB_OK            = 0                 /* Successful return code */
+	YDB_NOTOK         = (YDB_INT_MAX - 3) /* 0x7ffffffc */
+	YDB_LOCK_TIMEOUT  = (YDB_INT_MAX - 4) /* 0x7ffffffb */
+	YDB_DEFER_HANDLER = (YDB_INT_MAX - 5) /* 0x7ffffffa - defer this signal handler (used in Go wrapper) */
+	YDB_MAX_IDENT     = 31                /* Maximum size of global/local name (not including '^') */
+	YDB_MAX_NAMES     = 35                /* Maximum number of variable names can be specified in a single ydb_*_s() call */
+	YDB_MAX_STR       = (1 * 1024 * 1024) /* Maximum YottaDB string length */
+	YDB_MAX_SUBS      = 31                /* Maximum subscripts currently supported */
+	YDB_MAX_PARMS     = 32                /* Maximum parameters to an M call (call-in) */
+	YDB_MAX_ERRORMSG  = 1024              /* Maximum length of error message */
 
 	YDB_MAX_TIME_NSEC = (uint64(0x7fffffff) * uint64(1000) * uint64(1000)) /* Max specified time in (long long) nanoseconds */
 
@@ -1589,4 +1591,6 @@ const (
 	YDB_DATA_NOVALUE_DESC      = 10
 	YDB_DATA_VALUE_DESC        = 11
 	YDB_DATA_ERROR             = 0x7fffff00
+	YDB_MAIN_LANG_C            = 0
+	YDB_MAIN_LANG_GO           = 1
 )

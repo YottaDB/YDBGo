@@ -15,6 +15,7 @@ package yottadb
 import (
 	"fmt"
 	"runtime"
+	"sync/atomic"
 	"unsafe"
 )
 
@@ -96,7 +97,6 @@ func (imdesc *internalCallMDesc) Free() {
 func (mdesc *CallMDesc) SetRtnName(rtnname string) {
 	var cindPtr *C.ci_name_descriptor
 	var ctypPtr *C.ci_parm_type
-
 	printEntry("CallMDesc.SetRtnName()")
 	if nil == mdesc {
 		panic("YDB: *CallMDesc receiver of SetRtnName() cannot be nil")
@@ -162,6 +162,9 @@ func (mdesc *CallMDesc) CallMDescT(tptoken uint64, errstr *BufferT, retvallen ui
 	if (nil == mdesc.cmdesc) || (nil == (mdesc.cmdesc.cmdesc)) || (nil == mdesc.cmdesc.parmtyps) {
 		panic("YDB: SetRtnName() method has not been invoked on this descriptor")
 	}
+	if 1 != atomic.LoadUint32(&ydbInitialized) {
+		initializeYottaDB()
+	}
 	// If we haven't already fetched the call description from YDB, do that now
 	if !mdesc.cmdesc.filledin {
 		if nil != errstr {
@@ -219,10 +222,10 @@ func (mdesc *CallMDesc) CallMDescT(tptoken uint64, errstr *BufferT, retvallen ui
 	// input strings.
 	//
 	// Parameters can be various types supported by external calls. They are all converted to strings for now as
-	// golang does not have access to the call descriptor that defines argument types.
+	// Go does not have access to the call descriptor that defines argument types.
 	parmcnt := len(rtnargs)
 	if parmcnt > int(C.YDB_MAX_PARMS) {
-		panic(fmt.Sprintf("YDB: parm count of %d exceeds maximum parm count of %d", parmcnt, int(C.YDB_MAX_PARMS)))
+		panic(fmt.Sprintf("YDB: Parm count of %d exceeds maximum parm count of %d", parmcnt, int(C.YDB_MAX_PARMS)))
 	}
 	allocLen := C.size_t(C.sizeof_ydb_string_t * parmcnt)
 	parmblkPtr := (*C.ydb_string_t)(allocMem(allocLen))
@@ -290,7 +293,7 @@ func (mdesc *CallMDesc) CallMDescT(tptoken uint64, errstr *BufferT, retvallen ui
 				strparm = fmt.Sprintf("%v", rtnargs[i])
 			}
 			if !parmOK {
-				panic(fmt.Sprintf("Call-in routine %s parm %d is an output parm and must be *string but is not",
+				panic(fmt.Sprintf("YDB: Call-in routine %s parm %d is an output parm and must be *string but is not",
 					mdesc.cmdesc.rtnname, i+1))
 			}
 			// Initialize our ydb_string_t (parmPtr) that describes the parm
@@ -380,7 +383,10 @@ func (newcmtable *CallMTable) CallMTableSwitchT(tptoken uint64, errstr *BufferT)
 	var callmtabret CallMTable
 
 	if nil == newcmtable {
-		panic("Non-nil CallMTable structure must be specified")
+		panic("YDB: Non-nil CallMTable structure must be specified")
+	}
+	if 1 != atomic.LoadUint32(&ydbInitialized) {
+		initializeYottaDB()
 	}
 	if nil != errstr {
 		cbuft = errstr.getCPtr()
@@ -422,6 +428,9 @@ func CallMTableOpenT(tptoken uint64, errstr *BufferT, tablename string) (*CallMT
 	var callmtab CallMTable
 	var cbuft *C.ydb_buffer_t
 
+	if 1 != atomic.LoadUint32(&ydbInitialized) {
+		initializeYottaDB()
+	}
 	cstr := C.CString(tablename)
 	defer C.free(unsafe.Pointer(cstr))
 	if nil != errstr {
@@ -442,6 +451,20 @@ func MessageT(tptoken uint64, errstr *BufferT, status int) (string, error) {
 	var cbuft *C.ydb_buffer_t
 
 	printEntry("MessageT()")
+	if 1 != atomic.LoadUint32(&ydbInitialized) {
+		initializeYottaDB()
+	}
+	// But check for a couple of special cases first. First, if the error is YDB_ERR_THREADEDAPINOTALLOWED, the same error
+	// will prevent the below call into ydb_message_t() from working so create a hard-return error message for that case
+	// before attempting the call.
+	if YDB_ERR_THREADEDAPINOTALLOWED == status {
+		return "%YDB-E-THREADEDAPINOTALLOWED, Process cannot switch to using threaded Simple API while already using Simple API", nil
+	}
+	if YDB_ERR_CALLINAFTERXIT == status {
+		// The engine is shut down so calling ydb_message_t will fail if we attempt it so just hard-code this
+		// error return value.
+		return "%YDB-E-CALLINAFTERXIT, After a ydb_exit(), a process cannot create a valid YottaDB context", nil
+	}
 	defer msgval.Free()
 	msgval.Alloc(uint32(YDB_MAX_ERRORMSG))
 	if nil != errstr {
@@ -461,8 +484,7 @@ func MessageT(tptoken uint64, errstr *BufferT, status int) (string, error) {
 	return msgptr, err
 }
 
-// ReleaseT is a STAPI utility function to return release information for this verison of the Golang wrapper plus
-// info on the release of YottaDB itself.
+// ReleaseT is a STAPI utility function to return release information for the current underlying YottaDB version
 func ReleaseT(tptoken uint64, errstr *BufferT) (string, error) {
 	printEntry("ReleaseT()")
 	zyrel, err := ValE(tptoken, errstr, "$ZYRELEASE", []string{})

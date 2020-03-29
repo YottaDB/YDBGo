@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	//
+// Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -14,13 +14,20 @@ package yottadb
 
 import (
 	"fmt"
+	"log/syslog"
+	"os"
 	"runtime"
 	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
 	"unsafe"
 )
 
 // #include "libyottadb.h"
 import "C"
+
+var wgexit sync.WaitGroup
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -140,8 +147,66 @@ func IsLittleEndian() bool {
 // Exit is a function to drive YDB's exit handler in case of panic or other non-normal shutdown that bypasses
 // atexit() that would normally drive the exit handler.
 func Exit() {
-	rc := C.ydb_exit()
-	if YDB_OK != rc {
-		panic(fmt.Sprintf("YDB: Exit() got return code %d from C.ydb_exit()", rc))
+	if 1 != atomic.LoadUint32(&ydbInitialized) {
+		return // If not (never) initialized, nothing to do
 	}
+	if dbgSigHandling {
+		fmt.Fprintln(os.Stderr, "YDB: Exit(): YDB Engine shutdown started")
+	}
+	// When we run ydb_exit(), set up a timer that will pop if ydb_exit() gets stuck in a deadlock or whatever. We could
+	// be running after some fatal error has occurred so things could potentially be fairly screwed up and ydb_exit() may
+	// not be able to get the lock. We'll give it the given amount of time to finish before we give up and just exit.
+	exitdone := make(chan struct{})
+	wgexit.Add(1)
+	go func() {
+		_ = C.ydb_exit()
+		wgexit.Done()
+	}()
+	wgexit.Add(1) // And run our signal goroutine cleanup in parallel
+	go func() {
+		shutdownSignalGoroutines()
+		wgexit.Done()
+	}()
+	// And now, set up our channel notification for when those both ydb_exit() and signal goroutine shutdown finish
+	go func() {
+		wgexit.Wait()
+		close(exitdone)
+	}()
+	// Wait for either ydb_exit to complete or the timeout to expire but how long we wait depends on how we are ending.
+	// If a signal drove a panic, we have a much shorter wait as it is highly likely the YDB engine lock is held and
+	// ydb_exit() won't be able to grab it causing a hang. The timeout is to prevent the hang from becoming permanent.
+	// This is not a real issue because the signal handler would have driven the exit handler to clean things up already.
+	// On the other hand, if this is a normal exit, we need to be able to wait a reasonably long time in case there is
+	// a significant amount of data to flush.
+	exitWait := MaximumNormalExitWait
+	if ydbSigPanicCalled {
+		exitWait = MaximumPanicExitWait
+	}
+	select {
+	case _ = <-exitdone:
+		// We don't really care at this point what the return code is as we're just trying to run things down the
+		// best we can as this is the end of using the YottaDB engine in this process.
+	case <-time.After(time.Duration(exitWait) * time.Second):
+		if dbgSigHandling {
+			fmt.Fprintln(os.Stderr, "YDB: Exit(): Wait for ydb_exit() expired")
+		}
+		if !ydbSigPanicCalled {
+			// If we panic'd due to a signal, we definitely have run the exit handler as it runs before the panic is
+			// driven so we can bypass this message in that case.
+			syslogr, err := syslog.New(syslog.LOG_INFO+syslog.LOG_USER, "[YottaDB-Go-Wrapper]")
+			if nil != err {
+				panic(fmt.Sprintf("syslog.NewLogger() failed unexpectedly with error: %s", err))
+			}
+			err = syslogr.Info("YDB-W-DBRNDWNBYPASS YottaDB database rundown may have been bypassed due to timeout " +
+				"- run MUPIP RUNDOWN")
+			if nil != err {
+				panic(fmt.Sprintf("syslogr.Info() failed unexpectedly with error: %s", err))
+			}
+
+		}
+	}
+	// Note - the temptation here is to unset ydbInitialized but things work better if we do not do that (we don't have
+	// multiple goroutines trying to re-initialize the engine) so we bypass/ re-doing the initialization call later and
+	// just go straight to getting the CALLINAFTERXIT error when an actual call is attempted. We now handle CALLINAFTERXIT
+	// in the places it matters.
 }

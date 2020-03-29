@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	//
+// Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"runtime"
 	"strings"
+	"sync/atomic"
 )
 
 // #include "libyottadb.h"
@@ -38,6 +39,9 @@ func DataE(tptoken uint64, errstr *BufferT, varname string, subary []string) (ui
 	var cbuft *C.ydb_buffer_t
 
 	printEntry("DataE()")
+	if 1 != atomic.LoadUint32(&ydbInitialized) {
+		initializeYottaDB()
+	}
 	defer dbkey.Free()
 	initkey(tptoken, errstr, &dbkey, varname, subary)
 	if nil != errstr {
@@ -67,6 +71,9 @@ func DeleteE(tptoken uint64, errstr *BufferT, deltype int, varname string, subar
 	var cbuft *C.ydb_buffer_t
 
 	printEntry("DeleteE()")
+	if 1 != atomic.LoadUint32(&ydbInitialized) {
+		initializeYottaDB()
+	}
 	defer dbkey.Free()
 	initkey(tptoken, errstr, &dbkey, varname, subary)
 	if nil != errstr {
@@ -186,6 +193,9 @@ func IncrE(tptoken uint64, errstr *BufferT, incr, varname string, subary []strin
 	var cbuft *C.ydb_buffer_t
 
 	printEntry("IncrE()")
+	if 1 != atomic.LoadUint32(&ydbInitialized) {
+		initializeYottaDB()
+	}
 	defer dbkey.Free()
 	defer dbvalue.Free()
 	defer incrval.Free()
@@ -312,6 +322,9 @@ func LockDecrE(tptoken uint64, errstr *BufferT, varname string, subary []string)
 	var cbuft *C.ydb_buffer_t
 
 	printEntry("LockDecrE()")
+	if 1 != atomic.LoadUint32(&ydbInitialized) {
+		initializeYottaDB()
+	}
 	defer dbkey.Free()
 	initkey(tptoken, errstr, &dbkey, varname, subary)
 	if nil != errstr {
@@ -345,6 +358,9 @@ func LockIncrE(tptoken uint64, errstr *BufferT, timeoutNsec uint64, varname stri
 	var cbuft *C.ydb_buffer_t
 
 	printEntry("LockIncrE()")
+	if 1 != atomic.LoadUint32(&ydbInitialized) {
+		initializeYottaDB()
+	}
 	defer dbkey.Free()
 	initkey(tptoken, errstr, &dbkey, varname, subary)
 	if nil != errstr {
@@ -491,6 +507,9 @@ func SetValE(tptoken uint64, errstr *BufferT, value, varname string, subary []st
 	var cbuft *C.ydb_buffer_t
 
 	printEntry("SetValE()")
+	if 1 != atomic.LoadUint32(&ydbInitialized) {
+		initializeYottaDB()
+	}
 	defer dbkey.Free()
 	defer dbvalue.Free()
 	subcnt := uint32(len(subary))

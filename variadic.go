@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"runtime"
 	"strconv"
+	"sync/atomic"
 	"unsafe"
 )
 
@@ -49,7 +50,7 @@ type variadicPlist struct { // Variadic plist support (not exported) needed by L
 func (vplist *variadicPlist) alloc() {
 	printEntry("variadicPlist.alloc()")
 	if nil == vplist {
-		panic("*variadicPlist receiver of alloc() cannot be nil")
+		panic("YDB: *variadicPlist receiver of alloc() cannot be nil")
 	}
 	if nil != vplist.cvplist {
 		// Already allocated
@@ -59,14 +60,19 @@ func (vplist *variadicPlist) alloc() {
 }
 
 // callVariadicPlistFunc is a variadicPlist method to drive a variadic plist function with the given
-// plist. The function pointer must be to a C routine as cgo does not allow golang function pointers to
+// plist. The function pointer must be to a C routine as cgo does not allow Go function pointers to
 // be passed to C. Note that cgo also prohibits passing pointers to variadic routines so some "stealth"
 // to get around that is required - this is done by calling a C routine that creates the needed pointer
-// and returns it as an unsafe pointer that can then be used as the parameter for this routine.
+// and returns it as an unsafe pointer that can then be used as the parameter for this routine. Note this
+// routine assumes that our variadicPlist block is already initialized by a set-up call (a call to alloc()
+// and one or more calls to setVPlistParam()).
 func (vplist *variadicPlist) callVariadicPlistFunc(vpfunc unsafe.Pointer) int {
 	printEntry("variadicPlist.callVariadicPlistFunc()")
 	if nil == vplist {
-		panic("*variadicPlist receiver of callVariadicPlistFunc() cannot be nil")
+		panic("YDB: *variadicPlist receiver of callVariadicPlistFunc() cannot be nil")
+	}
+	if 1 != atomic.LoadUint32(&ydbInitialized) {
+		initializeYottaDB()
 	}
 	retval := int(C.ydb_call_variadic_plist_func((C.ydb_vplist_func)(vpfunc),
 		(C.uintptr_t)(uintptr((unsafe.Pointer(vplist.cvplist))))))
@@ -87,7 +93,7 @@ func (vplist *variadicPlist) free() {
 func (vplist *variadicPlist) dump(tptoken uint64, errstr *BufferT) {
 	printEntry("variadicPlist.dump()")
 	if nil == vplist {
-		panic("*variadicPlist receiver of dump() cannot be nil")
+		panic("YDB: *variadicPlist receiver of dump() cannot be nil")
 	}
 	cvplist := vplist.cvplist
 	if nil == cvplist {
@@ -113,7 +119,7 @@ func (vplist *variadicPlist) dump(tptoken uint64, errstr *BufferT) {
 func (vplist *variadicPlist) setUsed(tptoken uint64, errstr *BufferT, newUsed uint32) error {
 	printEntry("variadicPlist.setUsed")
 	if nil == vplist {
-		panic("*variadicPlist receiver of setUsed() cannot be nil")
+		panic("YDB: *variadicPlist receiver of setUsed() cannot be nil")
 	}
 	cvplist := vplist.cvplist
 	if nil == cvplist {
@@ -133,12 +139,12 @@ func (vplist *variadicPlist) setUsed(tptoken uint64, errstr *BufferT, newUsed ui
 }
 
 // setVPlistParam is a variadicPlist method to set an entry to the variable plist - note any addresses being passed in
-// here MUST point to C allocated memory and NOT Golang allocated memory or cgo will cause a panic. Note parameter
+// here MUST point to C allocated memory and NOT Go allocated memory or cgo will cause a panic. Note parameter
 // indexes are 0 based.
 func (vplist *variadicPlist) setVPlistParam(tptoken uint64, errstr *BufferT, paramindx uint32, paramaddr uintptr) error {
 	printEntry("variadicPlist.setVPlistParm")
 	if nil == vplist {
-		panic("*variadicPlist receiver of setVPlistParam() cannot be nil")
+		panic("YDB: *variadicPlist receiver of setVPlistParam() cannot be nil")
 	}
 	cvplist := vplist.cvplist
 	if nil == cvplist {
@@ -169,7 +175,7 @@ func (vplist *variadicPlist) setVPlistParam64Bit(tptoken uint64, errstr *BufferT
 
 	printEntry("variadicPlist.setVPlistParm64Bit")
 	if nil == vplist {
-		panic("*variadicPlist receiver of setVPlistParam64Bit() cannot be nil")
+		panic("YDB: *variadicPlist receiver of setVPlistParam64Bit() cannot be nil")
 	}
 	cvplist := vplist.cvplist
 	if nil == cvplist {
