@@ -17,6 +17,7 @@ import (
 	"bytes"
 	"fmt"
 	"lang.yottadb.com/go/yottadb"
+	"lang.yottadb.com/go/yottadb/internal/israce"
 	"os"
 	"os/exec"
 	"regexp"
@@ -262,6 +263,9 @@ func SkipMemIntensiveTests(t *testing.T) {
 	// We read this as kB, so convert to MB then GB
 	if GetSystemMemory(t) < (1024 * 1024) {
 		t.Skipf("Machine appears to have less then 1 GB memory, skipping test")
+	// -race can use up to 10x as much memory as a normal test run
+	} else if israce.Enabled && GetSystemMemory(t) < (1024 * 1024 * 10) {
+		t.Skipf("-race is enabled and machine appears to have less then 10 GB memory, skipping test")
 	}
 }
 
