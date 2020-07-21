@@ -17,7 +17,7 @@ stages:
   - deploy
 
 variables:
-  GOLANG_VERSION: 1.11.2
+  GOLANG_VERSION: 1.13.1
 
 before_script:
   - apt-get update && apt-get install -y --no-install-recommends wget ca-certificates git g++ gcc libc6-dev make pkg-config && rm -rf /var/lib/apt/lists/*
@@ -55,36 +55,6 @@ before_script:
 #
 # In general, test first and last minor version of each major version
 #
-unit_tests1.10:
-  extends: .unit_tests
-  variables:
-    GOLANG_VERSION: "1.10"
-
-unit_tests1.10.8:
-  extends: .unit_tests
-  variables:
-    GOLANG_VERSION: "1.10.8"
-
-unit_tests1.11:
-  extends: .unit_tests
-  variables:
-    GOLANG_VERSION: "1.11"
-
-unit_tests1.11.13:
-  extends: .unit_tests
-  variables:
-    GOLANG_VERSION: "1.11.13"
-
-unit_tests1.12:
-  extends: .unit_tests
-  variables:
-    GOLANG_VERSION: "1.12"
-
-unit_tests1.12.10:
-  extends: .unit_tests
-  variables:
-    GOLANG_VERSION: "1.12.10"
-
 unit_tests1.13:
   extends: .unit_tests
   variables:
@@ -99,6 +69,11 @@ unit_tests1.14:
   extends: .unit_tests
   variables:
     GOLANG_VERSION: "1.14"
+
+unit_tests1.14.5:
+  extends: .unit_tests
+  variables:
+    GOLANG_VERSION: "1.14.5"
 
 race_detector:
   stage: test
@@ -127,7 +102,7 @@ coverage:
 lint_code:
   stage: test
   script:
-    - go get -u github.com/golang/lint/golint
+    - go get -u golang.org/x/lint/golint
     - golint -set_exit_status $(go list ./... | grep -v /vendor/ | grep -v /internal/)
 
 error_codes:
