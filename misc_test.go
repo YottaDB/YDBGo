@@ -22,6 +22,11 @@ import (
 	"time"
 )
 
+// Allow for 30% difference between Expected and Actual in timed tests.
+// In testing, we have seen a difference up to 23% show up some times in the "miscGoTimersHelper()" timed test.
+// Hence the current choice of 30% in the "allowedErrorPct" variable.
+var allowedErrorPct float64 = 0.30
+
 func TestMiscIsLittleEndian(t *testing.T) {
 	// For now, we only see this getting run on LittleEndian machines, so just verify
 	//  true
@@ -46,14 +51,7 @@ func miscGoTimersHelper(t *testing.T, wg *sync.WaitGroup, loops int) {
 			r, err := yottadb.CallMT(yottadb.NOTTP, nil, 0, "TestMGoTimers")
 			assert.Nil(t, err)
 			elapsed := time.Since(start)
-			// This test failed on a loaded system with a 11% insteasd
-			//  of the allowed 10 % on 2019-01-01, if it continues to fail
-			//  we might consider adopting a strategy of "retrying" the
-			//  first timeout failure, then steadily increasing it until
-			//  the test passes
-			//  (i.e., test for 1s with 10% delta, then 2s with 10% delta
-			//   then 4s with 10% delta, etc.)
-			assert.InEpsilon(t, 1, elapsed.Seconds(), .2)
+			assert.InEpsilon(t, 1, elapsed.Seconds(), allowedErrorPct)
 			assert.Equal(t, "", r)
 		}
 		wg.Done()
@@ -77,7 +75,7 @@ func TestMiscGoTimers(t *testing.T) {
 				start := time.Now()
 				time.Sleep(sleepDuration)
 				elapsed := time.Since(start)
-				assert.InEpsilon(t, .1, elapsed.Seconds(), .2)
+				assert.InEpsilon(t, .1, elapsed.Seconds(), allowedErrorPct)
 			}
 			wg.Done()
 		}()
