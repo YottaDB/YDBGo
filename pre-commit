@@ -15,6 +15,9 @@
 # -----------------------------------------------------------------
 # Pre-commit hook that
 #	1) Enforces YottaDB Copyright in changed modules
+#	2) Runs `gofmt`
+#	3) Trims trailing whitespace
+#	4) Runs `go vet`
 #
 set nocopyright_extensions = "mod ci"	# List of extensions that cannot have copyrights.
 					# .mod -> e.g. go.mod is an auto-generated file and
@@ -70,6 +73,7 @@ endif
 # -----------------------------------------------------------------
 # 2) Run "gofmt"
 # -----------------------------------------------------------------
+set fixlist = ""
 foreach file ($filelist)
 	if (! -e $file) then
 		# If file is being deleted as part of this commit, skip gofmt conversion on it
@@ -86,7 +90,17 @@ foreach file ($filelist)
 		@ exitstatus = 1
 		echo "GOFMT-E-FAIL : Command [gofmt -e -w $file] failed with status : $status1"
 	endif
+	# Check if there a changes that are unstaged (as opposed to staged and uncommitted)
+	git diff-files --exit-code --name-only -- $file >/dev/null
+	if ($status) then
+		git add $file
+		set fixlist = "  $file\n"
+	endif
 end
+if ("" != "$fixlist") then
+	echo "note: automatically committing gofmt changes for the following files:"
+	echo "$fixlist"
+endif
 
 # ------------------------------------------------------------------------------------------
 # 3) Removes trailing white space (most likely not needed since "gofmt" is done in Step (2)

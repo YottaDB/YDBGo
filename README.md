@@ -64,6 +64,7 @@ To use a local development version of YDBGo
 ```sh
 mkdir -p $GOPATH/src/lang.yottadb.com/go/yottadb
 git clone https://gitlab.com/YottaDB/Lang/YDBGo.git $GOPATH/src/lang.yottadb.com/go/yottadb
+ln -s ../../pre-commit .git/hooks
 ```
 
 ## Docker Container
