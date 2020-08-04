@@ -179,7 +179,7 @@ func Exit() {
 	// On the other hand, if this is a normal exit, we need to be able to wait a reasonably long time in case there is
 	// a significant amount of data to flush.
 	exitWait := MaximumNormalExitWait
-	if ydbSigPanicCalled {
+	if 0 != atomic.LoadUint32(&ydbSigPanicCalled) { // Need "atomic" usage to avoid read/write DATA RACE issues
 		exitWait = MaximumPanicExitWait
 	}
 	select {
@@ -190,7 +190,7 @@ func Exit() {
 		if dbgSigHandling {
 			fmt.Fprintln(os.Stderr, "YDB: Exit(): Wait for ydb_exit() expired")
 		}
-		if !ydbSigPanicCalled {
+		if 0 == atomic.LoadUint32(&ydbSigPanicCalled) { // Need "atomic" usage to avoid read/write DATA RACE issues
 			// If we panic'd due to a signal, we definitely have run the exit handler as it runs before the panic is
 			// driven so we can bypass this message in that case.
 			syslogr, err := syslog.New(syslog.LOG_INFO+syslog.LOG_USER, "[YottaDB-Go-Wrapper]")

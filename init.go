@@ -88,9 +88,9 @@ func YDBWrapperPanic(sigNum C.int) {
 	var sig syscall.Signal
 
 	printEntry("YDBWrapperPanic()")
-	ydbSigPanicCalled = true
-	shutdownSignalGoroutines()   // Close the goroutines down with their signal notification channels
-	sig = syscall.Signal(sigNum) // Convert numeric signal number to Signal type for use in panic() messagee
+	atomic.StoreUint32(&ydbSigPanicCalled, 1) // Need "atomic" usage to avoid read/write DATA RACE issues
+	shutdownSignalGoroutines()                // Close the goroutines down with their signal notification channels
+	sig = syscall.Signal(sigNum)              // Convert numeric signal number to Signal type for use in panic() messagee
 	panic(fmt.Sprintf("YDB: Fatal signal %d (%v) occurred", sig, sig))
 }
 

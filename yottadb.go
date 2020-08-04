@@ -69,7 +69,7 @@ var easyAPIDefaultDataSize uint32 = 32   // Init value - may grow - Base allocat
 var easyAPIDefaultSubscrCnt uint32 = 2   // Init value - may grow - Base subscript count allocation for returned subscr list
 var easyAPIDefaultSubscrSize uint32 = 16 // Init value - may grow - Base subscript size allocation for returned subscr list
 
-var ydbInitialized uint32  // Atomic: Set to 1 when YDB has been initialized with a call to ydb_main_lang_init()
-var ydbSigPanicCalled bool // True when our exit is panic drive due to a signal
+var ydbInitialized uint32    // Atomic: Set to 1 when YDB has been initialized with a call to ydb_main_lang_init()
+var ydbSigPanicCalled uint32 // True when our exit is panic drive due to a signal
 
 //go:generate ./scripts/gen_error_codes.sh
