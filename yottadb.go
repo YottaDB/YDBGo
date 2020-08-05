@@ -35,8 +35,8 @@ const NOTTP uint64 = 0
 // Maximum panic exit wait specifies the wait in seconds that yottadb.Exit() will wait for ydb_exit() to run before
 // giving up and forcing the process to exit. Note the normal exit wait is longer as we expect ydb_exit() to be
 // successful so can afford to wait as long as needed to do the sync but for a signal exit, the rundown is likely
-// already done (exit handler called by the signal processing itself) but ydb_exit() is unlikely to be able to get
-// the system lock so is likely to hang and 3 seconds is about as much as we can afford to wait.
+// already done (exit handler called by the signal processing itself) but if ydb_exit() is not able to get
+// the system lock and is likely to hang, 3 seconds is about as much as we can afford to wait.
 
 // MaximumPanicExitWait is maximum wait when a panic caused by a signal has occured (unlikely able to run Exit())
 const MaximumPanicExitWait int = 3 // wait in seconds
@@ -71,9 +71,9 @@ const dbgInitFree bool = false       // (Re)Initialize C malloc code on free to 
 const dbgInitFreeChar C.int = 0xfe   // Char to initialize released memory to
 const dbgSigHandling bool = false    // Print extra info when running if true
 
-var easyAPIDefaultDataSize uint32 = 32   // Init value - may grow - Base allocation for returned data values
-var easyAPIDefaultSubscrCnt uint32 = 2   // Init value - may grow - Base subscript count allocation for returned subscr list
-var easyAPIDefaultSubscrSize uint32 = 16 // Init value - may grow - Base subscript size allocation for returned subscr list
+const easyAPIDefaultDataSize uint32 = 32   // Base allocation for returned data values
+const easyAPIDefaultSubscrCnt uint32 = 2   // Base subscript count allocation for returned subscr list
+const easyAPIDefaultSubscrSize uint32 = 16 // Base subscript size allocation for returned subscr list
 
 var ydbInitialized uint32    // Atomic: Set to 1 when YDB has been initialized with a call to ydb_main_lang_init()
 var ydbSigPanicCalled uint32 // True when our exit is panic drive due to a signal

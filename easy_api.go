@@ -146,15 +146,16 @@ func ValE(tptoken uint64, errstr *BufferT, varname string, subary []string) (str
 	var dbkey KeyT
 	var dbvalue BufferT
 	var err error
+	var dataSize uint32
 
 	printEntry("ValE()")
 	defer dbkey.Free()
 	defer dbvalue.Free()
 	initkey(tptoken, errstr, &dbkey, varname, subary)
-	dbvalue.Alloc(easyAPIDefaultDataSize)
-	// Attempt to fetch the value multiple times. We do not know how big the incoming record is
-	// so loop till it fits.
-	for YDB_MAX_STR > easyAPIDefaultDataSize {
+	dataSize = easyAPIDefaultDataSize
+	dbvalue.Alloc(dataSize)
+	// Attempt to fetch the value multiple times. We do not know how big the incoming record is so loop till it fits.
+	for {
 		// dbvalue is allocated with current best-guess size of returning data
 		err = dbkey.ValST(tptoken, errstr, &dbvalue)
 		if nil != err {
@@ -162,11 +163,12 @@ func ValE(tptoken uint64, errstr *BufferT, varname string, subary []string) (str
 			errorcode := ErrorCode(err)
 			if int(YDB_ERR_INVSTRLEN) == errorcode {
 				// This is INVSTRLEN - reallocate the size we need
-				easyAPIDefaultDataSize = uint32(dbvalue.getCPtr().len_used)
-				dbvalue.Alloc(easyAPIDefaultDataSize)
+				dataSize = uint32(dbvalue.getCPtr().len_used)
+				dbvalue.Free()
+				dbvalue.Alloc(dataSize)
 				continue
 			}
-			// Otherwise something badder-er happened
+			// Otherwise an unexpected error occurred. Return that.
 			return "", err
 		}
 		break // No error so success and we are done!
@@ -388,15 +390,19 @@ func NodeNextE(tptoken uint64, errstr *BufferT, varname string, subary []string)
 	var dbkey KeyT
 	var dbsubs BufferTArray
 	var err error
+	var subscrCnt uint32
+	var subscrSize uint32
 
 	printEntry("NodeNextE()")
 	defer dbkey.Free()
 	defer dbsubs.Free()
 	initkey(tptoken, errstr, &dbkey, varname, subary)
-	dbsubs.Alloc(easyAPIDefaultSubscrCnt, easyAPIDefaultSubscrSize)
+	subscrCnt = easyAPIDefaultSubscrCnt
+	subscrSize = easyAPIDefaultSubscrSize
+	dbsubs.Alloc(subscrCnt, subscrSize)
 	// Attempt to fetch the next subscript set multiple times. We do not know how big the incoming subscripts are
 	// so loop till they fit.
-	for YDB_MAX_STR > easyAPIDefaultDataSize {
+	for {
 		// dbvalue is allocated with current best-guess size of returning data
 		err = dbkey.NodeNextST(tptoken, errstr, &dbsubs)
 		if nil != err {
@@ -404,8 +410,9 @@ func NodeNextE(tptoken uint64, errstr *BufferT, varname string, subary []string)
 			errorcode := ErrorCode(err)
 			if int(YDB_ERR_INSUFFSUBS) == errorcode {
 				// This is INSUFFSUBS - pickup number of subscripts we actually need and reallocate
-				easyAPIDefaultSubscrCnt = dbsubs.ElemUsed()
-				dbsubs.Alloc(easyAPIDefaultSubscrCnt, easyAPIDefaultSubscrSize) // Reallocate and reset dbsubs
+				subscrCnt = dbsubs.ElemUsed()
+				dbsubs.Free()
+				dbsubs.Alloc(subscrCnt, subscrSize) // Reallocate and reset dbsubs
 				continue
 			}
 			if int(YDB_ERR_INVSTRLEN) == errorcode {
@@ -414,11 +421,12 @@ func NodeNextE(tptoken uint64, errstr *BufferT, varname string, subary []string)
 				if nil != err {
 					panic(fmt.Sprintf("YDB: Unexpected error with ElemLenUsed(): %s", err))
 				}
-				easyAPIDefaultSubscrSize = neededlen
-				dbsubs.Alloc(easyAPIDefaultSubscrCnt, easyAPIDefaultSubscrSize) // Reallocate and reset dbsubs
+				subscrSize = neededlen
+				dbsubs.Free()
+				dbsubs.Alloc(subscrCnt, subscrSize) // Reallocate and reset dbsubs
 				continue
 			}
-			// Otherwise something badder-er happened so return that
+			// Otherwise some error happened so return that
 			return []string{}, err
 		}
 		break // No error so we had success and we are done!
@@ -447,15 +455,19 @@ func NodePrevE(tptoken uint64, errstr *BufferT, varname string, subary []string)
 	var dbkey KeyT
 	var dbsubs BufferTArray
 	var err error
+	var subscrCnt uint32
+	var subscrSize uint32
 
 	printEntry("NodePrevE()")
 	defer dbkey.Free()
 	defer dbsubs.Free()
 	initkey(tptoken, errstr, &dbkey, varname, subary)
-	dbsubs.Alloc(easyAPIDefaultSubscrCnt, easyAPIDefaultSubscrSize)
+	subscrCnt = easyAPIDefaultSubscrCnt
+	subscrSize = easyAPIDefaultSubscrSize
+	dbsubs.Alloc(subscrCnt, subscrSize)
 	// Attempt to fetch the next subscript set multiple times. We do not know how big the incoming subscripts are
 	// so loop till they fit.
-	for YDB_MAX_STR > easyAPIDefaultDataSize {
+	for {
 		// dbvalue is allocated with current best-guess size of returning data
 		err = dbkey.NodePrevST(tptoken, errstr, &dbsubs)
 		if nil != err {
@@ -463,8 +475,9 @@ func NodePrevE(tptoken uint64, errstr *BufferT, varname string, subary []string)
 			errorcode := ErrorCode(err)
 			if int(YDB_ERR_INSUFFSUBS) == errorcode {
 				// This is INSUFFSUBS - pickup number of subscripts we actually need and reallocate
-				easyAPIDefaultSubscrCnt = dbkey.Subary.ElemUsed()
-				dbsubs.Alloc(easyAPIDefaultSubscrCnt, easyAPIDefaultSubscrSize)
+				subscrCnt = dbsubs.ElemUsed()
+				dbsubs.Free()
+				dbsubs.Alloc(subscrCnt, subscrSize)
 				continue
 			}
 			if int(YDB_ERR_INVSTRLEN) == errorcode {
@@ -473,11 +486,12 @@ func NodePrevE(tptoken uint64, errstr *BufferT, varname string, subary []string)
 				if nil != err {
 					panic(fmt.Sprintf("YDB: Unexpected error with ElemLenUsed(): %s", err))
 				}
-				easyAPIDefaultSubscrSize = neededlen
-				dbsubs.Alloc(easyAPIDefaultSubscrCnt, easyAPIDefaultSubscrSize)
+				subscrSize = neededlen
+				dbsubs.Free()
+				dbsubs.Alloc(subscrCnt, subscrSize)
 				continue
 			}
-			// Otherwise something badder-er happened so return that
+			// Otherwise some error happened so return that
 			return []string{}, err
 		}
 		break // No error so success and we are done!
@@ -572,15 +586,17 @@ func SubNextE(tptoken uint64, errstr *BufferT, varname string, subary []string) 
 	var dbkey KeyT
 	var dbsub BufferT
 	var err error
+	var subscrSize uint32
 
 	printEntry("SubNextE()")
 	defer dbkey.Free()
 	defer dbsub.Free()
 	initkey(tptoken, errstr, &dbkey, varname, subary)
-	dbsub.Alloc(easyAPIDefaultSubscrSize)
+	subscrSize = easyAPIDefaultSubscrSize
+	dbsub.Alloc(subscrSize)
 	// Attempt to fetch the value multiple times. We do not know how big the incoming record is
 	// so loop till it fits.
-	for YDB_MAX_STR > easyAPIDefaultDataSize {
+	for {
 		// dbsub is allocated with current best-guess size of returning data
 		err = dbkey.SubNextST(tptoken, errstr, &dbsub)
 		if nil != err {
@@ -588,8 +604,9 @@ func SubNextE(tptoken uint64, errstr *BufferT, varname string, subary []string) 
 			errorcode := ErrorCode(err)
 			if int(YDB_ERR_INVSTRLEN) == errorcode {
 				// This is INVSTRLEN - reallocate the size we need
-				easyAPIDefaultSubscrSize = uint32(dbsub.getCPtr().len_used)
-				dbsub.Alloc(easyAPIDefaultSubscrSize)
+				subscrSize = uint32(dbsub.getCPtr().len_used)
+				dbsub.Free()
+				dbsub.Alloc(subscrSize)
 				continue
 			}
 			// Otherwise something badder-er happened
@@ -618,15 +635,17 @@ func SubPrevE(tptoken uint64, errstr *BufferT, varname string, subary []string) 
 	var dbkey KeyT
 	var dbsub BufferT
 	var err error
+	var subscrSize uint32
 
 	printEntry("SubPrevE()")
 	defer dbkey.Free()
 	defer dbsub.Free()
 	initkey(tptoken, errstr, &dbkey, varname, subary)
-	dbsub.Alloc(easyAPIDefaultSubscrSize)
+	subscrSize = easyAPIDefaultSubscrSize
+	dbsub.Alloc(subscrSize)
 	// Attempt to fetch the value multiple times. We do not know how big the incoming record is
 	// so loop till it fits.
-	for YDB_MAX_STR > easyAPIDefaultDataSize {
+	for {
 		// dbsub is allocated with current best-guess size of returning data
 		err = dbkey.SubPrevST(tptoken, errstr, &dbsub)
 		if nil != err {
@@ -634,8 +653,9 @@ func SubPrevE(tptoken uint64, errstr *BufferT, varname string, subary []string) 
 			errorcode := ErrorCode(err)
 			if int(YDB_ERR_INVSTRLEN) == errorcode {
 				// This is INVSTRLEN - reallocate the size we need
-				easyAPIDefaultSubscrSize = uint32(dbsub.getCPtr().len_used)
-				dbsub.Alloc(easyAPIDefaultSubscrSize)
+				subscrSize = uint32(dbsub.getCPtr().len_used)
+				dbsub.Free()
+				dbsub.Alloc(subscrSize)
 				continue
 			}
 			// Otherwise something badder-er happened
