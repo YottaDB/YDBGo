@@ -32,14 +32,20 @@ import "C"
 // NOTTP contains the tptoken value to use when NOT in a TP transaction callback routine.
 const NOTTP uint64 = 0
 
-// MaxExitWait specifies the wait in seconds that yottadb.Exit() will wait for ydb_exit() to run before giving
-// up and forcing the process to exit. Note the normal exit wait is longer as we expect ydb_exit() to be successful
-// so can afford to wait as long as needed to do the sync but for a signal exit, the rundown is likely already done
-// (exit handler called by the signal processing itself) but ydb_exit() is unlikely to be able to get the system lock
-// so is likely to hang and 3 seconds is about as much as we can afford to wait.
-const MaximumPanicExitWait int = 3   // Maximum wait when a panic caused by a signal has occured (unlikely able to run Exit())
-const MaximumNormalExitWait int = 60 // Maximum wait for a normal shutdown when no system lock hang in Exit() is likely
-const MaximumCloseWait int = 5       // Maximum wait to close down signal handling goroutines (shouldn't take this long)
+// Maximum panic exit wait specifies the wait in seconds that yottadb.Exit() will wait for ydb_exit() to run before
+// giving up and forcing the process to exit. Note the normal exit wait is longer as we expect ydb_exit() to be
+// successful so can afford to wait as long as needed to do the sync but for a signal exit, the rundown is likely
+// already done (exit handler called by the signal processing itself) but ydb_exit() is unlikely to be able to get
+// the system lock so is likely to hang and 3 seconds is about as much as we can afford to wait.
+
+// MaximumPanicExitWait is maximum wait when a panic caused by a signal has occured (unlikely able to run Exit())
+const MaximumPanicExitWait int = 3 // wait in seconds
+
+// MaximumNormalExitWait is maximum wait for a normal shutdown when no system lock hang in Exit() is likely
+const MaximumNormalExitWait int = 60 // wait in seconds
+
+// MaximumCloseWait is maximum wait to close down signal handling goroutines (shouldn't take this long)
+const MaximumCloseWait int = 5 // wait in seconds
 
 // Release version constants - be sure to change all of them appropriately
 
