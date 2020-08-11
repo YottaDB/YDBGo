@@ -172,11 +172,6 @@ func (mdesc *CallMDesc) CallMDescT(tptoken uint64, errstr *BufferT, retvallen ui
 		}
 		rc := C.ydb_ci_get_info_t(C.uint64_t(tptoken), cbuft, mdesc.cmdesc.cmdesc.rtn_name.address, mdesc.cmdesc.parmtyps)
 		if YDB_OK != rc {
-			if 0 > rc {
-				// Since this is only used in ydb_ci[p]_t() calls which do NOT return negative values,
-				// just un-negate rc
-				rc = -rc
-			}
 			err := NewError(tptoken, errstr, int(rc))
 			return "", err
 		}

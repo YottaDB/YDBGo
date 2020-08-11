@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	//
+// Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -122,7 +122,7 @@ func TestCallMT(t *testing.T) {
 	retval, err = yottadb.CallMT(yottadb.NOTTP, &errstr, 15, "CallMTStrTest")
 	out, _ := errstr.ValStr(yottadb.NOTTP, nil)
 	errCode := yottadb.ErrorCode(err)
-	if -yottadb.YDB_ERR_INVSTRLEN != errCode {
+	if yottadb.YDB_ERR_INVSTRLEN != errCode {
 		panic(fmt.Sprintf("CallMT() returned wrong ErrorCode. Got: %d; Expected: %d", errCode, yottadb.YDB_ERR_INVSTRLEN))
 	}
 	if out != cmpstr {
@@ -163,7 +163,7 @@ func TestCallMDescT(t *testing.T) {
 	retval, err = callin.CallMDescT(yottadb.NOTTP, &errstr, 15)
 	out, _ := errstr.ValStr(yottadb.NOTTP, &errstr)
 	errCode := yottadb.ErrorCode(err)
-	if -yottadb.YDB_ERR_INVSTRLEN != errCode {
+	if yottadb.YDB_ERR_INVSTRLEN != errCode {
 		panic(fmt.Sprintf("CallMT() returned wrong ErrorCode. Got: %d; Expected: %d", errCode, yottadb.YDB_ERR_INVSTRLEN))
 	}
 	if out != cmpstr {
@@ -193,7 +193,7 @@ func TestCallMTab(t *testing.T) {
 	// Try to invoke our test routine but expect error since it does not exist in this calltab
 	retval, err = yottadb.CallMT(yottadb.NOTTP, nil, 64, "HelloWorld99")
 	assert.NotNil(t, err)
-	assert.Equal(t, -yottadb.YDB_ERR_CINOENTRY, yottadb.ErrorCode(err))
+	assert.Equal(t, yottadb.YDB_ERR_CINOENTRY, yottadb.ErrorCode(err))
 	// Now open the new package and make it current
 	newtabTable, err := yottadb.CallMTableOpenT(yottadb.NOTTP, &errstr, "testcalltab.ci")
 	assert.Nil(t, err)
