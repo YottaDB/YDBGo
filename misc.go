@@ -198,7 +198,7 @@ func Exit() {
 				panic(fmt.Sprintf("syslog.NewLogger() failed unexpectedly with error: %s", err))
 			}
 			err = syslogr.Info("YDB-W-DBRNDWNBYPASS YottaDB database rundown may have been bypassed due to timeout " +
-				"- run MUPIP RUNDOWN")
+				"- run MUPIP JOURNAL ROLLBACK BACKWARD / MUPIP JOURNAL RECOVER BACKWARD / MUPIP RUNDOWN")
 			if nil != err {
 				panic(fmt.Sprintf("syslogr.Info() failed unexpectedly with error: %s", err))
 			}
