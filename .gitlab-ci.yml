@@ -17,6 +17,13 @@ stages:
   - deploy
 
 variables:
+  # Note: If GOLANG_VERSION below is bumped up in the future, changes would be needed to at least the following files
+  #     YDBGo   repo : Dockerfile
+  #     YDBOcto repo : .gitlab-ci.yml
+  #     YDBOcto repo : Dockerfile-Tests
+  #     YDBOcto repo : Dockerfile-Tests.centos
+  # There might be more files to change in the future.
+  # Search for "GOLANG_VERSION" name in all YDB repos to find places that need change.
   GOLANG_VERSION: 1.13.1
 
 before_script:

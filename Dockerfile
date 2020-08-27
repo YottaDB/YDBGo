@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.  	#
+# Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #   This source code contains the intellectual property		#
@@ -31,7 +31,7 @@ RUN apt-get update && \
 # Install go
 ENV GOPATH /go
 RUN mkdir /go
-ENV GOLANG_VERSION 1.11.4
+ENV GOLANG_VERSION 1.13.1
 ENV PATH=$GOPATH/bin:/usr/local/go/bin:$PATH
 RUN wget -O go.tgz -q https://golang.org/dl/go${GOLANG_VERSION}.linux-amd64.tar.gz && \
     tar -C /usr/local -xzf go.tgz && \
