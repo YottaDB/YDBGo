@@ -91,6 +91,10 @@ race_detector:
 coverage:
   stage: test
   script:
+    # Copy commit gpg key verify script to build directory and execute
+    - wget https://gitlab.com/YottaDB/DB/YDB/-/raw/master/ci/commit_gpgkey_verify.sh
+    - chmod +x commit_gpgkey_verify.sh
+    - ./commit_gpgkey_verify.sh
     - PKG_LIST=$(go list ./... | grep -v /vendor/)
     - mkdir -p $CI_PROJECT_DIR/cover
     - for package in ${PKG_LIST}; do
