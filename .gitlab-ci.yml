@@ -106,16 +106,18 @@ coverage:
       - cover/coverage.cov
       - cover/coverage.html
 
-gpgkey-verify:
+commit-verify:
   image: ubuntu:18.04
   stage: test
   before_script:
     - apt-get update -qq && apt-get install -y -qq git wget gnupg
   script:
     # Copy commit gpg key verify script to build directory and execute
-    - wget https://gitlab.com/YottaDB/DB/YDB/-/raw/master/ci/commit_gpgkey_verify.sh
-    - chmod +x commit_gpgkey_verify.sh
-    - ./commit_gpgkey_verify.sh https://gitlab.com/YottaDB/Lang/YDBGo develop
+    - wget https://gitlab.com/YottaDB/DB/YDB/-/raw/master/ci/commit_verify.sh
+    - chmod +x commit_verify.sh
+    - ./commit_verify.sh scripts/needs_copyright.sh
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "external_pull_request" || $CI_PIPELINE_SOURCE == "merge_request_event"'
 
 lint_code:
   stage: test
