@@ -49,8 +49,11 @@ const MaximumCloseWait int = 5 // wait in seconds
 
 // Release version constants - be sure to change all of them appropriately
 
-// WrapperRelease - (string) The Go wrapper release value for YottaDB SimpleAPI
-const WrapperRelease string = "v1.1.0"
+// WrapperRelease - (string) The Go wrapper release value for YottaDB SimpleAPI. Note the third piece of this version
+// will be even for a production release and odd for a development release (branch develop). When released, depending
+// on new content, either the 3rd digit with be bumped to an even value or the second value will be bumped by 1 and the
+// third value set to 0.
+const WrapperRelease string = "v1.1.1"
 
 // MinimumYDBReleaseMajor - (int) Minimum major release number required by this wrapper of the linked YottaDB
 const MinimumYDBReleaseMajor int = 1
