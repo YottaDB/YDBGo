@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	//
+// Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -28,6 +28,8 @@ import (
 import "C"
 
 var wgexit sync.WaitGroup
+var mtxInExit sync.Mutex
+var exitRun bool
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -134,6 +136,18 @@ func formatINVSTRLEN(tptoken uint64, errstr *BufferT, lenalloc, lenused C.uint) 
 	return errmsg
 }
 
+// syslogEntry records the given message in the syslog
+func syslogEntry(logMsg string) {
+	syslogr, err := syslog.New(syslog.LOG_INFO+syslog.LOG_USER, "[YottaDB-Go-Wrapper]")
+	if nil != err {
+		panic(fmt.Sprintf("syslog.NewLogger() failed unexpectedly with error: %s", err))
+	}
+	err = syslogr.Info(logMsg)
+	if nil != err {
+		panic(fmt.Sprintf("syslogr.Info() failed unexpectedly with error: %s", err))
+	}
+}
+
 // IsLittleEndian is a function to determine endianness. Exposed in case anyone else wants to know.
 func IsLittleEndian() bool {
 	var bittest = 0x01
@@ -144,11 +158,25 @@ func IsLittleEndian() bool {
 	return false
 }
 
+// Init is a function to drive the initialization for this process. This is part wrapper initialization and part YottaDB
+// runtime initialization. This routine is the exterior face of initialization.
+func Init() {
+	if 1 != atomic.LoadUint32(&ydbInitialized) {
+		initializeYottaDB()
+	}
+}
+
 // Exit is a function to drive YDB's exit handler in case of panic or other non-normal shutdown that bypasses
 // atexit() that would normally drive the exit handler.
 func Exit() {
+	defer func() { exitRun = true }() // Set flag we have run Exit on exit.
 	if 1 != atomic.LoadUint32(&ydbInitialized) {
-		return // If not (never) initialized, nothing to do
+		return // If never initialized, nothing to do
+	}
+	mtxInExit.Lock()         // One thread at a time through here else we can get DATA-RACE warnings accessing wgexit wait group
+	defer mtxInExit.Unlock() // Release lock when we leave this routine
+	if exitRun {
+		return // If exit has already run, no use in running it again
 	}
 	if dbgSigHandling {
 		fmt.Fprintln(os.Stderr, "YDB: Exit(): YDB Engine shutdown started")
@@ -193,16 +221,8 @@ func Exit() {
 		if 0 == atomic.LoadUint32(&ydbSigPanicCalled) { // Need "atomic" usage to avoid read/write DATA RACE issues
 			// If we panic'd due to a signal, we definitely have run the exit handler as it runs before the panic is
 			// driven so we can bypass this message in that case.
-			syslogr, err := syslog.New(syslog.LOG_INFO+syslog.LOG_USER, "[YottaDB-Go-Wrapper]")
-			if nil != err {
-				panic(fmt.Sprintf("syslog.NewLogger() failed unexpectedly with error: %s", err))
-			}
-			err = syslogr.Info("YDB-W-DBRNDWNBYPASS YottaDB database rundown may have been bypassed due to timeout " +
+			syslogEntry("YDB-W-DBRNDWNBYPASS YottaDB database rundown may have been bypassed due to timeout " +
 				"- run MUPIP JOURNAL ROLLBACK BACKWARD / MUPIP JOURNAL RECOVER BACKWARD / MUPIP RUNDOWN")
-			if nil != err {
-				panic(fmt.Sprintf("syslogr.Info() failed unexpectedly with error: %s", err))
-			}
-
 		}
 	}
 	// Note - the temptation here is to unset ydbInitialized but things work better if we do not do that (we don't have

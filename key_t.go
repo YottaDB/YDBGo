@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	//
+// Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -190,7 +190,7 @@ func (key *KeyT) ValST(tptoken uint64, errstr *BufferT, retval *BufferT) error {
 	if nil == key {
 		panic("YDB: *KeyT receiver of ValST() cannot be nil")
 	}
-	if 1 != atomic.LoadUint32(&ydbInitialized) {
+	if (1 != atomic.LoadUint32(&inInit)) && (1 != atomic.LoadUint32(&ydbInitialized)) {
 		initializeYottaDB()
 	}
 	if nil != errstr {

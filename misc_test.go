@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	//
+// Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -202,4 +202,27 @@ func TestMiscGoSelectWithYdbTimers3(t *testing.T) {
 	}()
 	wg.Wait()
 	assert.Equal(t, 100, recvCount)
+}
+
+// Test the 4 timer global variable timer values to make sure they can be accessed and updated.
+func testTimerParameter(t *testing.T, waitValue *int, defaultValue int) {
+	assert.Equal(t, *waitValue, defaultValue)   // Expect it to be its default value initially
+	*waitValue++                                // Bump it by a second
+	assert.Equal(t, *waitValue, defaultValue+1) // Verify the update worked
+}
+
+func TestMaximumNormalExitWait(t *testing.T) {
+	testTimerParameter(t, &yottadb.MaximumNormalExitWait, yottadb.DefaultMaximumNormalExitWait)
+}
+
+func TestMaximumPanicExitWait(t *testing.T) {
+	testTimerParameter(t, &yottadb.MaximumPanicExitWait, yottadb.DefaultMaximumPanicExitWait)
+}
+
+func TestMaximumCloseWait(t *testing.T) {
+	testTimerParameter(t, &yottadb.MaximumCloseWait, yottadb.DefaultMaximumCloseWait)
+}
+
+func TestMaximumSigAckWait(t *testing.T) {
+	testTimerParameter(t, &yottadb.MaximumSigAckWait, yottadb.DefaultMaximumSigAckWait)
 }

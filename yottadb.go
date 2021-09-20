@@ -38,34 +38,62 @@ const NOTTP uint64 = 0
 // already done (exit handler called by the signal processing itself) but if ydb_exit() is not able to get
 // the system lock and is likely to hang, 3 seconds is about as much as we can afford to wait.
 
-// MaximumPanicExitWait is maximum wait when a panic caused by a signal has occured (unlikely able to run Exit())
-const MaximumPanicExitWait int = 3 // wait in seconds
+// DefaultMaximumPanicExitWait is default/initial value for MaximumPanicExitWait
+const DefaultMaximumPanicExitWait int = 3 // wait in seconds
+// MaximumPanicExitWait is the maximum wait when a panic caused by a signal has occured (unlikely able to run Exit(
+var MaximumPanicExitWait int = DefaultMaximumPanicExitWait
 
+// DefaultMaximumNormalExitWait is default/initial value for MaximumNormalExitWait
+const DefaultMaximumNormalExitWait int = 60 // wait in seconds
 // MaximumNormalExitWait is maximum wait for a normal shutdown when no system lock hang in Exit() is likely
-const MaximumNormalExitWait int = 60 // wait in seconds
+var MaximumNormalExitWait int = DefaultMaximumNormalExitWait
 
+// DefaultMaximumCloseWait is default/initial value for MaximumCloseWait
+const DefaultMaximumCloseWait int = 5 // wait in seconds
 // MaximumCloseWait is maximum wait to close down signal handling goroutines (shouldn't take this long)
-const MaximumCloseWait int = 5 // wait in seconds
+var MaximumCloseWait int = DefaultMaximumCloseWait
+
+// DefaultMaximumSigAckWait is default/initial value for MaximumSigAckWait
+const DefaultMaximumSigAckWait int = 15 // wait in seconds
+// MaximumSigAckWait is maximum wait for notify via acknowledgement channel that a notified signal handler is
+// done handling the signal.
+var MaximumSigAckWait int = DefaultMaximumSigAckWait
 
 // Release version constants - be sure to change all of them appropriately
 
 // WrapperRelease - (string) The Go wrapper release value for YottaDB SimpleAPI. Note the third piece of this version
 // will be even for a production release and odd for a development release (branch develop). When released, depending
-// on new content, either the 3rd digit with be bumped to an even value or the second value will be bumped by 1 and the
+// on new content, either the 3rd digit will be bumped to an even value or the second value will be bumped by 1 and the
 // third value set to 0.
-const WrapperRelease string = "v1.1.1"
+const WrapperRelease string = "v1.2.0"
 
 // MinimumYDBReleaseMajor - (int) Minimum major release number required by this wrapper of the linked YottaDB
 const MinimumYDBReleaseMajor int = 1
 
 // MinimumYDBReleaseMinor - (int) Minimum minor release number required by this wrapper of the linked YottaDB
-const MinimumYDBReleaseMinor int = 30
+const MinimumYDBReleaseMinor int = 33
 
 // MinimumYDBRelease - (string) Minimum YottaDB release name required by this wrapper
 const MinimumYDBRelease string = "r1.33"
 
 // MinimumGoRelease - (string) Minimum version of Go to fully support this wrapper (including tests)
 const MinimumGoRelease string = "go1.13"
+
+// YDBHandlerFlag type is the flag type passed to yottadb.RegisterSignalNotify() to indicate when or if the driver should run the
+// YottaDB signal handler.
+type YDBHandlerFlag int
+
+// Use iota to get enum like auto values starting at 1
+const (
+	// NotifyBeforeYDBSigHandler - Request sending notification BEFORE running YDB signal handler
+	NotifyBeforeYDBSigHandler YDBHandlerFlag = iota + 1
+	// NotifyAfterYDBSigHandler - Request sending notification AFTER running YDB signal handler
+	NotifyAfterYDBSigHandler
+	// NotifyAsyncYDBSigHandler - Notify user and run YDB handler simultaneously (non-fatal signals only)
+	NotifyAsyncYDBSigHandler
+	// NotifyInsteadOfYDBSigHandler - Do the signal notification but do NOT drive the YDB handler
+	NotifyInsteadOfYDBSigHandler
+)
 
 const dbgPrintEPHdrs bool = false    // Print entry point headers when routine is entered
 const dbgInitMalloc bool = false     // Initialize C malloc'd storage (already initialized to zeroes)
@@ -78,7 +106,10 @@ const easyAPIDefaultDataSize uint32 = C.DEFAULT_DATA_SIZE     // Base allocation
 const easyAPIDefaultSubscrCnt uint32 = C.DEFAULT_SUBSCR_CNT   // Base subscript count allocation for returned subscr list
 const easyAPIDefaultSubscrSize uint32 = C.DEFAULT_SUBSCR_SIZE // Base subscript size allocation for returned subscr list
 
-var ydbInitialized uint32    // Atomic: Set to 1 when YDB has been initialized with a call to ydb_main_lang_init()
-var ydbSigPanicCalled uint32 // True when our exit is panic drive due to a signal
+var ydbInitialized uint32      // Atomic: Set to 1 when YDB has been initialized with a call to ydb_main_lang_init()
+var ydbSigPanicCalled uint32   // Atomic: True when our exit is panic driven due to a signal
+var inInit uint32              // Atomic: We are in initializeYottaDB() so don't force re-init in ValE()
+var runningYDBMajorRelease int // YottaDB major release number
+var runningYDBMinorRelease int // YottaB minor release number
 
 //go:generate ./scripts/gen_error_codes.sh
