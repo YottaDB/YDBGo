@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	//
+// Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -62,7 +62,7 @@ const MinimumYDBReleaseMajor int = 1
 const MinimumYDBReleaseMinor int = 30
 
 // MinimumYDBRelease - (string) Minimum YottaDB release name required by this wrapper
-const MinimumYDBRelease string = "r1.30"
+const MinimumYDBRelease string = "r1.33"
 
 // MinimumGoRelease - (string) Minimum version of Go to fully support this wrapper (including tests)
 const MinimumGoRelease string = "go1.13"

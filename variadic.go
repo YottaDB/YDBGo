@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	//
+// Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -22,19 +22,13 @@ import (
 
 // #include <stdlib.h> /* For uint64_t definition on Linux */
 // #include "libyottadb.h"
-// /* Equivalent of gparam_list in callg.h (not available to us) */
-// #define MAXVPARMS 36
-// typedef struct {
-//         intptr_t  n;
-//         uintptr_t arg[MAXVPARMS];
-// } gparam_list;
 import "C"
 
 const maxARM32RegParms uint32 = 4 // Max number of parms passed in registers in ARM32 (affects passing of 64 bit parms)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //
-// Variadic plist support for C (despite cgo not supporting it).
+// Variadic plist support for C (despite Go [via cgo] not supporting it).
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -59,13 +53,10 @@ func (vplist *variadicPlist) alloc() {
 	vplist.cvplist = (*C.gparam_list)(allocMem(C.size_t(C.sizeof_gparam_list)))
 }
 
-// callVariadicPlistFunc is a variadicPlist method to drive a variadic plist function with the given
-// plist. The function pointer must be to a C routine as cgo does not allow Go function pointers to
-// be passed to C. Note that cgo also prohibits passing pointers to variadic routines so some "stealth"
-// to get around that is required - this is done by calling a C routine that creates the needed pointer
-// and returns it as an unsafe pointer that can then be used as the parameter for this routine. Note this
-// routine assumes that our variadicPlist block is already initialized by a set-up call (a call to alloc()
-// and one or more calls to setVPlistParam()).
+// callVariadicPlistFunc is a variadicPlist method to drive a variadic plist function with the given "vplist".
+// The function pointer "vpfunc" must be to a C routine (ensured by caller) as cgo does not allow Go function
+// pointers to be passed to C. Hence the unsafe pointer type usage below. Note this routine assumes that "vplist"
+// is already initialized by a set-up call (a call to alloc() and one or more calls to setVPlistParam()).
 func (vplist *variadicPlist) callVariadicPlistFunc(vpfunc unsafe.Pointer) int {
 	printEntry("variadicPlist.callVariadicPlistFunc()")
 	if nil == vplist {
@@ -75,7 +66,7 @@ func (vplist *variadicPlist) callVariadicPlistFunc(vpfunc unsafe.Pointer) int {
 		initializeYottaDB()
 	}
 	retval := int(C.ydb_call_variadic_plist_func((C.ydb_vplist_func)(vpfunc),
-		(C.uintptr_t)(uintptr((unsafe.Pointer(vplist.cvplist))))))
+		vplist.cvplist))
 	runtime.KeepAlive(vplist)
 	return retval
 }
@@ -130,8 +121,8 @@ func (vplist *variadicPlist) setUsed(tptoken uint64, errstr *BufferT, newUsed ui
 		}
 		return &YDBError{(int)(YDB_ERR_STRUCTNOTALLOCD), errmsg}
 	}
-	if C.MAXVPARMS < newUsed {
-		panic(fmt.Sprintf("YDB: setUsed item count %d exceeds maximum count of %d", newUsed, C.MAXVPARMS))
+	if C.MAX_GPARAM_LIST_ARGS < newUsed {
+		panic(fmt.Sprintf("YDB: setUsed item count %d exceeds maximum count of %d", newUsed, C.MAX_GPARAM_LIST_ARGS))
 	}
 	cvplist.n = C.intptr_t(newUsed)
 	runtime.KeepAlive(vplist)
@@ -155,8 +146,8 @@ func (vplist *variadicPlist) setVPlistParam(tptoken uint64, errstr *BufferT, par
 		}
 		return &YDBError{(int)(YDB_ERR_STRUCTNOTALLOCD), errmsg}
 	}
-	if C.MAXVPARMS <= paramindx {
-		panic(fmt.Sprintf("YDB: setVPlistParam item count %d exceeds maximum count of %d", paramindx, C.MAXVPARMS))
+	if C.MAX_GPARAM_LIST_ARGS <= paramindx {
+		panic(fmt.Sprintf("YDB: setVPlistParam item count %d exceeds maximum count of %d", paramindx, C.MAX_GPARAM_LIST_ARGS))
 	}
 	// Compute address of indexed element
 	elemptr := (*uintptr)(unsafe.Pointer(uintptr(unsafe.Pointer(&cvplist.arg[0])) +
@@ -186,8 +177,9 @@ func (vplist *variadicPlist) setVPlistParam64Bit(tptoken uint64, errstr *BufferT
 		}
 		return &YDBError{(int)(YDB_ERR_STRUCTNOTALLOCD), errmsg}
 	}
-	if C.MAXVPARMS <= *paramindx {
-		panic(fmt.Sprintf("YDB: setVPlistParam64Bit item count %d exceeds maximum count of %d", paramindx, C.MAXVPARMS))
+	if C.MAX_GPARAM_LIST_ARGS <= *paramindx {
+		panic(fmt.Sprintf("YDB: setVPlistParam64Bit item count %d exceeds maximum count of %d", paramindx,
+			C.MAX_GPARAM_LIST_ARGS))
 	}
 	// Compute address of indexed element(s)
 	if 64 == strconv.IntSize {
@@ -209,9 +201,9 @@ func (vplist *variadicPlist) setVPlistParam64Bit(tptoken uint64, errstr *BufferT
 					// take the time to clear them.
 					(*paramindx)++
 				}
-				if C.MAXVPARMS <= *paramindx {
+				if C.MAX_GPARAM_LIST_ARGS <= *paramindx {
 					panic(fmt.Sprintf("YDB: setVPlistParam64Bit item count %d exceeds maximum count of %d",
-						paramindx, C.MAXVPARMS))
+						paramindx, C.MAX_GPARAM_LIST_ARGS))
 				}
 			}
 			err = vplist.setVPlistParam(tptoken, errstr, *paramindx, uintptr(parm64bit&0xffffffff))
@@ -219,9 +211,9 @@ func (vplist *variadicPlist) setVPlistParam64Bit(tptoken uint64, errstr *BufferT
 				panic(fmt.Sprintf("YDB: Unknown error with varidicPlist.setVPlistParam(): %s", err))
 			}
 			(*paramindx)++
-			if C.MAXVPARMS <= *paramindx {
+			if C.MAX_GPARAM_LIST_ARGS <= *paramindx {
 				panic(fmt.Sprintf("YDB: setVPlistParam64Bit item count %d exceeds maximum count of %d",
-					paramindx, C.MAXVPARMS))
+					paramindx, C.MAX_GPARAM_LIST_ARGS))
 			}
 			err = vplist.setVPlistParam(tptoken, errstr, *paramindx, uintptr(parm64bit>>32))
 			if nil != err {
@@ -233,9 +225,9 @@ func (vplist *variadicPlist) setVPlistParam64Bit(tptoken uint64, errstr *BufferT
 				panic(fmt.Sprintf("YDB: Unknown error with varidicPlist.setVPlistParam(): %s", err))
 			}
 			(*paramindx)++
-			if C.MAXVPARMS <= *paramindx {
+			if C.MAX_GPARAM_LIST_ARGS <= *paramindx {
 				panic(fmt.Sprintf("YDB: setVPlistParam64Bit item count %d exceeds maximum count of %d",
-					paramindx, C.MAXVPARMS))
+					paramindx, C.MAX_GPARAM_LIST_ARGS))
 			}
 			err = vplist.setVPlistParam(tptoken, errstr, *paramindx, uintptr(parm64bit&0xffffffff))
 			if nil != err {

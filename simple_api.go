@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	//
+// Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -21,8 +21,6 @@ import (
 )
 
 // #include "libyottadb.h"
-// /* Equivalent of gparam_list in callg.h (not available to us) */
-// #define MAXVPARMS 36
 // /* C routine to get around the cgo issue and its lack of support for variadic plist routines */
 // void *ydb_get_lockst_funcvp(void);
 // void *ydb_get_lockst_funcvp(void)
@@ -83,9 +81,9 @@ func LockST(tptoken uint64, errstr *BufferT, timeoutNsec uint64, lockname ...*Ke
 	}
 	parmIndx++
 	if 0 != lockcnt {
-		parmsleft := C.MAXVPARMS - parmIndx // We've already slotted 4 parms (tptoken, errstr, timeout, and namecount in up to 6 slots)
-		parmsleftorig := parmsleft          // Save for error below just-in-case
-		lockindx := 0                       // The next lockname index to be read
+		parmsleft := C.MAX_GPARAM_LIST_ARGS - parmIndx // We've already slotted 4 parms in up to 6 slots
+		parmsleftorig := parmsleft                     // Save for error below just-in-case
+		lockindx := 0                                  // The next lockname index to be read
 		// Load the lockname parameters into the plist
 		for 0 < lockcnt {
 			// Make sure enough room for another set of 3 parms
