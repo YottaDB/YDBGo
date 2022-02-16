@@ -139,14 +139,16 @@ func RegisterSignalNotify(sig syscall.Signal, notifyChan, ackChan chan bool, not
 
 // UnRegisterSignalNotify removes a notification request for the given signal. No error is raised if the signal did not already
 // have a notification request in effect.
-func UnRegisterSignalNotify(sig syscall.Signal) {
+func UnRegisterSignalNotify(sig syscall.Signal) error {
 	err := validateNotifySignal(sig)
 	if nil != err {
-		panic(fmt.Sprintf("%v", err))
+		panic(fmt.Sprintf("YDB: %v", err))
 	}
 	sigNotificationMapMutex.Lock()
 	delete(sigNotificationMap, sig)
 	sigNotificationMapMutex.Unlock()
+	// There is no error to return yet but there will be when YDB#790 is complee
+	return nil
 }
 
 // shutdownSignalGoroutines is a function to stop the signal handling goroutines used to tell the YDB engine what signals
@@ -197,7 +199,7 @@ func shutdownSignalGoroutines() {
 		if dbgSigHandling {
 			fmt.Fprintln(os.Stderr, "YDB: shutdownSignalGoroutines: All signal goroutines successfully closed or active")
 		}
-	case <-time.After(time.Duration(MaximumCloseWait) * time.Second):
+	case <-time.After(time.Duration(MaximumSigShutDownWait) * time.Second):
 		// Note, if these goroutines don't shutdown, it is not considered significant enough to warrant a warning to
 		// the syslog but here is where we would add one if that opinion changes.
 		if dbgSigHandling {

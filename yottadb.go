@@ -48,10 +48,10 @@ const DefaultMaximumNormalExitWait int = 60 // wait in seconds
 // MaximumNormalExitWait is maximum wait for a normal shutdown when no system lock hang in Exit() is likely
 var MaximumNormalExitWait int = DefaultMaximumNormalExitWait
 
-// DefaultMaximumCloseWait is default/initial value for MaximumCloseWait
-const DefaultMaximumCloseWait int = 5 // wait in seconds
-// MaximumCloseWait is maximum wait to close down signal handling goroutines (shouldn't take this long)
-var MaximumCloseWait int = DefaultMaximumCloseWait
+// DefaultMaximumSigShutDownWait is default/initial value for MaximumSigShutDownWait
+const DefaultMaximumSigShutDownWait int = 5 // wait in seconds
+// MaximumSigShutDownWait is maximum wait to close down signal handling goroutines (shouldn't take this long)
+var MaximumSigShutDownWait int = DefaultMaximumSigShutDownWait
 
 // DefaultMaximumSigAckWait is default/initial value for MaximumSigAckWait
 const DefaultMaximumSigAckWait int = 15 // wait in seconds

@@ -168,15 +168,17 @@ func Init() {
 
 // Exit is a function to drive YDB's exit handler in case of panic or other non-normal shutdown that bypasses
 // atexit() that would normally drive the exit handler.
-func Exit() {
+func Exit() error {
+	var errstr string
+
 	defer func() { exitRun = true }() // Set flag we have run Exit on exit.
 	if 1 != atomic.LoadUint32(&ydbInitialized) {
-		return // If never initialized, nothing to do
+		return nil // If never initialized, nothing to do
 	}
 	mtxInExit.Lock()         // One thread at a time through here else we can get DATA-RACE warnings accessing wgexit wait group
 	defer mtxInExit.Unlock() // Release lock when we leave this routine
 	if exitRun {
-		return // If exit has already run, no use in running it again
+		return nil // If exit has already run, no use in running it again
 	}
 	if dbgSigHandling {
 		fmt.Fprintln(os.Stderr, "YDB: Exit(): YDB Engine shutdown started")
@@ -218,15 +220,20 @@ func Exit() {
 		if dbgSigHandling {
 			fmt.Fprintln(os.Stderr, "YDB: Exit(): Wait for ydb_exit() expired")
 		}
+		errstr = "YDB-W-DBRNDWNBYPASS YottaDB database rundown may have been bypassed due to timeout " +
+			"- run MUPIP JOURNAL ROLLBACK BACKWARD / MUPIP JOURNAL RECOVER BACKWARD / MUPIP RUNDOWN"
 		if 0 == atomic.LoadUint32(&ydbSigPanicCalled) { // Need "atomic" usage to avoid read/write DATA RACE issues
 			// If we panic'd due to a signal, we definitely have run the exit handler as it runs before the panic is
 			// driven so we can bypass this message in that case.
-			syslogEntry("YDB-W-DBRNDWNBYPASS YottaDB database rundown may have been bypassed due to timeout " +
-				"- run MUPIP JOURNAL ROLLBACK BACKWARD / MUPIP JOURNAL RECOVER BACKWARD / MUPIP RUNDOWN")
+			syslogEntry(errstr)
 		}
 	}
 	// Note - the temptation here is to unset ydbInitialized but things work better if we do not do that (we don't have
 	// multiple goroutines trying to re-initialize the engine) so we bypass/ re-doing the initialization call later and
 	// just go straight to getting the CALLINAFTERXIT error when an actual call is attempted. We now handle CALLINAFTERXIT
 	// in the places it matters.
+	if "" != errstr {
+		return &YDBError{-1, errstr} // No number for DBRNDWNBYPASS at this time (defined only for Go)
+	}
+	return nil
 }
