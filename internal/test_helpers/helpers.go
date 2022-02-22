@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	//
+// Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -202,21 +202,21 @@ func TestTpRtn(tptoken uint64, errstr unsafe.Pointer, tpfnparm unsafe.Pointer) i
 }
 
 func CheckErrorExpectYDB_ERR_NODEEND(errorcode int) bool {
-	if int(C.YDB_ERR_NODEEND) == errorcode {
+	if int(yottadb.YDB_ERR_NODEEND) == errorcode {
 		return true
 	}
 	return false
 }
 
 func CheckErrorExpectYDB_ERR_STRUCTNOTALLOCD(errorcode int) bool {
-	if int(C.YDB_ERR_STRUCTNOTALLOCD) == errorcode {
+	if int(yottadb.YDB_ERR_STRUCTNOTALLOCD) == errorcode {
 		return true
 	}
 	return false
 }
 
 func CheckErrorExpectYDB_ERR_INSUFFSUBS(errorcode int) bool {
-	if int(C.YDB_ERR_INSUFFSUBS) == errorcode {
+	if int(yottadb.YDB_ERR_INSUFFSUBS) == errorcode {
 		return true
 	}
 	return false
@@ -263,8 +263,8 @@ func SkipMemIntensiveTests(t *testing.T) {
 	// We read this as kB, so convert to MB then GB
 	if GetSystemMemory(t) < (1024 * 1024) {
 		t.Skipf("Machine appears to have less then 1 GB memory, skipping test")
-	// -race can use up to 10x as much memory as a normal test run
-	} else if israce.Enabled && GetSystemMemory(t) < (1024 * 1024 * 10) {
+		// -race can use up to 10x as much memory as a normal test run
+	} else if israce.Enabled && GetSystemMemory(t) < (1024*1024*10) {
 		t.Skipf("-race is enabled and machine appears to have less then 10 GB memory, skipping test")
 	}
 }

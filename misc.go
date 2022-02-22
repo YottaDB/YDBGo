@@ -170,6 +170,7 @@ func Init() {
 // atexit() that would normally drive the exit handler.
 func Exit() error {
 	var errstr string
+	var errNum int
 
 	defer func() { exitRun = true }() // Set flag we have run Exit on exit.
 	if 1 != atomic.LoadUint32(&ydbInitialized) {
@@ -220,8 +221,8 @@ func Exit() error {
 		if dbgSigHandling {
 			fmt.Fprintln(os.Stderr, "YDB: Exit(): Wait for ydb_exit() expired")
 		}
-		errstr = "YDB-W-DBRNDWNBYPASS YottaDB database rundown may have been bypassed due to timeout " +
-			"- run MUPIP JOURNAL ROLLBACK BACKWARD / MUPIP JOURNAL RECOVER BACKWARD / MUPIP RUNDOWN"
+		errstr = getLocalErrorMsg(YDB_ERR_DBRNDWNBYPASS)
+		errNum = YDB_ERR_DBRNDWNBYPASS
 		if 0 == atomic.LoadUint32(&ydbSigPanicCalled) { // Need "atomic" usage to avoid read/write DATA RACE issues
 			// If we panic'd due to a signal, we definitely have run the exit handler as it runs before the panic is
 			// driven so we can bypass this message in that case.
@@ -233,7 +234,7 @@ func Exit() error {
 	// just go straight to getting the CALLINAFTERXIT error when an actual call is attempted. We now handle CALLINAFTERXIT
 	// in the places it matters.
 	if "" != errstr {
-		return &YDBError{-1, errstr} // No number for DBRNDWNBYPASS at this time (defined only for Go)
+		return &YDBError{errNum, errstr} // No number for DBRNDWNBYPASS at this time (defined only for Go)
 	}
 	return nil
 }

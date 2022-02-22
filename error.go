@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	//
+// Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -23,9 +23,27 @@ import "C"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //
-// Define error related structure/method
+// Define error related structures, methods and functions
 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+
+type ydbErrorSeverity uint32
+
+const ( // Set of of constant severity values
+	ydbSevWarn ydbErrorSeverity = iota
+	ydbSevSuccess
+	ydbSevError
+	ydbSevInfo
+	ydbSevSevere
+)
+
+// ydbGoErrEntry is a structure that contains the definition of a local YottaDB Go-only error.
+type ydbGoErrEntry struct {
+	errNum  C.uint32_t // Error number for this error
+	errSev  string     // Severity of the error (single char)
+	errName string     // Name of the error (e.g. MEMORY)
+	errText string     // Text of the error message (e.g. out of memory)
+}
 
 // YDBError is a structure that defines the error message format which includes both the formated $ZSTATUS
 // type message and the numeric error value.
@@ -103,4 +121,23 @@ func NewError(tptoken uint64, errstr *BufferT, errnum int) error {
 		}
 	}
 	return &YDBError{errnum, errmsg}
+}
+
+// getLocalErrorMsg fetches returns a message string containing a formatted-as-error local message given its error number
+// If the error is not found in the local cache, an empty string is returned.
+func getLocalErrorMsg(errNum int) string {
+	var i int
+	var errMsg string
+
+	if 0 > errNum { // Cheap absolute value (rather than float64 convert to/from)
+		errNum = -errNum
+	}
+	// Serial lookup of the error message number
+	for i, _ = range ydbGoErrors {
+		if errNum == int(ydbGoErrors[i].errNum) {
+			errMsg = "%YDB-" + ydbGoErrors[i].errSev + "-" + ydbGoErrors[i].errName + ", " + ydbGoErrors[i].errText
+			break
+		}
+	}
+	return errMsg
 }

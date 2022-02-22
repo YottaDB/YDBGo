@@ -325,7 +325,7 @@ func waitForSignalAckWTimeout(ackChan chan bool, whatAck string) {
 	select { // Wait for an acknowledgement but put a timer on it
 	case _ = <-ackChan:
 	case <-time.After(time.Duration(MaximumSigAckWait) * time.Second):
-		syslogEntry("YDB-W-SIGACKTIMEOUT Signal completion acknowledgement timeout:" + whatAck)
+		syslogEntry(strings.Replace(getLocalErrorMsg(YDB_ERR_SIGACKTIMEOUT), "!AD", whatAck, 1))
 	}
 }
 

@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	//
+// Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -444,6 +444,8 @@ func CallMTableOpenT(tptoken uint64, errstr *BufferT, tablename string) (*CallMT
 func MessageT(tptoken uint64, errstr *BufferT, status int) (string, error) {
 	var msgval BufferT
 	var cbuft *C.ydb_buffer_t
+	var err error
+	var errorMsg string
 
 	printEntry("MessageT()")
 	if 1 != atomic.LoadUint32(&ydbInitialized) {
@@ -467,16 +469,20 @@ func MessageT(tptoken uint64, errstr *BufferT, status int) (string, error) {
 	}
 	rc := C.ydb_message_t(C.uint64_t(tptoken), cbuft, C.int(status), msgval.getCPtr())
 	if YDB_OK != rc {
-		panic(fmt.Sprintf("YDB: Error calling ydb_message_t: %d", int(rc)))
-	}
-	// Returned string should be snug in the retval buffer. Pick it out so can return it as a string
-	msgptr, err := msgval.ValStr(tptoken, errstr)
-	if nil != err {
-		panic(fmt.Sprintf("YDB: Unexpected error with ValStr(): %s", err))
+		// Message was not found - check if it is one of our internal errors
+		errorMsg = getLocalErrorMsg(status)
+		if "" == errorMsg {
+			panic(fmt.Sprintf("YDB: Error calling ydb_message_t: %d", int(rc)))
+		}
+	} else { // Returned string should be snug in the retval buffer. Pick it out so can return it as a string
+		errorMsg, err = msgval.ValStr(tptoken, errstr)
+		if nil != err {
+			panic(fmt.Sprintf("YDB: Unexpected error with ValStr(): %s", err))
+		}
 	}
 	runtime.KeepAlive(errstr)
 	runtime.KeepAlive(msgval)
-	return msgptr, err
+	return errorMsg, err
 }
 
 // ReleaseT is a STAPI utility function to return release information for the current underlying YottaDB version
