@@ -148,6 +148,14 @@ func syslogEntry(logMsg string) {
 	}
 }
 
+// selectString returns the first string parm if the expression is true and the second if it is false
+func selectString(boolVal bool, trueString, falseString string) string {
+	if boolVal {
+		return trueString
+	}
+	return falseString
+}
+
 // IsLittleEndian is a function to determine endianness. Exposed in case anyone else wants to know.
 func IsLittleEndian() bool {
 	var bittest = 0x01
@@ -172,7 +180,6 @@ func Exit() error {
 	var errstr string
 	var errNum int
 
-	defer func() { exitRun = true }() // Set flag we have run Exit on exit.
 	if 1 != atomic.LoadUint32(&ydbInitialized) {
 		return nil // If never initialized, nothing to do
 	}
@@ -181,6 +188,7 @@ func Exit() error {
 	if exitRun {
 		return nil // If exit has already run, no use in running it again
 	}
+	defer func() { exitRun = true }() // Set flag we have run Exit()
 	if dbgSigHandling {
 		fmt.Fprintln(os.Stderr, "YDB: Exit(): YDB Engine shutdown started")
 	}

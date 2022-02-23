@@ -190,7 +190,8 @@ func (key *KeyT) ValST(tptoken uint64, errstr *BufferT, retval *BufferT) error {
 	if nil == key {
 		panic("YDB: *KeyT receiver of ValST() cannot be nil")
 	}
-	if (1 != atomic.LoadUint32(&inInit)) && (1 != atomic.LoadUint32(&ydbInitialized)) {
+	if (1 != atomic.LoadUint32(&ydbInitialized)) && (1 != atomic.LoadUint32(&inInit)) {
+		// Run initialization but only if we haven't run it before AND we aren't already in initializeYottaDB()
 		initializeYottaDB()
 	}
 	if nil != errstr {

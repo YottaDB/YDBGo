@@ -40,7 +40,7 @@ const NOTTP uint64 = 0
 
 // DefaultMaximumPanicExitWait is default/initial value for MaximumPanicExitWait
 const DefaultMaximumPanicExitWait int = 3 // wait in seconds
-// MaximumPanicExitWait is the maximum wait when a panic caused by a signal has occured (unlikely able to run Exit(
+// MaximumPanicExitWait is the maximum wait when a panic caused by a signal has occured (unlikely able to run Exit()
 var MaximumPanicExitWait int = DefaultMaximumPanicExitWait
 
 // DefaultMaximumNormalExitWait is default/initial value for MaximumNormalExitWait
@@ -63,8 +63,9 @@ var MaximumSigAckWait int = DefaultMaximumSigAckWait
 
 // WrapperRelease - (string) The Go wrapper release value for YottaDB SimpleAPI. Note the third piece of this version
 // will be even for a production release and odd for a development release (branch develop). When released, depending
-// on new content, either the 3rd digit will be bumped to an even value or the second value will be bumped by 1 and the
-// third value set to 0.
+// on new content, either the third piece of the version will be bumped to an even value or the second piece of the
+// version will be bumped by 1 and the third piece of the version set to 0. On rare occasions, we may bump the first
+// piece of the version and zero the others when the changes are significant.
 const WrapperRelease string = "v1.2.0"
 
 // MinimumYDBReleaseMajor - (int) Minimum major release number required by this wrapper of the linked YottaDB
@@ -106,10 +107,8 @@ const easyAPIDefaultDataSize uint32 = C.DEFAULT_DATA_SIZE     // Base allocation
 const easyAPIDefaultSubscrCnt uint32 = C.DEFAULT_SUBSCR_CNT   // Base subscript count allocation for returned subscr list
 const easyAPIDefaultSubscrSize uint32 = C.DEFAULT_SUBSCR_SIZE // Base subscript size allocation for returned subscr list
 
-var ydbInitialized uint32      // Atomic: Set to 1 when YDB has been initialized with a call to ydb_main_lang_init()
-var ydbSigPanicCalled uint32   // Atomic: True when our exit is panic driven due to a signal
-var inInit uint32              // Atomic: We are in initializeYottaDB() so don't force re-init in ValE()
-var runningYDBMajorRelease int // YottaDB major release number
-var runningYDBMinorRelease int // YottaB minor release number
+var ydbInitialized uint32    // Atomic: Set to 1 when YDB has been initialized with a call to ydb_main_lang_init()
+var ydbSigPanicCalled uint32 // Atomic: True when our exit is panic driven due to a signal
+var inInit uint32            // Atomic: We are in initializeYottaDB() so don't force re-init in ValE()
 
 //go:generate ./scripts/gen_error_codes.sh

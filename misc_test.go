@@ -219,8 +219,8 @@ func TestMaximumPanicExitWait(t *testing.T) {
 	testTimerParameter(t, &yottadb.MaximumPanicExitWait, yottadb.DefaultMaximumPanicExitWait)
 }
 
-func TestMaximumCloseWait(t *testing.T) {
-	testTimerParameter(t, &yottadb.MaximumCloseWait, yottadb.DefaultMaximumCloseWait)
+func TestMaximumSigShutDownWait(t *testing.T) {
+	testTimerParameter(t, &yottadb.MaximumSigShutDownWait, yottadb.DefaultMaximumSigShutDownWait)
 }
 
 func TestMaximumSigAckWait(t *testing.T) {

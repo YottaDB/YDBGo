@@ -29,6 +29,13 @@ import (
 // extern void *ydb_get_gowrapper_panic_callback_funcvp(void);
 import "C"
 
+type ydbHndlrWhen int
+
+const (
+	beforeYDBHandler ydbHndlrWhen = iota + 1
+	afterYDBHandler
+)
+
 // Table of signals that the wrapper handles and passes to YottaDB
 var ydbSignalList = []syscall.Signal{
 	// Signal           Index in array
@@ -200,11 +207,12 @@ func shutdownSignalGoroutines() {
 			fmt.Fprintln(os.Stderr, "YDB: shutdownSignalGoroutines: All signal goroutines successfully closed or active")
 		}
 	case <-time.After(time.Duration(MaximumSigShutDownWait) * time.Second):
-		// Note, if these goroutines don't shutdown, it is not considered significant enough to warrant a warning to
-		// the syslog but here is where we would add one if that opinion changes.
+		// Notify syslog that this timeout happened
 		if dbgSigHandling {
 			fmt.Fprintln(os.Stderr, "YDB: shutdownSignalGoroutines: Timeout! Some signal threads did not shutdown")
 		}
+		errstr := getLocalErrorMsg(YDB_ERR_SIGGORTNTIMEOUT)
+		syslogEntry(errstr)
 	}
 	shutdownSigGortns = true
 	shutdownSigGortnsMutex.Unlock()
@@ -261,7 +269,6 @@ func initializeYottaDB() {
 	if nil != err {
 		panic(fmt.Sprintf("YDB: YottaDB fetch of $ZYRELEASE failed wih return code %s", err))
 	}
-	atomic.StoreUint32(&inInit, 0)
 	// The returned output should have the YottaDB version as the 2nd token in the form rxyy[y] where:
 	//   - 'r' is a fixed character
 	//   - x is a numeric digit specifying the major version number
@@ -280,15 +287,20 @@ func initializeYottaDB() {
 		releaseMajorStr = releaseNumberStr // Isolate the major version number
 		releaseMinorStr = "00"
 	}
+	// Note it is possible for either the major or minor release values to have a single letter suffix that is primarily
+	// for use in a development environment (no production releases have character suffixes). If we get an error, try
+	// removing a char off the end and retry.
 	runningYDBReleaseMajor, err := strconv.Atoi(releaseMajorStr)
 	if nil != err {
-		panic(fmt.Sprintf("YDB: Failure trying to convert major release to int: %s", err))
+		releaseMajorStr = releaseMajorStr[:len(releaseMajorStr)-1]
+		runningYDBReleaseMajor, err = strconv.Atoi(releaseMajorStr)
+		if nil != err {
+			panic(fmt.Sprintf("YDB: Failure trying to convert major release to int: %s", err))
+		}
 	}
-	// Note it is possible for the minor version number to have a letter suffix so if our conversion fails, strip
-	// a char off the end and retry.
 	runningYDBReleaseMinor, err := strconv.Atoi(releaseMinorStr)
 	if nil != err { // Strip off last char and try again
-		releaseMinorStr = releaseMinorStr[1 : len(releaseMinorStr)-1]
+		releaseMinorStr = releaseMinorStr[:len(releaseMinorStr)-1]
 		runningYDBReleaseMinor, err = strconv.Atoi(releaseMinorStr)
 		if nil != err {
 			panic(fmt.Sprintf("YDB: Failure trying to convert minor release to int: %s", err))
@@ -318,6 +330,34 @@ func initializeYottaDB() {
 	wgSigInit.Wait()
 	atomic.StoreUint32(&ydbInitialized, 1) // YottaDB wrapper is now initialized
 	ydbInitMutex.Unlock()
+}
+
+// notifyUserSignalChannel drives a user signal routine associated with a given signal
+func notifyUserSignalChannel(sigHndlrEntry sigNotificationMapEntry, whenCalled ydbHndlrWhen) {
+	// Notify user code via the supplied channel
+	if dbgSigHandling {
+		fmt.Fprintln(os.Stderr, "YDB: goroutine-sighandler: Sending 'true' to notify",
+			"channel", selectString(beforeYDBHandler == whenCalled, "(a)", "(b)"))
+	}
+	// Purge the acknowledgement channel of any content by reading the contents if any
+	for 0 < len(sigHndlrEntry.ackChan) {
+		if dbgSigHandling {
+			fmt.Println("YDB: goroutine-sighandler: Flush loop read",
+				selectString(beforeYDBHandler == whenCalled, "(a)", "(b)"))
+		}
+		waitForSignalAckWTimeout(sigHndlrEntry.ackChan,
+			selectString(beforeYDBHandler == whenCalled, "(flush before)", "(flush after)"))
+	}
+	sigHndlrEntry.notifyChan <- true // Notify receiver the signal has been seen
+	if NotifyAsyncYDBSigHandler != sigHndlrEntry.notifyWhen {
+		// Wait for acknowledgement that their handling is complete
+		if dbgSigHandling {
+			fmt.Fprintln(os.Stderr, "YDB: goroutine-sighandler: Waiting for notify acknowledgement",
+				selectString(beforeYDBHandler == whenCalled, "(a)", "(b)"))
+		}
+		waitForSignalAckWTimeout(sigHndlrEntry.ackChan,
+			selectString(beforeYDBHandler == whenCalled, "(wait before)", "(wait after)"))
+	}
 }
 
 // waitForSignalAckWTimeout is used to wait for a signal with a timeout value of MaximumSignalAckWait
@@ -355,7 +395,7 @@ func waitForAndProcessSignal(shutdownChannelIndx int) {
 	}
 	wgSigInit.Done() // Signal parent goroutine that we have completed initializing signal handling
 	// Although we typically refer to individual signals with their syscall.Signal type, we do need to have them
-	// in their numeric form too to pass to C when we want to dispatch their YottaDB handler. Unfortnuately,
+	// in their numeric form too to pass to C when we want to dispatch their YottaDB handler. Unfortunately,
 	// switching between designations is a bit silly.
 	csignum := fmt.Sprintf("%d", sig)
 	signum, err := strconv.Atoi(csignum)
@@ -397,26 +437,7 @@ func waitForAndProcessSignal(shutdownChannelIndx int) {
 					fallthrough
 				case NotifyInsteadOfYDBSigHandler:
 					// Notify user code via the supplied channel
-					if dbgSigHandling {
-						fmt.Fprintln(os.Stderr, "YDB: goroutine-sighandler: Sending 'true' to notify",
-							"channel (a)")
-					}
-					// Purge the acknowledgement channel of any content by reading the contents if any
-					for 0 < len(sigHndlrEntry.ackChan) {
-						if dbgSigHandling {
-							fmt.Println("YDB: goroutine-sighandler: Flush loop read (a)")
-						}
-						waitForSignalAckWTimeout(sigHndlrEntry.ackChan, "(flush before)")
-					}
-					sigHndlrEntry.notifyChan <- true // Notify receiver the signal has been seen
-					if NotifyAsyncYDBSigHandler != sigHndlrEntry.notifyWhen {
-						// Wait for acknowledgement that their handling is complete
-						if dbgSigHandling {
-							fmt.Fprintln(os.Stderr, "YDB: goroutine-sighandler: Waiting for notify",
-								"acknowledgement (a)")
-						}
-						waitForSignalAckWTimeout(sigHndlrEntry.ackChan, "(wait before)")
-					}
+					notifyUserSignalChannel(sigHndlrEntry, beforeYDBHandler)
 				case NotifyAfterYDBSigHandler:
 				}
 			}
@@ -438,7 +459,6 @@ func waitForAndProcessSignal(shutdownChannelIndx int) {
 					// If CALLINAFTERXIT (positive or negative version) we're done - exit goroutine
 				case YDB_ERR_CALLINAFTERXIT, -YDB_ERR_CALLINAFTERXIT:
 					allDone = true
-					break
 				default: // Some sort of error occurred during signal handling
 					if YDB_OK != rc {
 						errstring, err := errstr.ValStr(NOTTP, nil)
@@ -456,47 +476,26 @@ func waitForAndProcessSignal(shutdownChannelIndx int) {
 			}
 			// Drive user notification if requested
 			if sigHndlrEntryFound && (NotifyAfterYDBSigHandler == sigHndlrEntry.notifyWhen) {
-				if dbgSigHandling {
-					fmt.Fprintln(os.Stderr, "YDB: goroutine-sighandler: Sending 'true' to notify",
-						"channel (b)")
-				}
-				// Purge the ackknowledgement channel of any content by reading the contents if any
-				for 0 < len(sigHndlrEntry.ackChan) {
-					if dbgSigHandling {
-						fmt.Println("YDB: goroutine-sighandler: Flush loop read (b)")
-					}
-					waitForSignalAckWTimeout(sigHndlrEntry.ackChan, "(flush after)")
-				}
-				sigHndlrEntry.notifyChan <- true
-				// Wait for acknowledgement that their handling is complete
-				if dbgSigHandling {
-					fmt.Fprintln(os.Stderr, "YDB: goroutine-sighandler: Waiting for notify",
-						"acknowledgement (b)")
-				}
-				waitForSignalAckWTimeout(sigHndlrEntry.ackChan, "(wait after)")
+				notifyUserSignalChannel(sigHndlrEntry, afterYDBHandler)
 			}
-			// It is probable that the fatal signals (SIGSEGV/SIGBUS/SIGILL/etc) won't return from the above handling
-			// and will end up calling YDBWrapperPanic() defined above but allow them to come through here too and be
-			// handled appropriately.
 			if dbgSigHandling {
 				sigStatus = "complete"
-			}
-			switch sig {
-			case syscall.SIGALRM, syscall.SIGCONT, syscall.SIGIO, syscall.SIGIOT, syscall.SIGURG:
-				// No post processing but SIGALRM is most common signal so check for it first
-			case syscall.SIGTSTP, syscall.SIGTTIN, syscall.SIGTTOU, syscall.SIGUSR1:
-				// No post processing here either
-			case syscall.SIGHUP, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM:
-				// These are the deferrable signals - see if need deferring
-				if YDB_DEFER_HANDLER == rc {
-					if dbgSigHandling {
+				switch sig {
+				case syscall.SIGALRM, syscall.SIGCONT, syscall.SIGIO, syscall.SIGIOT, syscall.SIGURG:
+					// No post processing but SIGALRM is most common signal so check for it first
+				case syscall.SIGTSTP, syscall.SIGTTIN, syscall.SIGTTOU, syscall.SIGUSR1:
+					// No post processing here either
+				case syscall.SIGHUP, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM:
+					// These are the deferrable signals - mark our handling as such if they were deferred
+					if YDB_DEFER_HANDLER == rc {
 						sigStatus = "deferred"
 					}
 				}
-			}
-			if dbgSigHandling && (syscall.SIGURG != sig) {
-				// Note our passage if not SIGURG (SIGURG happens almost continually so be silent)
-				fmt.Fprintln(os.Stderr, "YDB: goroutine-sighandler: Signal handling for signal", signum, sigStatus)
+				if syscall.SIGURG != sig {
+					// Note our passage if not SIGURG (SIGURG happens almost continually so be silent)
+					fmt.Fprintln(os.Stderr, "YDB: goroutine-sighandler: Signal handling for signal", signum,
+						sigStatus)
+				}
 			}
 		}()
 	}
