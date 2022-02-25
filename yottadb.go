@@ -23,6 +23,8 @@
 
 package yottadb // import "lang.yottadb.com/go/yottadb"
 
+import "time"
+
 // The following comment block is a Go/cgo preamble defining C related things we need in this package
 
 // #cgo pkg-config: yottadb
@@ -39,25 +41,25 @@ const NOTTP uint64 = 0
 // the system lock and is likely to hang, 3 seconds is about as much as we can afford to wait.
 
 // DefaultMaximumPanicExitWait is default/initial value for MaximumPanicExitWait
-const DefaultMaximumPanicExitWait int = 3 // wait in seconds
+const DefaultMaximumPanicExitWait time.Duration = 3 // wait in seconds
 // MaximumPanicExitWait is the maximum wait when a panic caused by a signal has occured (unlikely able to run Exit()
-var MaximumPanicExitWait int = DefaultMaximumPanicExitWait
+var MaximumPanicExitWait time.Duration = DefaultMaximumPanicExitWait
 
 // DefaultMaximumNormalExitWait is default/initial value for MaximumNormalExitWait
-const DefaultMaximumNormalExitWait int = 60 // wait in seconds
+const DefaultMaximumNormalExitWait time.Duration = 60 // wait in seconds
 // MaximumNormalExitWait is maximum wait for a normal shutdown when no system lock hang in Exit() is likely
-var MaximumNormalExitWait int = DefaultMaximumNormalExitWait
+var MaximumNormalExitWait time.Duration = DefaultMaximumNormalExitWait
 
 // DefaultMaximumSigShutDownWait is default/initial value for MaximumSigShutDownWait
-const DefaultMaximumSigShutDownWait int = 5 // wait in seconds
+const DefaultMaximumSigShutDownWait time.Duration = 5 // wait in seconds
 // MaximumSigShutDownWait is maximum wait to close down signal handling goroutines (shouldn't take this long)
-var MaximumSigShutDownWait int = DefaultMaximumSigShutDownWait
+var MaximumSigShutDownWait time.Duration = DefaultMaximumSigShutDownWait
 
 // DefaultMaximumSigAckWait is default/initial value for MaximumSigAckWait
-const DefaultMaximumSigAckWait int = 15 // wait in seconds
+const DefaultMaximumSigAckWait time.Duration = 15 // wait in seconds
 // MaximumSigAckWait is maximum wait for notify via acknowledgement channel that a notified signal handler is
 // done handling the signal.
-var MaximumSigAckWait int = DefaultMaximumSigAckWait
+var MaximumSigAckWait time.Duration = DefaultMaximumSigAckWait
 
 // Release version constants - be sure to change all of them appropriately
 

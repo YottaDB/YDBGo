@@ -205,7 +205,7 @@ func TestMiscGoSelectWithYdbTimers3(t *testing.T) {
 }
 
 // Test the 4 timer global variable timer values to make sure they can be accessed and updated.
-func testTimerParameter(t *testing.T, waitValue *int, defaultValue int) {
+func testTimerParameter(t *testing.T, waitValue *time.Duration, defaultValue time.Duration) {
 	assert.Equal(t, *waitValue, defaultValue)   // Expect it to be its default value initially
 	*waitValue++                                // Bump it by a second
 	assert.Equal(t, *waitValue, defaultValue+1) // Verify the update worked
