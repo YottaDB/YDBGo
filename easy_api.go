@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	//
+// Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -242,21 +242,23 @@ func IncrE(tptoken uint64, errstr *BufferT, incr, varname string, subary []strin
 // interface{} is a series of pairs of varname string and subary []string parameters, where a null subary parameter
 // ([]string{}) specifies the unsubscripted lock resource name.
 //
-// If lock resources are specified, upon return, the process will have acquired all of the named lock resources or none of the named lock resources.
+// If lock resources are specified, upon return, the process will have acquired all of the named lock resources or none of the
+// named lock resources.
 //
 // If timeoutNsec exceeds YDB_MAX_TIME_NSEC, the function returns with an error return of TIME2LONG.
 // If the lock resource names exceeds the maximum number supported (currently eleven), the function returns a PARMOFLOW error.
-// If namesubs is not a series of alternating string and []string parameters, the function returns the INVLNPAIRLIST error.
+// If namesubs is not a series of alternating string and []string parameters, the function returns the INVLKNMPAIRLIST error.
 // If it is able to aquire the lock resource(s) within timeoutNsec nanoseconds, the function returns holding the lock
-// resource(s); otherwise it returns LOCKTIMEOUT. If timeoutNsec is zero, the function makes exactly one attempt to acquire the lock resource(s).
+// resource(s); otherwise it returns LOCKTIMEOUT. If timeoutNsec is zero, the function makes exactly one attempt to acquire the
+// lock resource(s).
 func LockE(tptoken uint64, errstr *BufferT, timeoutNsec uint64, namesnsubs ...interface{}) error {
 	printEntry("LockE()")
 	if 0 != (uint32(len(namesnsubs)) & 1) {
-		errmsg, err := MessageT(tptoken, nil, (int)(YDB_ERR_INVLNPAIRLIST))
+		errmsg, err := MessageT(tptoken, nil, (int)(YDB_ERR_INVLKNMPAIRLIST))
 		if nil != err {
-			panic(fmt.Sprintf("YDB: Error fetching INVLNPAIRLIST: %s", err))
+			panic(fmt.Sprintf("YDB: Error fetching INVLKNMPAIRLIST: %s", err))
 		}
-		return &YDBError{(int)(YDB_ERR_INVLNPAIRLIST), errmsg}
+		return &YDBError{(int)(YDB_ERR_INVLKNMPAIRLIST), errmsg}
 	}
 	lckparms := len(namesnsubs)
 	parmlst := make([]*KeyT, lckparms/2) // Allocate parameter list of *KeyT values

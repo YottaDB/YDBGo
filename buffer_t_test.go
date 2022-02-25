@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	//
+// Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -66,16 +66,16 @@ func TestStr2ZwrSTAndZwr2StrST(t *testing.T) {
 	// Try calling on a non-allocated value
 	err = noalloc_value.Zwr2StrST(tptoken, nil, &cvalue)
 	errcode = yottadb.ErrorCode(err)
-	assert.Equal(t, yottadb.YDB_ERR_STRUCTNOTALLOCD, errcode)
+	assert.Equal(t, yottadb.YDB_ERR_STRUCTUNALLOCD, errcode)
 
 	// Test Str2ZwrST with an allocated value in the second param
 	err = ovalue.Str2ZwrST(tptoken, nil, &noalloc_value)
 	errcode = yottadb.ErrorCode(err)
-	assert.Equal(t, yottadb.YDB_ERR_STRUCTNOTALLOCD, errcode)
+	assert.Equal(t, yottadb.YDB_ERR_STRUCTUNALLOCD, errcode)
 
 	err = ovalue.Zwr2StrST(tptoken, nil, &noalloc_value)
 	errcode = yottadb.ErrorCode(err)
-	assert.Equal(t, yottadb.YDB_ERR_STRUCTNOTALLOCD, errcode)
+	assert.Equal(t, yottadb.YDB_ERR_STRUCTUNALLOCD, errcode)
 
 	// Test with nil as the second argument
 	(func() {
@@ -85,7 +85,7 @@ func TestStr2ZwrSTAndZwr2StrST(t *testing.T) {
 		err = ovalue.Str2ZwrST(tptoken, nil, nil)
 	})()
 	errcode = yottadb.ErrorCode(err)
-	assert.Equal(t, yottadb.YDB_ERR_STRUCTNOTALLOCD, errcode)
+	assert.Equal(t, yottadb.YDB_ERR_STRUCTUNALLOCD, errcode)
 
 	(func() {
 		defer (func() {
@@ -94,7 +94,7 @@ func TestStr2ZwrSTAndZwr2StrST(t *testing.T) {
 		err = ovalue.Zwr2StrST(tptoken, nil, nil)
 	})()
 	errcode = yottadb.ErrorCode(err)
-	assert.Equal(t, yottadb.YDB_ERR_STRUCTNOTALLOCD, errcode)
+	assert.Equal(t, yottadb.YDB_ERR_STRUCTUNALLOCD, errcode)
 }
 
 func TestLenAlloc(t *testing.T) {
@@ -106,7 +106,7 @@ func TestLenAlloc(t *testing.T) {
 	// Test return before Alloc() should return error
 	len, err := value.LenAlloc(yottadb.NOTTP, nil)
 	errcode = yottadb.ErrorCode(err)
-	assert.Equal(t, yottadb.YDB_ERR_STRUCTNOTALLOCD, errcode)
+	assert.Equal(t, yottadb.YDB_ERR_STRUCTUNALLOCD, errcode)
 
 	value.Alloc(128)
 
@@ -144,7 +144,7 @@ func TestAlloc(t *testing.T) {
 
 	_, err = value.LenAlloc(yottadb.NOTTP, nil)
 	errcode = yottadb.ErrorCode(err)
-	assert.Equal(t, yottadb.YDB_ERR_STRUCTNOTALLOCD, errcode)
+	assert.Equal(t, yottadb.YDB_ERR_STRUCTUNALLOCD, errcode)
 
 	// Test Free with no Alloc
 	value.Free()
@@ -206,7 +206,7 @@ func TestLen(t *testing.T) {
 	// Test before Alloc()
 	l, err := value.LenUsed(yottadb.NOTTP, nil)
 	errcode = yottadb.ErrorCode(err)
-	assert.Equal(t, yottadb.YDB_ERR_STRUCTNOTALLOCD, errcode)
+	assert.Equal(t, yottadb.YDB_ERR_STRUCTUNALLOCD, errcode)
 
 	value.Alloc(length)
 
@@ -238,7 +238,7 @@ func TestLen(t *testing.T) {
 	// Try setting length on non-allocated buffer
 	err = noalloc_value.SetLenUsed(yottadb.NOTTP, nil, length-2)
 	errcode = yottadb.ErrorCode(err)
-	assert.Equal(t, yottadb.YDB_ERR_STRUCTNOTALLOCD, errcode)
+	assert.Equal(t, yottadb.YDB_ERR_STRUCTUNALLOCD, errcode)
 }
 
 func TestValStr(t *testing.T) {
@@ -251,12 +251,12 @@ func TestValStr(t *testing.T) {
 	str, err := value.ValStr(yottadb.NOTTP, nil)
 	assert.Equal(t, str, "")
 	errcode = yottadb.ErrorCode(err)
-	assert.Equal(t, yottadb.YDB_ERR_STRUCTNOTALLOCD, errcode)
+	assert.Equal(t, yottadb.YDB_ERR_STRUCTUNALLOCD, errcode)
 
 	// Test set before Alloc
 	err = value.SetValStr(yottadb.NOTTP, nil, global_name)
 	errcode = yottadb.ErrorCode(err)
-	assert.Equal(t, yottadb.YDB_ERR_STRUCTNOTALLOCD, errcode)
+	assert.Equal(t, yottadb.YDB_ERR_STRUCTUNALLOCD, errcode)
 
 	defer value.Free()
 	value.Alloc(length + 1)
@@ -297,12 +297,12 @@ func TestValBAry(t *testing.T) {
 	ary, err := value.ValBAry(yottadb.NOTTP, nil)
 	assert.Nil(t, ary)
 	errcode = yottadb.ErrorCode(err)
-	assert.Equal(t, yottadb.YDB_ERR_STRUCTNOTALLOCD, errcode)
+	assert.Equal(t, yottadb.YDB_ERR_STRUCTUNALLOCD, errcode)
 
 	// Test set before Alloc
 	err = value.SetValBAry(yottadb.NOTTP, nil, global_name)
 	errcode = yottadb.ErrorCode(err)
-	assert.Equal(t, yottadb.YDB_ERR_STRUCTNOTALLOCD, errcode)
+	assert.Equal(t, yottadb.YDB_ERR_STRUCTUNALLOCD, errcode)
 
 	defer value.Free()
 	value.Alloc(length + 1)

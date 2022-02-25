@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	//
+// Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -522,11 +522,11 @@ func TestLockEErrors(t *testing.T) {
 	if yottadb.YDB_ERR_NAMECOUNT2HI != errcode {
 		t.Error("The LockE() errorcode for 12 lock pairs expected to be", yottadb.YDB_ERR_NAMECOUNT2HI, "but was", errcode)
 	}
-	// YDB_ERR_INVLNPAIRLIST
+	// YDB_ERR_INVLKNMPAIRLIST
 	err = yottadb.LockE(tptoken, &errstr, 0, "a")
 	errcode = yottadb.ErrorCode(err)
-	if yottadb.YDB_ERR_INVLNPAIRLIST != errcode {
-		t.Error("The LockE() errorcode for an incorrect pair expected to be", yottadb.YDB_ERR_INVLNPAIRLIST, "but was", errcode)
+	if yottadb.YDB_ERR_INVLKNMPAIRLIST != errcode {
+		t.Error("The LockE() errorcode for an incorrect pair expected to be", yottadb.YDB_ERR_INVLKNMPAIRLIST, "but was", errcode)
 	}
 }
 

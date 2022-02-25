@@ -89,11 +89,11 @@ func (vplist *variadicPlist) dump(tptoken uint64, errstr *BufferT) {
 	cvplist := vplist.cvplist
 	if nil == cvplist {
 		// Create an error to return
-		errmsg, err := MessageT(tptoken, errstr, (int)(YDB_ERR_STRUCTNOTALLOCD))
+		errmsg, err := MessageT(tptoken, errstr, (int)(YDB_ERR_STRUCTUNALLOCD))
 		if nil != err {
-			panic(fmt.Sprintf("YDB: Error fetching STRUCTNOTALLOCD: %s", err))
+			panic(fmt.Sprintf("YDB: Error fetching STRUCTUNALLOCD: %s", err))
 		}
-		fmt.Printf("YDB: Error fetching STRUCTNOTALLOCD: %s\n", errmsg)
+		fmt.Printf("YDB: Error fetching STRUCTUNALLOCD: %s\n", errmsg)
 		return
 	}
 	elemcnt := cvplist.n
@@ -115,11 +115,11 @@ func (vplist *variadicPlist) setUsed(tptoken uint64, errstr *BufferT, newUsed ui
 	cvplist := vplist.cvplist
 	if nil == cvplist {
 		// Create an error to return
-		errmsg, err := MessageT(tptoken, nil, (int)(YDB_ERR_STRUCTNOTALLOCD))
+		errmsg, err := MessageT(tptoken, nil, (int)(YDB_ERR_STRUCTUNALLOCD))
 		if nil != err {
-			panic(fmt.Sprintf("YDB: Error fetching STRUCTNOTALLOCD: %s", err))
+			panic(fmt.Sprintf("YDB: Error fetching STRUCTUNALLOCD: %s", err))
 		}
-		return &YDBError{(int)(YDB_ERR_STRUCTNOTALLOCD), errmsg}
+		return &YDBError{(int)(YDB_ERR_STRUCTUNALLOCD), errmsg}
 	}
 	if C.MAX_GPARAM_LIST_ARGS < newUsed {
 		panic(fmt.Sprintf("YDB: setUsed item count %d exceeds maximum count of %d", newUsed, C.MAX_GPARAM_LIST_ARGS))
@@ -140,11 +140,11 @@ func (vplist *variadicPlist) setVPlistParam(tptoken uint64, errstr *BufferT, par
 	cvplist := vplist.cvplist
 	if nil == cvplist {
 		// Create an error to return
-		errmsg, err := MessageT(tptoken, errstr, (int)(YDB_ERR_STRUCTNOTALLOCD))
+		errmsg, err := MessageT(tptoken, errstr, (int)(YDB_ERR_STRUCTUNALLOCD))
 		if nil != err {
-			panic(fmt.Sprintf("YDB: Error fetching STRUCTNOTALLOCD: %s", err))
+			panic(fmt.Sprintf("YDB: Error fetching STRUCTUNALLOCD: %s", err))
 		}
-		return &YDBError{(int)(YDB_ERR_STRUCTNOTALLOCD), errmsg}
+		return &YDBError{(int)(YDB_ERR_STRUCTUNALLOCD), errmsg}
 	}
 	if C.MAX_GPARAM_LIST_ARGS <= paramindx {
 		panic(fmt.Sprintf("YDB: setVPlistParam item count %d exceeds maximum count of %d", paramindx, C.MAX_GPARAM_LIST_ARGS))
@@ -171,11 +171,11 @@ func (vplist *variadicPlist) setVPlistParam64Bit(tptoken uint64, errstr *BufferT
 	cvplist := vplist.cvplist
 	if nil == cvplist {
 		// Create an error to return
-		errmsg, err := MessageT(tptoken, nil, (int)(YDB_ERR_STRUCTNOTALLOCD))
+		errmsg, err := MessageT(tptoken, nil, (int)(YDB_ERR_STRUCTUNALLOCD))
 		if nil != err {
-			panic(fmt.Sprintf("YDB: Error fetching STRUCTNOTALLOCD: %s", err))
+			panic(fmt.Sprintf("YDB: Error fetching STRUCTUNALLOCD: %s", err))
 		}
-		return &YDBError{(int)(YDB_ERR_STRUCTNOTALLOCD), errmsg}
+		return &YDBError{(int)(YDB_ERR_STRUCTUNALLOCD), errmsg}
 	}
 	if C.MAX_GPARAM_LIST_ARGS <= *paramindx {
 		panic(fmt.Sprintf("YDB: setVPlistParam64Bit item count %d exceeds maximum count of %d", paramindx,

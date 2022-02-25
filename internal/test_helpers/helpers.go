@@ -208,8 +208,8 @@ func CheckErrorExpectYDB_ERR_NODEEND(errorcode int) bool {
 	return false
 }
 
-func CheckErrorExpectYDB_ERR_STRUCTNOTALLOCD(errorcode int) bool {
-	if int(yottadb.YDB_ERR_STRUCTNOTALLOCD) == errorcode {
+func CheckErrorExpectYDB_ERR_STRUCTUNALLOCD(errorcode int) bool {
+	if int(yottadb.YDB_ERR_STRUCTUNALLOCD) == errorcode {
 		return true
 	}
 	return false

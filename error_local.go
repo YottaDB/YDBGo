@@ -14,22 +14,22 @@ package yottadb
 
 // Global constants containing the error ids
 const (
-	ERR_STRUCTNOTALLOCD = 151027722
-	ERR_INVLNPAIRLIST   = 151027730
+	ERR_STRUCTUNALLOCD  = 151027722
+	ERR_INVLKNMPAIRLIST = 151027730
 	ERR_DBRNDWNBYPASS   = 151027738
 	ERR_SIGACKTIMEOUT   = 151027746
 	ERR_SIGGORTNTIMEOUT = 151027752
 )
-const YDB_ERR_STRUCTNOTALLOCD = -int(ERR_STRUCTNOTALLOCD)
-const YDB_ERR_INVLNPAIRLIST = -int(ERR_INVLNPAIRLIST)
+const YDB_ERR_STRUCTUNALLOCD = -int(ERR_STRUCTUNALLOCD)
+const YDB_ERR_INVLKNMPAIRLIST = -int(ERR_INVLKNMPAIRLIST)
 const YDB_ERR_DBRNDWNBYPASS = -int(ERR_DBRNDWNBYPASS)
 const YDB_ERR_SIGACKTIMEOUT = -int(ERR_SIGACKTIMEOUT)
 const YDB_ERR_SIGGORTNTIMEOUT = -int(ERR_SIGGORTNTIMEOUT)
 
 // ydbGoErrors is an array of error entries containing the Go-only set of errors
 var ydbGoErrors = []ydbGoErrEntry{
-	{ERR_STRUCTNOTALLOCD, "STRUCTNOTALLOCD", "Structure not previously called with Alloc() method", "E"},
-	{ERR_INVLNPAIRLIST, "INVLNPAIRLIST",
+	{ERR_STRUCTUNALLOCD, "STRUCTNUNALLOCD", "Structure not previously called with Alloc() method", "E"},
+	{ERR_INVLKNMPAIRLIST, "INVLKNMPAIRLIST",
 		"Invalid lockname/subscript pair list (uneven number of lockname/subscript parameters)", "E"},
 	{ERR_DBRNDWNBYPASS, "DBRNDWNBYPASS",
 		"YDB-W-DBRNDWNBYPASS YottaDB database rundown may have been bypassed due to timeout - run MUPIP JOURNAL ROLLBACK" +

@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	//
+// Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -26,10 +26,10 @@ func TestErrorErrorCode(t *testing.T) {
 	assert.Equal(t, r, -1)
 
 	// Get a valid YDB-error
-	err = yottadb.NewError(yottadb.NOTTP, nil, yottadb.YDB_ERR_INVLNPAIRLIST)
+	err = yottadb.NewError(yottadb.NOTTP, nil, yottadb.YDB_ERR_INVLKNMPAIRLIST)
 	assert.NotNil(t, err)
 	r = yottadb.ErrorCode(err)
-	assert.Equal(t, r, yottadb.YDB_ERR_INVLNPAIRLIST)
+	assert.Equal(t, r, yottadb.YDB_ERR_INVLKNMPAIRLIST)
 }
 
 func verifyErrorCode(t *testing.T, errcode int) {

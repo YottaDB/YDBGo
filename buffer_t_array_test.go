@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	//
+// Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -292,7 +292,7 @@ func TestBufTAryElemLenUsed(t *testing.T) {
 	assert.Equal(t, yottadb.YDB_ERR_INSUFFSUBS, errcode)
 	r, err := value.ElemLenUsed(tp, nil, 0)
 	errcode = yottadb.ErrorCode(err)
-	assert.Equal(t, yottadb.YDB_ERR_STRUCTNOTALLOCD, errcode)
+	assert.Equal(t, yottadb.YDB_ERR_STRUCTUNALLOCD, errcode)
 	assert.Equal(t, r, uint32(0))
 
 	// Allocate, then test with an element past the end

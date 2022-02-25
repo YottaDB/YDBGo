@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	//
+// Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -206,11 +206,11 @@ func (buftary *BufferTArray) ElemLenUsed(tptoken uint64, errstr *BufferT, idx ui
 	cbuftary := buftary.getCPtr()
 	if nil == cbuftary {
 		// Create an error to return
-		errmsg, err := MessageT(tptoken, errstr, (int)(YDB_ERR_STRUCTNOTALLOCD))
+		errmsg, err := MessageT(tptoken, errstr, (int)(YDB_ERR_STRUCTUNALLOCD))
 		if nil != err {
-			panic(fmt.Sprintf("YDB: Error fetching STRUCTNOTALLOCD: %s", err))
+			panic(fmt.Sprintf("YDB: Error fetching STRUCTUNALLOCD: %s", err))
 		}
-		return 0, &YDBError{(int)(YDB_ERR_STRUCTNOTALLOCD), errmsg}
+		return 0, &YDBError{(int)(YDB_ERR_STRUCTUNALLOCD), errmsg}
 	}
 	elemcnt := buftary.ElemAlloc()
 	if idx >= elemcnt { // Request for non-existant element
@@ -259,11 +259,11 @@ func (buftary *BufferTArray) ValBAry(tptoken uint64, errstr *BufferT, idx uint32
 	cbuftary := buftary.getCPtr()
 	if nil == cbuftary {
 		// Create an error to return
-		errmsg, err := MessageT(tptoken, errstr, (int)(YDB_ERR_STRUCTNOTALLOCD))
+		errmsg, err := MessageT(tptoken, errstr, (int)(YDB_ERR_STRUCTUNALLOCD))
 		if nil != err {
-			panic(fmt.Sprintf("YDB: Error fetching STRUCTNOTALLOCD: %s", err))
+			panic(fmt.Sprintf("YDB: Error fetching STRUCTUNALLOCD: %s", err))
 		}
-		return nil, &YDBError{(int)(YDB_ERR_STRUCTNOTALLOCD), errmsg}
+		return nil, &YDBError{(int)(YDB_ERR_STRUCTUNALLOCD), errmsg}
 	}
 	elemptr := (*C.ydb_buffer_t)(unsafe.Pointer(uintptr(unsafe.Pointer(cbuftary)) + uintptr(C.sizeof_ydb_buffer_t*idx)))
 	lenalloc := elemptr.len_alloc
@@ -300,11 +300,11 @@ func (buftary *BufferTArray) ValStr(tptoken uint64, errstr *BufferT, idx uint32)
 	cbuftary := buftary.getCPtr()
 	if nil == cbuftary {
 		// Create an error to return
-		errmsg, err := MessageT(tptoken, errstr, (int)(YDB_ERR_STRUCTNOTALLOCD))
+		errmsg, err := MessageT(tptoken, errstr, (int)(YDB_ERR_STRUCTUNALLOCD))
 		if nil != err {
-			panic(fmt.Sprintf("YDB: Error fetching STRUCTNOTALLOCD: %s", err))
+			panic(fmt.Sprintf("YDB: Error fetching STRUCTUNALLOCD: %s", err))
 		}
-		return "", &YDBError{(int)(YDB_ERR_STRUCTNOTALLOCD), errmsg}
+		return "", &YDBError{(int)(YDB_ERR_STRUCTUNALLOCD), errmsg}
 	}
 	elemptr := (*C.ydb_buffer_t)(unsafe.Pointer(uintptr(unsafe.Pointer(cbuftary)) + uintptr(C.sizeof_ydb_buffer_t*idx)))
 	lenalloc := elemptr.len_alloc
@@ -339,11 +339,11 @@ func (buftary *BufferTArray) SetElemLenUsed(tptoken uint64, errstr *BufferT, idx
 	cbuftary := buftary.getCPtr()
 	if nil == cbuftary {
 		// Create an error to return
-		errmsg, err := MessageT(tptoken, errstr, (int)(YDB_ERR_STRUCTNOTALLOCD))
+		errmsg, err := MessageT(tptoken, errstr, (int)(YDB_ERR_STRUCTUNALLOCD))
 		if nil != err {
-			panic(fmt.Sprintf("YDB: Error fetching STRUCTNOTALLOCD: %s", err))
+			panic(fmt.Sprintf("YDB: Error fetching STRUCTUNALLOCD: %s", err))
 		}
-		return &YDBError{(int)(YDB_ERR_STRUCTNOTALLOCD), errmsg}
+		return &YDBError{(int)(YDB_ERR_STRUCTUNALLOCD), errmsg}
 	}
 	elemptr := (*C.ydb_buffer_t)(unsafe.Pointer(uintptr(unsafe.Pointer(cbuftary)) + uintptr(C.sizeof_ydb_buffer_t*idx)))
 	lenalloc := elemptr.len_alloc
@@ -397,11 +397,11 @@ func (buftary *BufferTArray) SetValBAry(tptoken uint64, errstr *BufferT, idx uin
 	cbuftary := buftary.getCPtr()
 	if nil == cbuftary {
 		// Create an error to return
-		errmsg, err := MessageT(tptoken, errstr, (int)(YDB_ERR_STRUCTNOTALLOCD))
+		errmsg, err := MessageT(tptoken, errstr, (int)(YDB_ERR_STRUCTUNALLOCD))
 		if nil != err {
-			panic(fmt.Sprintf("YDB: Error fetching STRUCTNOTALLOCD: %s", err))
+			panic(fmt.Sprintf("YDB: Error fetching STRUCTUNALLOCD: %s", err))
 		}
-		return &YDBError{(int)(YDB_ERR_STRUCTNOTALLOCD), errmsg}
+		return &YDBError{(int)(YDB_ERR_STRUCTUNALLOCD), errmsg}
 	}
 	elemptr := (*C.ydb_buffer_t)(unsafe.Pointer(uintptr(unsafe.Pointer(cbuftary)) + uintptr(C.sizeof_ydb_buffer_t*idx)))
 	lenalloc := uint32(elemptr.len_alloc)

@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	//
+// Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -177,7 +177,7 @@ func (buft *BufferT) getCPtr() *C.ydb_buffer_t {
 
 // LenAlloc is a method to fetch the ydb_buffer_t.len_alloc field containing the allocated length of the buffer.
 //
-// If the C.ydb_buffer_t structure referenced by cbuft has not yet been allocated, return the STRUCTNOTALLOCD error.
+// If the C.ydb_buffer_t structure referenced by cbuft has not yet been allocated, return the STRUCTUNALLOCD error.
 // Otherwise, return the len_alloc field of the C.ydb_buffer_t structure referenced by cbuft.
 func (buft *BufferT) LenAlloc(tptoken uint64, errstr *BufferT) (uint32, error) {
 	printEntry("BufferT.LenAlloc()")
@@ -187,11 +187,11 @@ func (buft *BufferT) LenAlloc(tptoken uint64, errstr *BufferT) (uint32, error) {
 	cbuftptr := buft.getCPtr()
 	if nil == cbuftptr {
 		// Create an error to return
-		errmsg, err := MessageT(tptoken, errstr, (int)(YDB_ERR_STRUCTNOTALLOCD))
+		errmsg, err := MessageT(tptoken, errstr, (int)(YDB_ERR_STRUCTUNALLOCD))
 		if nil != err {
-			panic(fmt.Sprintf("YDB: Error fetching STRUCTNOTALLOCD: %s", err))
+			panic(fmt.Sprintf("YDB: Error fetching STRUCTUNALLOCD: %s", err))
 		}
-		return 0, &YDBError{(int)(YDB_ERR_STRUCTNOTALLOCD), errmsg}
+		return 0, &YDBError{(int)(YDB_ERR_STRUCTUNALLOCD), errmsg}
 	}
 	retval := uint32(cbuftptr.len_alloc)
 	runtime.KeepAlive(buft)
@@ -201,7 +201,7 @@ func (buft *BufferT) LenAlloc(tptoken uint64, errstr *BufferT) (uint32, error) {
 // LenUsed is a method to fetch the ydb_buffer_t.len_used field containing the used length of the buffer. Note
 // that if len_used > len_alloc, thus indicating a previous issue, an INVSTRLEN error is raised.
 //
-// If the C.ydb_buffer_t structure referenced by cbuft has not yet been allocated, return the STRUCTNOTALLOCD error.
+// If the C.ydb_buffer_t structure referenced by cbuft has not yet been allocated, return the STRUCTUNALLOCD error.
 // Otherwise, return the len_used field of the C.ydb_buffer_t structure referenced by cbuft.
 func (buft *BufferT) LenUsed(tptoken uint64, errstr *BufferT) (uint32, error) {
 	printEntry("BufferT.LenUsed()")
@@ -211,11 +211,11 @@ func (buft *BufferT) LenUsed(tptoken uint64, errstr *BufferT) (uint32, error) {
 	cbuftptr := buft.getCPtr()
 	if nil == cbuftptr {
 		// Create an error to return
-		errmsg, err := MessageT(tptoken, errstr, (int)(YDB_ERR_STRUCTNOTALLOCD))
+		errmsg, err := MessageT(tptoken, errstr, (int)(YDB_ERR_STRUCTUNALLOCD))
 		if nil != err {
-			panic(fmt.Sprintf("YDB: Error fetching STRUCTNOTALLOCD: %s", err))
+			panic(fmt.Sprintf("YDB: Error fetching STRUCTUNALLOCD: %s", err))
 		}
-		return 0, &YDBError{(int)(YDB_ERR_STRUCTNOTALLOCD), errmsg}
+		return 0, &YDBError{(int)(YDB_ERR_STRUCTUNALLOCD), errmsg}
 	}
 	lenused := cbuftptr.len_used
 	runtime.KeepAlive(buft)
@@ -224,7 +224,7 @@ func (buft *BufferT) LenUsed(tptoken uint64, errstr *BufferT) (uint32, error) {
 
 // ValBAry is a method to fetch the buffer contents as a byte array.
 //
-// If the C.ydb_buffer_t structure referenced by cbuft has not yet been allocated, return the STRUCTNOTALLOCD error.
+// If the C.ydb_buffer_t structure referenced by cbuft has not yet been allocated, return the STRUCTUNALLOCD error.
 // If the len_used field of the C.ydb_buffer_t structure is greater than its len_alloc field (owing to a prior
 // INVSTRLEN error), return an INVSTRLEN error. Otherwise, return len_used bytes of the buffer as a byte array.
 func (buft *BufferT) ValBAry(tptoken uint64, errstr *BufferT) ([]byte, error) {
@@ -237,11 +237,11 @@ func (buft *BufferT) ValBAry(tptoken uint64, errstr *BufferT) ([]byte, error) {
 	cbuftptr := buft.getCPtr()
 	if nil == cbuftptr {
 		// Create an error to return
-		errmsg, err := MessageT(tptoken, errstr, (int)(YDB_ERR_STRUCTNOTALLOCD))
+		errmsg, err := MessageT(tptoken, errstr, (int)(YDB_ERR_STRUCTUNALLOCD))
 		if nil != err {
-			panic(fmt.Sprintf("YDB: Error fetching STRUCTNOTALLOCD: %s", err))
+			panic(fmt.Sprintf("YDB: Error fetching STRUCTUNALLOCD: %s", err))
 		}
-		return nil, &YDBError{(int)(YDB_ERR_STRUCTNOTALLOCD), errmsg}
+		return nil, &YDBError{(int)(YDB_ERR_STRUCTUNALLOCD), errmsg}
 	}
 	lenalloc := cbuftptr.len_alloc
 	lenused := cbuftptr.len_used
@@ -259,7 +259,7 @@ func (buft *BufferT) ValBAry(tptoken uint64, errstr *BufferT) ([]byte, error) {
 
 // ValStr is a method to fetch the buffer contents as a string.
 //
-// If the C.ydb_buffer_t structure referenced by cbuft has not yet been allocated, return the STRUCTNOTALLOCD error.
+// If the C.ydb_buffer_t structure referenced by cbuft has not yet been allocated, return the STRUCTUNALLOCD error.
 // If the len_used field of the C.ydb_buffer_t structure is greater than its len_alloc field (owing to a prior
 // INVSTRLEN error), return an INVSTRLEN error. Otherwise, return len_used bytes of the buffer as a string.
 func (buft *BufferT) ValStr(tptoken uint64, errstr *BufferT) (string, error) {
@@ -272,11 +272,11 @@ func (buft *BufferT) ValStr(tptoken uint64, errstr *BufferT) (string, error) {
 	cbuftptr := buft.getCPtr()
 	if nil == cbuftptr {
 		// Create an error to return
-		errmsg, err := MessageT(tptoken, errstr, (int)(YDB_ERR_STRUCTNOTALLOCD))
+		errmsg, err := MessageT(tptoken, errstr, (int)(YDB_ERR_STRUCTUNALLOCD))
 		if nil != err {
-			panic(fmt.Sprintf("YDB: Error fetching STRUCTNOTALLOCD: %s", err))
+			panic(fmt.Sprintf("YDB: Error fetching STRUCTUNALLOCD: %s", err))
 		}
-		return "", &YDBError{(int)(YDB_ERR_STRUCTNOTALLOCD), errmsg}
+		return "", &YDBError{(int)(YDB_ERR_STRUCTUNALLOCD), errmsg}
 	}
 	lenalloc := cbuftptr.len_alloc
 	lenused := cbuftptr.len_used
@@ -297,7 +297,7 @@ func (buft *BufferT) ValStr(tptoken uint64, errstr *BufferT) (string, error) {
 // Use this method to change the length of a used substring of the contents of the buffer referenced by the buf_addr field of the
 // referenced C.ydb_buffer_t.
 //
-// If the C.ydb_buffer_t structure referenced by cbuft has not yet been allocated, return the STRUCTNOTALLOCD error.
+// If the C.ydb_buffer_t structure referenced by cbuft has not yet been allocated, return the STRUCTUNALLOCD error.
 // If newLen is greater than the len_alloc field of the referenced C.ydb_buffer_t, make no changes and return with
 // an error return of INVSTRLEN. Otherwise, set the len_used field of the referenced C.ydb_buffer_t to newLen.
 //
@@ -311,11 +311,11 @@ func (buft *BufferT) SetLenUsed(tptoken uint64, errstr *BufferT, newLen uint32) 
 	cbuftptr := buft.getCPtr()
 	if nil == cbuftptr {
 		// Create an error to return
-		errmsg, err := MessageT(tptoken, errstr, (int)(YDB_ERR_STRUCTNOTALLOCD))
+		errmsg, err := MessageT(tptoken, errstr, (int)(YDB_ERR_STRUCTUNALLOCD))
 		if nil != err {
-			panic(fmt.Sprintf("YDB: Error fetching STRUCTNOTALLOCD: %s", err))
+			panic(fmt.Sprintf("YDB: Error fetching STRUCTUNALLOCD: %s", err))
 		}
-		return &YDBError{(int)(YDB_ERR_STRUCTNOTALLOCD), errmsg}
+		return &YDBError{(int)(YDB_ERR_STRUCTUNALLOCD), errmsg}
 	}
 	lenalloc := cbuftptr.len_alloc
 	if newLen > uint32(lenalloc) {
@@ -329,7 +329,7 @@ func (buft *BufferT) SetLenUsed(tptoken uint64, errstr *BufferT, newLen uint32) 
 
 // SetValBAry is a method to set a []byte array into the given buffer.
 //
-// If the C.ydb_buffer_t structure referenced by cbuft has not yet been allocated, return the STRUCTNOTALLOCD error.
+// If the C.ydb_buffer_t structure referenced by cbuft has not yet been allocated, return the STRUCTUNALLOCD error.
 // If the length of value is greater than the len_alloc field of the C.ydb_buffer_t structure referenced by
 // cbuft, make no changes and return INVSTRLEN. Otherwise, copy the bytes of value to the location referenced
 // by the buf_addr field of the C.ydbbuffer_t structure, set the len_used field to the length of value.
@@ -341,11 +341,11 @@ func (buft *BufferT) SetValBAry(tptoken uint64, errstr *BufferT, value []byte) e
 	cbuftptr := buft.getCPtr()
 	if nil == cbuftptr {
 		// Create an error to return
-		errmsg, err := MessageT(tptoken, errstr, (int)(YDB_ERR_STRUCTNOTALLOCD))
+		errmsg, err := MessageT(tptoken, errstr, (int)(YDB_ERR_STRUCTUNALLOCD))
 		if nil != err {
-			panic(fmt.Sprintf("YDB: Error fetching STRUCTNOTALLOCD: %s", err))
+			panic(fmt.Sprintf("YDB: Error fetching STRUCTUNALLOCD: %s", err))
 		}
-		return &YDBError{(int)(YDB_ERR_STRUCTNOTALLOCD), errmsg}
+		return &YDBError{(int)(YDB_ERR_STRUCTUNALLOCD), errmsg}
 	}
 	vallen := C.uint(len(value))
 	lenalloc := cbuftptr.len_alloc
@@ -364,7 +364,7 @@ func (buft *BufferT) SetValBAry(tptoken uint64, errstr *BufferT, value []byte) e
 
 // SetValStr is a method to set a string into the given buffer.
 //
-// If the C.ydb_buffer_t structure referenced by cbuft has not yet been allocated, return the STRUCTNOTALLOCD error.
+// If the C.ydb_buffer_t structure referenced by cbuft has not yet been allocated, return the STRUCTUNALLOCD error.
 // If the length of value is greater than the len_alloc field of the C.ydb_buffer_t structure referenced by
 // cbuft, make no changes and return INVSTRLEN. Otherwise, copy the bytes of value to the location referenced
 // by the buf_addr field of the C.ydbbuffer_t structure, set the len_used field to the length of value.
@@ -385,7 +385,7 @@ func (buft *BufferT) SetValStr(tptoken uint64, errstr *BufferT, value string) er
 
 // Str2ZwrST is a STAPI method to take the given string and return it in ZWRITE format.
 //
-// If the C.ydb_buffer_t structure referenced by cbuft has not yet been allocated, return the STRUCTNOTALLOCD error.
+// If the C.ydb_buffer_t structure referenced by cbuft has not yet been allocated, return the STRUCTUNALLOCD error.
 // If len_alloc is not large enough, set len_used to the required length, and return an INVSTRLEN error. In this case,
 // len_used will be greater than len_alloc until corrected by application code. Otherwise, set the buffer referenced by buf_addr
 // to the zwrite format string, and set len_used to the length.
@@ -404,11 +404,11 @@ func (buft *BufferT) Str2ZwrST(tptoken uint64, errstr *BufferT, zwr *BufferT) er
 	}
 	if nil == buft.getCPtr() || nil == zwr.getCPtr() {
 		// Create an error to return
-		errmsg, err := MessageT(tptoken, errstr, (int)(YDB_ERR_STRUCTNOTALLOCD))
+		errmsg, err := MessageT(tptoken, errstr, (int)(YDB_ERR_STRUCTUNALLOCD))
 		if nil != err {
-			panic(fmt.Sprintf("YDB: Error fetching STRUCTNOTALLOCD: %s", err))
+			panic(fmt.Sprintf("YDB: Error fetching STRUCTUNALLOCD: %s", err))
 		}
-		return &YDBError{(int)(YDB_ERR_STRUCTNOTALLOCD), errmsg}
+		return &YDBError{(int)(YDB_ERR_STRUCTUNALLOCD), errmsg}
 	}
 	if nil != errstr {
 		cbuft = errstr.getCPtr()
@@ -426,7 +426,7 @@ func (buft *BufferT) Str2ZwrST(tptoken uint64, errstr *BufferT, zwr *BufferT) er
 
 // Zwr2StrST is a STAPI method to take the given ZWRITE format string and return it as a normal ASCII string.
 //
-// If the C.ydb_buffer_t structure referenced by cbuft has not yet been allocated, return the STRUCTNOTALLOCD error.
+// If the C.ydb_buffer_t structure referenced by cbuft has not yet been allocated, return the STRUCTUNALLOCD error.
 // If len_alloc is not large enough, set len_used to the required length, and return an INVSTRLEN error. In this case,
 // len_used will be greater than len_alloc until corrected by application code. If str has errors and is not in valid zwrite format, set
 // len_used to zero, and return the error code returned by ydb_zwr2str_s() e.g., INVZWRITECHAR. Otherwise, set the buffer referenced
@@ -448,11 +448,11 @@ func (buft *BufferT) Zwr2StrST(tptoken uint64, errstr *BufferT, str *BufferT) er
 	}
 	if nil == buft.getCPtr() || nil == str.getCPtr() {
 		// Create an error to return
-		errmsg, err := MessageT(tptoken, errstr, (int)(YDB_ERR_STRUCTNOTALLOCD))
+		errmsg, err := MessageT(tptoken, errstr, (int)(YDB_ERR_STRUCTUNALLOCD))
 		if nil != err {
-			panic(fmt.Sprintf("YDB: Error fetching STRUCTNOTALLOCD: %s", err))
+			panic(fmt.Sprintf("YDB: Error fetching STRUCTUNALLOCD: %s", err))
 		}
-		return &YDBError{(int)(YDB_ERR_STRUCTNOTALLOCD), errmsg}
+		return &YDBError{(int)(YDB_ERR_STRUCTUNALLOCD), errmsg}
 	}
 	if nil != errstr {
 		cbuft = errstr.getCPtr()
