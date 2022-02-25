@@ -451,34 +451,48 @@ func MessageT(tptoken uint64, errstr *BufferT, status int) (string, error) {
 	if 1 != atomic.LoadUint32(&ydbInitialized) {
 		initializeYottaDB()
 	}
-	// But check for a couple of special cases first. First, if the error is YDB_ERR_THREADEDAPINOTALLOWED, the same error
-	// will prevent the below call into ydb_message_t() from working so create a hard-return error message for that case
-	// before attempting the call.
-	if YDB_ERR_THREADEDAPINOTALLOWED == status {
-		return "%YDB-E-THREADEDAPINOTALLOWED, Process cannot switch to using threaded Simple API while already using Simple API", nil
+	if 0 > status { // Get absolute value of status so we can extract facility bits correctly
+		status = -status
 	}
-	if YDB_ERR_CALLINAFTERXIT == status {
-		// The engine is shut down so calling ydb_message_t will fail if we attempt it so just hard-code this
-		// error return value.
-		return "%YDB-E-CALLINAFTERXIT, After a ydb_exit(), a process cannot create a valid YottaDB context", nil
-	}
-	defer msgval.Free()
-	msgval.Alloc(uint32(YDB_MAX_ERRORMSG))
-	if nil != errstr {
-		cbuft = errstr.getCPtr()
-	}
-	rc := C.ydb_message_t(C.uint64_t(tptoken), cbuft, C.int(status), msgval.getCPtr())
-	if YDB_OK != rc {
-		// Message was not found - check if it is one of our internal errors
-		errorMsg = getLocalErrorMsg(status)
-		if "" == errorMsg {
+	// First check the "facility" id buried in the error number (status)
+	facility := (uint32(status) >> 16) & 0x7ff // See error format in sr_port/error.h of YottaDB - isolate the 11 bit facility
+	switch facility {
+	case 246: // GT.M facility (use C.ydb_message_t())
+		fallthrough
+	case 256: // YDB facility (use C.ydb_message_t())
+		// Check for a couple of special cases first. First, if the error is YDB_ERR_THREADEDAPINOTALLOWED, the same error
+		// will prevent the below call into ydb_message_t() from working so create a hard-return error message for that
+		// case before attempting the call.
+		if YDB_ERR_THREADEDAPINOTALLOWED == status {
+			return "%YDB-E-THREADEDAPINOTALLOWED, Process cannot switch to using threaded Simple API while " +
+				"already using Simple API", nil
+		}
+		if YDB_ERR_CALLINAFTERXIT == status {
+			// The engine is shut down so calling ydb_message_t will fail if we attempt it so just hard-code this
+			// error return value.
+			return "%YDB-E-CALLINAFTERXIT, After a ydb_exit(), a process cannot create a valid YottaDB context", nil
+		}
+		defer msgval.Free()
+		msgval.Alloc(uint32(YDB_MAX_ERRORMSG))
+		if nil != errstr {
+			cbuft = errstr.getCPtr()
+		}
+		rc := C.ydb_message_t(C.uint64_t(tptoken), cbuft, C.int(status), msgval.getCPtr())
+		if YDB_OK != rc {
 			panic(fmt.Sprintf("YDB: Error calling ydb_message_t: %d", int(rc)))
 		}
-	} else { // Returned string should be snug in the retval buffer. Pick it out so can return it as a string
+		// Returned string should be snug in the retval buffer. Pick it out so can return it as a string
 		errorMsg, err = msgval.ValStr(tptoken, errstr)
 		if nil != err {
 			panic(fmt.Sprintf("YDB: Unexpected error with ValStr(): %s", err))
 		}
+	case 264: // Facility id for YDBGo wrapper errors
+		errorMsg = getWrapperErrorMsg(status)
+		if "" == errorMsg {
+			panic(fmt.Sprintf("YDB: Wrapper error message %d not found", status))
+		}
+	default:
+		panic(fmt.Sprintf("YDB: Unknown message facility: %d from error id %d", facility, status))
 	}
 	runtime.KeepAlive(errstr)
 	runtime.KeepAlive(msgval)

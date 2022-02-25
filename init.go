@@ -63,7 +63,7 @@ var ydbSignalList = []syscall.Signal{
 // signalsHandled is the count of the signals the wrapper gets notified of and passes on to YottaDB. This matches with
 // the number of signals (and thus also the number of goroutines launched running waitForAndProcessSignal() as well as
 // being the dimension of the ydbShutdownChannel array below that has one slot for each signal handled.
-var signalsHandled int = len(ydbSignalList)
+var signalsHandled = len(ydbSignalList)
 
 // This is a map value element used to look up user signal notification channel and flags (one handler per signal)
 type sigNotificationMapEntry struct {
@@ -86,7 +86,7 @@ var ydbSignalActive []uint32           // Array of indicators indicating indexed
 var ydbShutdownComplete []uint32       // Array of flags that indexed signal goroutine shutdown is complete
 
 // validateNotifySignal verifies that the specified signal is valid for RegisterSignalNotify()/UnregisterSignalNotify()
-func validateNotifySignal(sig syscall.Signal) error {
+func validateNotifySignal(sig syscall.Signal, entryPoint ydbEntryPoint) error {
 	// Verify the supplied signal is one that we support with this function. Note this list contains all of the signals
 	// that the wrapper traps as seen below in the initializeYottaDB() function except those signals that cause
 	// problems if handlers other than YottaDB's handler is driven (e.g. SIGTSTP, SIGTTIN, etc). It is up to the user
@@ -113,8 +113,10 @@ func validateNotifySignal(sig syscall.Signal) error {
 	case syscall.SIGURG: // Same as SIGPOLL and SIGIO - happens almost constantly so be careful if used
 	case syscall.SIGUSR1:
 	default:
-		panic(fmt.Sprintf("YDB: The specified signal (%v) is not supported for signal notification by yottadb."+
-			"[Un]RegisterSignalNotify()", sig))
+		entryPoint := selectString((ydbEntryRegisterSigNotify == entryPoint), "yottadb.RegisterSignalNotify()",
+			"yottadb.UnRegisterSignalNotify()")
+		panic(fmt.Sprintf("YDB: The specified signal (%v) is not supported for signal notification by %s",
+			sig, entryPoint))
 	}
 	// Note no error is currently returned but will when YDB#790 is complete.
 	return nil
@@ -130,7 +132,7 @@ func RegisterSignalNotify(sig syscall.Signal, notifyChan, ackChan chan bool, not
 	if 1 != atomic.LoadUint32(&ydbInitialized) {
 		initializeYottaDB()
 	}
-	err := validateNotifySignal(sig)
+	err := validateNotifySignal(sig, ydbEntryRegisterSigNotify)
 	if nil != err {
 		panic(fmt.Sprintf("YDB: %v", err))
 	}
@@ -147,7 +149,7 @@ func RegisterSignalNotify(sig syscall.Signal, notifyChan, ackChan chan bool, not
 // UnRegisterSignalNotify removes a notification request for the given signal. No error is raised if the signal did not already
 // have a notification request in effect.
 func UnRegisterSignalNotify(sig syscall.Signal) error {
-	err := validateNotifySignal(sig)
+	err := validateNotifySignal(sig, ydbEntryUnRegisterSigNotify)
 	if nil != err {
 		panic(fmt.Sprintf("YDB: %v", err))
 	}
@@ -177,13 +179,15 @@ func shutdownSignalGoroutines() {
 	// Wait for the signal goroutines to exit but with a timeout
 	done := make(chan struct{})
 	go func() {
-		// Loop handling channel blips as goroutines shutdown. Take into account any signals that are in-process also
-		// as those routines will be unable to shutdown so no use waiting for them until timeout. Note, if this loop
-		// is unable to return, this goroutine will die when the process dies.
+		// Loop handling channel notifications as goroutines shutdown. If we are currently handling a fatal signal
+		// like a SIGQUIT, that channel is active but is busy so will not respond to a shutdown request. For this
+		// reason, we treat active goroutines the same as successfully shutdown goroutines so we don't delay
+		// shutdown. No need to wait for something that is likely to not occur (The YottaDB handlers for fatal signals
+		// drive a process-ending panic and never return).
 		sigRtnScanStopped := false
 		for !sigRtnScanStopped {
 			select {
-			case <-ydbShutdownCheck: // A goroutine finished - check if all are shutdown or otherwise busy
+			case _ = <-ydbShutdownCheck: // A goroutine finished - check if all are shutdown or otherwise busy
 				var i int
 				for i = 0; signalsHandled > i; i++ {
 					lclShutdownComplete := (1 == atomic.LoadUint32(&ydbShutdownComplete[i]))
@@ -202,7 +206,7 @@ func shutdownSignalGoroutines() {
 		}
 	}()
 	select {
-	case <-done: // All signal monitoring goroutines are shutdown!
+	case _ = <-done: // All signal monitoring goroutines are shutdown or are busy!
 		if dbgSigHandling {
 			fmt.Fprintln(os.Stderr, "YDB: shutdownSignalGoroutines: All signal goroutines successfully closed or active")
 		}
@@ -211,7 +215,7 @@ func shutdownSignalGoroutines() {
 		if dbgSigHandling {
 			fmt.Fprintln(os.Stderr, "YDB: shutdownSignalGoroutines: Timeout! Some signal threads did not shutdown")
 		}
-		errstr := getLocalErrorMsg(YDB_ERR_SIGGORTNTIMEOUT)
+		errstr := getWrapperErrorMsg(YDB_ERR_SIGGORTNTIMEOUT)
 		syslogEntry(errstr)
 	}
 	shutdownSigGortns = true
@@ -365,7 +369,7 @@ func waitForSignalAckWTimeout(ackChan chan bool, whatAck string) {
 	select { // Wait for an acknowledgement but put a timer on it
 	case _ = <-ackChan:
 	case <-time.After(time.Duration(MaximumSigAckWait) * time.Second):
-		syslogEntry(strings.Replace(getLocalErrorMsg(YDB_ERR_SIGACKTIMEOUT), "!AD", whatAck, 1))
+		syslogEntry(strings.Replace(getWrapperErrorMsg(YDB_ERR_SIGACKTIMEOUT), "!AD", whatAck, 1))
 	}
 }
 
@@ -436,7 +440,8 @@ func waitForAndProcessSignal(shutdownChannelIndx int) {
 				case NotifyAsyncYDBSigHandler:
 					fallthrough
 				case NotifyInsteadOfYDBSigHandler:
-					// Notify user code via the supplied channel
+					// Notify user code via the supplied channel specifying that this message is occurring BEFORE
+					// the YDB handler has been driven.
 					notifyUserSignalChannel(sigHndlrEntry, beforeYDBHandler)
 				case NotifyAfterYDBSigHandler:
 				}

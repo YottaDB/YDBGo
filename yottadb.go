@@ -56,7 +56,7 @@ const DefaultMaximumSigShutDownWait time.Duration = 5 // wait in seconds
 var MaximumSigShutDownWait time.Duration = DefaultMaximumSigShutDownWait
 
 // DefaultMaximumSigAckWait is default/initial value for MaximumSigAckWait
-const DefaultMaximumSigAckWait time.Duration = 15 // wait in seconds
+const DefaultMaximumSigAckWait time.Duration = 10 // wait in seconds
 // MaximumSigAckWait is maximum wait for notify via acknowledgement channel that a notified signal handler is
 // done handling the signal.
 var MaximumSigAckWait time.Duration = DefaultMaximumSigAckWait
@@ -74,10 +74,10 @@ const WrapperRelease string = "v1.2.0"
 const MinimumYDBReleaseMajor int = 1
 
 // MinimumYDBReleaseMinor - (int) Minimum minor release number required by this wrapper of the linked YottaDB
-const MinimumYDBReleaseMinor int = 33
+const MinimumYDBReleaseMinor int = 34
 
 // MinimumYDBRelease - (string) Minimum YottaDB release name required by this wrapper
-const MinimumYDBRelease string = "r1.33"
+const MinimumYDBRelease string = "r1.34"
 
 // MinimumGoRelease - (string) Minimum version of Go to fully support this wrapper (including tests)
 const MinimumGoRelease string = "go1.13"

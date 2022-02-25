@@ -136,15 +136,21 @@ func formatINVSTRLEN(tptoken uint64, errstr *BufferT, lenalloc, lenused C.uint) 
 	return errmsg
 }
 
-// syslogEntry records the given message in the syslog
+// syslogEntry records the given message in the syslog. Since these are rare or one-time per process type errors
+// that get recorded here, we open a new syslog handle each time to reduce complexity of single threading access
+// across goroutines.
 func syslogEntry(logMsg string) {
 	syslogr, err := syslog.New(syslog.LOG_INFO+syslog.LOG_USER, "[YottaDB-Go-Wrapper]")
 	if nil != err {
-		panic(fmt.Sprintf("syslog.NewLogger() failed unexpectedly with error: %s", err))
+		panic(fmt.Sprintf("syslog.New() failed unexpectedly with error: %s", err))
 	}
 	err = syslogr.Info(logMsg)
 	if nil != err {
 		panic(fmt.Sprintf("syslogr.Info() failed unexpectedly with error: %s", err))
+	}
+	err = syslogr.Close()
+	if nil != err {
+		panic(fmt.Sprintf("syslogr.Close() failed unexpectedly with error: %s", err))
 	}
 }
 
@@ -176,6 +182,11 @@ func Init() {
 
 // Exit is a function to drive YDB's exit handler in case of panic or other non-normal shutdown that bypasses
 // atexit() that would normally drive the exit handler.
+//
+// Note this function is guarded with a mutex and has a "exitRun" flag indicating it has been run. This is because we have seen
+// the Exit() routine being run multiple times by multiple goroutines which causes hangs. So it is now controlled with a mutex and
+// the already-been-here global flag "exitRun". Once this routine calls C.ydb_exit(), even if it gets stuck, the goroutine is still
+// active so if the engine lock becomes available prior to process demise, this routine will wake up and complete the rundown
 func Exit() error {
 	var errstr string
 	var errNum int
@@ -229,7 +240,7 @@ func Exit() error {
 		if dbgSigHandling {
 			fmt.Fprintln(os.Stderr, "YDB: Exit(): Wait for ydb_exit() expired")
 		}
-		errstr = getLocalErrorMsg(YDB_ERR_DBRNDWNBYPASS)
+		errstr = getWrapperErrorMsg(YDB_ERR_DBRNDWNBYPASS)
 		errNum = YDB_ERR_DBRNDWNBYPASS
 		if 0 == atomic.LoadUint32(&ydbSigPanicCalled) { // Need "atomic" usage to avoid read/write DATA RACE issues
 			// If we panic'd due to a signal, we definitely have run the exit handler as it runs before the panic is
@@ -242,7 +253,7 @@ func Exit() error {
 	// just go straight to getting the CALLINAFTERXIT error when an actual call is attempted. We now handle CALLINAFTERXIT
 	// in the places it matters.
 	if "" != errstr {
-		return &YDBError{errNum, errstr} // No number for DBRNDWNBYPASS at this time (defined only for Go)
+		return &YDBError{errNum, errstr}
 	}
 	return nil
 }
