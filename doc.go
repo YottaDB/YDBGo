@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2018-2020 YottaDB LLC and/or its subsidiaries.	//
+// Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -17,7 +17,7 @@ YottaDB Quick Start
 
 Before starting, consider reading the introduction to YottaDB's data model at https://docs.yottadb.com/MultiLangProgGuide/MultiLangProgGuide.html#concepts
 
-The YottaDB Go wrapper requires a minimum YottaDB version of r1.30 and
+The YottaDB Go wrapper requires a minimum YottaDB version of r1.34 and
 is tested with a minimum Go version of 1.13. If the Go packages on
 your operating system are older, and the Go wrapper does not work,
 please obtain and install a newer Go implementation.
