@@ -21,7 +21,7 @@
 // cgo allows us full access to C structures, enums, routines declarations, and simple #define values just by
 // including the appropriate C header file and invoking cgo in the prescribed manner as shown below.
 
-package yottadb // import "lang.yottadb.com/go/yottadb"
+package yottadb
 
 import "time"
 
