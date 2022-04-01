@@ -451,6 +451,7 @@ func MessageT(tptoken uint64, errstr *BufferT, status int) (string, error) {
 	if 1 != atomic.LoadUint32(&ydbInitialized) {
 		initializeYottaDB()
 	}
+	statusOriginal := status
 	if 0 > status { // Get absolute value of status so we can extract facility bits correctly
 		status = -status
 	}
@@ -463,11 +464,11 @@ func MessageT(tptoken uint64, errstr *BufferT, status int) (string, error) {
 		// Check for a couple of special cases first. First, if the error is YDB_ERR_THREADEDAPINOTALLOWED, the same error
 		// will prevent the below call into ydb_message_t() from working so create a hard-return error message for that
 		// case before attempting the call.
-		if YDB_ERR_THREADEDAPINOTALLOWED == status {
+		switch statusOriginal {
+		case YDB_ERR_THREADEDAPINOTALLOWED:
 			return "%YDB-E-THREADEDAPINOTALLOWED, Process cannot switch to using threaded Simple API while " +
 				"already using Simple API", nil
-		}
-		if YDB_ERR_CALLINAFTERXIT == status {
+		case YDB_ERR_CALLINAFTERXIT:
 			// The engine is shut down so calling ydb_message_t will fail if we attempt it so just hard-code this
 			// error return value.
 			return "%YDB-E-CALLINAFTERXIT, After a ydb_exit(), a process cannot create a valid YottaDB context", nil
@@ -487,12 +488,12 @@ func MessageT(tptoken uint64, errstr *BufferT, status int) (string, error) {
 			panic(fmt.Sprintf("YDB: Unexpected error with ValStr(): %s", err))
 		}
 	case 264: // Facility id for YDBGo wrapper errors
-		errorMsg = getWrapperErrorMsg(status)
+		errorMsg = getWrapperErrorMsg(statusOriginal)
 		if "" == errorMsg {
-			panic(fmt.Sprintf("YDB: Wrapper error message %d not found", status))
+			panic(fmt.Sprintf("YDB: Wrapper error message %d not found", statusOriginal))
 		}
 	default:
-		panic(fmt.Sprintf("YDB: Unknown message facility: %d from error id %d", facility, status))
+		panic(fmt.Sprintf("YDB: Unknown message facility: %d from error id %d", facility, statusOriginal))
 	}
 	runtime.KeepAlive(errstr)
 	runtime.KeepAlive(msgval)
