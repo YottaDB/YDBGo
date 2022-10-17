@@ -120,21 +120,21 @@ func TestBufTAryDeleteExclSTErrors(t *testing.T) {
 	if yottadb.YDB_ERR_INVVARNAME != errcode {
 		t.Error("The DeleteExclST() errorcode for 1 expected to be", yottadb.YDB_ERR_INVVARNAME, "but was", errcode)
 	}
-	// YDB_ERR_INVVARNAME - from special variable
+	// YDB_ERR_ISVUNSUPPORTED - from special variable
 	err = namelst.SetValStr(tptoken, nil, 0, "$ZCHSET")
 	Assertnoerr(err, t)
 	err = namelst.DeleteExclST(tptoken, nil)
 	errcode = yottadb.ErrorCode(err)
-	if yottadb.YDB_ERR_INVVARNAME != errcode {
-		t.Error("The DeleteExclST() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_INVVARNAME, "but was", errcode)
+	if yottadb.YDB_ERR_ISVUNSUPPORTED != errcode {
+		t.Error("The DeleteExclST() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_ISVUNSUPPORTED, "but was", errcode)
 	}
-	// YDB_ERR_INVVARNAME - from passing a global
+	// YDB_ERR_GVNUNSUPPORTED - from passing a global
 	err = namelst.SetValStr(tptoken, nil, 0, "^a")
 	Assertnoerr(err, t)
 	err = namelst.DeleteExclST(tptoken, nil)
 	errcode = yottadb.ErrorCode(err)
-	if yottadb.YDB_ERR_INVVARNAME != errcode {
-		t.Error("The DeleteExclST() errorcode for ^a expected to be", yottadb.YDB_ERR_INVVARNAME, "but was", errcode)
+	if yottadb.YDB_ERR_GVNUNSUPPORTED != errcode {
+		t.Error("The DeleteExclST() errorcode for ^a expected to be", yottadb.YDB_ERR_GVNUNSUPPORTED, "but was", errcode)
 	}
 	// YDB_ERR_VARNAME2LONG
 	err = namelst.SetValStr(tptoken, nil, 0, "a1a2a3a4a5a6a7a8a9a0b1b2b3b4b5b6b7b8b9b0")

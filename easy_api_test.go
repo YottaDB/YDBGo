@@ -78,11 +78,11 @@ func TestDataEErrors(t *testing.T) {
 	if yottadb.YDB_ERR_INVVARNAME != errcode {
 		t.Error("The DataE() errorcode for ^ expected to be", yottadb.YDB_ERR_INVVARNAME, "but was", errcode)
 	}
-	// YDB_ERR_UNIMPLOP
+	// YDB_ERR_ISVUNSUPPORTED
 	_, err = yottadb.DataE(tptoken, &errstr, "$ZCHSET", []string{})
 	errcode = yottadb.ErrorCode(err)
-	if yottadb.YDB_ERR_UNIMPLOP != errcode {
-		t.Error("The DataE() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_UNIMPLOP, "but was", errcode)
+	if yottadb.YDB_ERR_ISVUNSUPPORTED != errcode {
+		t.Error("The DataE() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_ISVUNSUPPORTED, "but was", errcode)
 	}
 	// YDB_ERR_INVSVN
 	_, err = yottadb.DataE(tptoken, &errstr, "$NOTATHING", []string{})
@@ -148,11 +148,11 @@ func TestDeleteEErrors(t *testing.T) {
 	if yottadb.YDB_ERR_INVVARNAME != errcode {
 		t.Error("The DeleteE() errorcode for ^ expected to be", yottadb.YDB_ERR_INVVARNAME, "but was", errcode)
 	}
-	// YDB_ERR_UNIMPLOP - from special variable
+	// YDB_ERR_ISVUNSUPPORTED - from special variable
 	err = yottadb.DeleteE(tptoken, &errstr, yottadb.YDB_DEL_TREE, "$ZCHSET", []string{})
 	errcode = yottadb.ErrorCode(err)
-	if yottadb.YDB_ERR_UNIMPLOP != errcode {
-		t.Error("The DeleteE() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_UNIMPLOP, "but was", errcode)
+	if yottadb.YDB_ERR_ISVUNSUPPORTED != errcode {
+		t.Error("The DeleteE() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_ISVUNSUPPORTED, "but was", errcode)
 	}
 	// YDB_ERR_INVSVN
 	err = yottadb.DeleteE(tptoken, &errstr, yottadb.YDB_DEL_TREE, "$NOTATHING", []string{})
@@ -260,17 +260,17 @@ func TestDeleteExclEErrors(t *testing.T) {
 	if yottadb.YDB_ERR_INVVARNAME != errcode {
 		t.Error("The DeleteExclE() errorcode for 1 expected to be", yottadb.YDB_ERR_INVVARNAME, "but was", errcode)
 	}
-	// YDB_ERR_INVVARNAME - from special variable
+	// YDB_ERR_ISVUNSUPPORTED - from special variable
 	err = yottadb.DeleteExclE(tptoken, &errstr, []string{"$ZCHSET"})
 	errcode = yottadb.ErrorCode(err)
-	if yottadb.YDB_ERR_INVVARNAME != errcode {
-		t.Error("The DeleteExclE() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_INVVARNAME, "but was", errcode)
+	if yottadb.YDB_ERR_ISVUNSUPPORTED != errcode {
+		t.Error("The DeleteExclE() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_ISVUNSUPPORTED, "but was", errcode)
 	}
-	// YDB_ERR_INVVARNAME - from passing a global
+	// YDB_ERR_GVNUNSUPPORTED - from passing a global
 	err = yottadb.DeleteExclE(tptoken, &errstr, []string{"^a"})
 	errcode = yottadb.ErrorCode(err)
-	if yottadb.YDB_ERR_INVVARNAME != errcode {
-		t.Error("The DeleteExclE() errorcode for ^a expected to be", yottadb.YDB_ERR_INVVARNAME, "but was", errcode)
+	if yottadb.YDB_ERR_GVNUNSUPPORTED != errcode {
+		t.Error("The DeleteExclE() errorcode for ^a expected to be", yottadb.YDB_ERR_GVNUNSUPPORTED, "but was", errcode)
 	}
 	// YDB_ERR_VARNAME2LONG
 	err = yottadb.DeleteExclE(yottadb.NOTTP, &errstr, []string{"a1a2a3a4a5a6a7a8a9a0b1b2b3b4b5b6b7b8b9b0"})
@@ -424,11 +424,11 @@ func TestIncrEErrors(t *testing.T) {
 	if yottadb.YDB_ERR_INVVARNAME != errcode {
 		t.Error("The IncrE() errorcode for ^ expected to be", yottadb.YDB_ERR_INVVARNAME, "but was", errcode)
 	}
-	// YDB_ERR_UNIMPLOP
+	// YDB_ERR_ISVUNSUPPORTED
 	_, err = yottadb.IncrE(tptoken, &errstr, "", "$ZCHSET", []string{})
 	errcode = yottadb.ErrorCode(err)
-	if yottadb.YDB_ERR_UNIMPLOP != errcode {
-		t.Error("The IncrE() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_UNIMPLOP, "but was", errcode)
+	if yottadb.YDB_ERR_ISVUNSUPPORTED != errcode {
+		t.Error("The IncrE() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_ISVUNSUPPORTED, "but was", errcode)
 	}
 	// YDB_ERR_INVSVN
 	_, err = yottadb.IncrE(tptoken, &errstr, "", "$NOTATHING", []string{})
@@ -486,11 +486,11 @@ func TestLockEErrors(t *testing.T) {
 	if yottadb.YDB_ERR_INVVARNAME != errcode {
 		t.Error("The LockE() errorcode for ^ expected to be", yottadb.YDB_ERR_INVVARNAME, "but was", errcode)
 	}
-	// YDB_ERR_UNIMPLOP
+	// YDB_ERR_ISVUNSUPPORTED
 	err = yottadb.LockE(tptoken, &errstr, 0, "$ZCHSET", []string{})
 	errcode = yottadb.ErrorCode(err)
-	if yottadb.YDB_ERR_UNIMPLOP != errcode {
-		t.Error("The LockE() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_UNIMPLOP, "but was", errcode)
+	if yottadb.YDB_ERR_ISVUNSUPPORTED != errcode {
+		t.Error("The LockE() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_ISVUNSUPPORTED, "but was", errcode)
 	}
 	// YDB_ERR_INVSVN
 	err = yottadb.LockE(tptoken, &errstr, 0, "$NOTATHING", []string{})
@@ -580,11 +580,11 @@ func TestLockIncrEErrors(t *testing.T) {
 	if yottadb.YDB_ERR_INVVARNAME != errcode {
 		t.Error("The LockIncrE() errorcode for ^ expected to be", yottadb.YDB_ERR_INVVARNAME, "but was", errcode)
 	}
-	// YDB_ERR_UNIMPLOP
+	// YDB_ERR_ISVUNSUPPORTED
 	err = yottadb.LockIncrE(tptoken, &errstr, 0, "$ZCHSET", []string{})
 	errcode = yottadb.ErrorCode(err)
-	if yottadb.YDB_ERR_UNIMPLOP != errcode {
-		t.Error("The LockIncrE() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_UNIMPLOP, "but was", errcode)
+	if yottadb.YDB_ERR_ISVUNSUPPORTED != errcode {
+		t.Error("The LockIncrE() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_ISVUNSUPPORTED, "but was", errcode)
 	}
 	// YDB_ERR_INVSVN
 	err = yottadb.LockIncrE(tptoken, &errstr, 0, "$NOTATHING", []string{})
@@ -617,11 +617,11 @@ func TestLockIncrEErrors(t *testing.T) {
 	if yottadb.YDB_ERR_INVVARNAME != errcode {
 		t.Error("The LockDecrE() errorcode for ^ expected to be", yottadb.YDB_ERR_INVVARNAME, "but was", errcode)
 	}
-	// YDB_ERR_UNIMPLOP
+	// YDB_ERR_ISVUNSUPPORTED
 	err = yottadb.LockDecrE(tptoken, &errstr, "$ZCHSET", []string{})
 	errcode = yottadb.ErrorCode(err)
-	if yottadb.YDB_ERR_UNIMPLOP != errcode {
-		t.Error("The LockDecrE() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_UNIMPLOP, "but was", errcode)
+	if yottadb.YDB_ERR_ISVUNSUPPORTED != errcode {
+		t.Error("The LockDecrE() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_ISVUNSUPPORTED, "but was", errcode)
 	}
 	// YDB_ERR_INVSVN
 	err = yottadb.LockDecrE(tptoken, &errstr, "$NOTATHING", []string{})
@@ -755,11 +755,11 @@ func TestNodeNextEErrors(t *testing.T) {
 	if yottadb.YDB_ERR_INVVARNAME != errcode {
 		t.Error("The NodeNextE() errorcode for ^ expected to be", yottadb.YDB_ERR_INVVARNAME, "but was", errcode)
 	}
-	// YDB_ERR_UNIMPLOP
+	// YDB_ERR_ISVUNSUPPORTED
 	_, err = yottadb.NodeNextE(tptoken, &errstr, "$ZCHSET", []string{})
 	errcode = yottadb.ErrorCode(err)
-	if yottadb.YDB_ERR_UNIMPLOP != errcode {
-		t.Error("The NodeNextE() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_UNIMPLOP, "but was", errcode)
+	if yottadb.YDB_ERR_ISVUNSUPPORTED != errcode {
+		t.Error("The NodeNextE() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_ISVUNSUPPORTED, "but was", errcode)
 	}
 	// YDB_ERR_INVSVN
 	_, err = yottadb.NodeNextE(tptoken, &errstr, "$NOTATHING", []string{})
@@ -786,11 +786,11 @@ func TestNodeNextEErrors(t *testing.T) {
 	if yottadb.YDB_ERR_INVVARNAME != errcode {
 		t.Error("The NodePrevE() errorcode for ^ expected to be", yottadb.YDB_ERR_INVVARNAME, "but was", errcode)
 	}
-	// YDB_ERR_UNIMPLOP
+	// YDB_ERR_ISVUNSUPPORTED
 	_, err = yottadb.NodePrevE(tptoken, &errstr, "$ZCHSET", []string{})
 	errcode = yottadb.ErrorCode(err)
-	if yottadb.YDB_ERR_UNIMPLOP != errcode {
-		t.Error("The NodePrevE() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_UNIMPLOP, "but was", errcode)
+	if yottadb.YDB_ERR_ISVUNSUPPORTED != errcode {
+		t.Error("The NodePrevE() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_ISVUNSUPPORTED, "but was", errcode)
 	}
 	// YDB_ERR_INVSVN
 	_, err = yottadb.NodePrevE(tptoken, &errstr, "$NOTATHING", []string{})
@@ -953,11 +953,11 @@ func TestSubNextEErrors(t *testing.T) {
 	if yottadb.YDB_ERR_INVVARNAME != errcode {
 		t.Error("The SubNextE() errorcode for ^ expected to be", yottadb.YDB_ERR_INVVARNAME, "but was", errcode)
 	}
-	// YDB_ERR_UNIMPLOP
+	// YDB_ERR_ISVUNSUPPORTED
 	_, err = yottadb.SubNextE(tptoken, &errstr, "$ZCHSET", []string{})
 	errcode = yottadb.ErrorCode(err)
-	if yottadb.YDB_ERR_UNIMPLOP != errcode {
-		t.Error("The SubNextE() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_UNIMPLOP, "but was", errcode)
+	if yottadb.YDB_ERR_ISVUNSUPPORTED != errcode {
+		t.Error("The SubNextE() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_ISVUNSUPPORTED, "but was", errcode)
 	}
 	// YDB_ERR_INVSVN
 	_, err = yottadb.SubNextE(tptoken, &errstr, "$NOTATHING", []string{})
@@ -984,11 +984,11 @@ func TestSubNextEErrors(t *testing.T) {
 	if yottadb.YDB_ERR_INVVARNAME != errcode {
 		t.Error("The SubPrevE() errorcode for ^ expected to be", yottadb.YDB_ERR_INVVARNAME, "but was", errcode)
 	}
-	// YDB_ERR_UNIMPLOP
+	// YDB_ERR_ISVUNSUPPORTED
 	_, err = yottadb.SubPrevE(tptoken, &errstr, "$ZCHSET", []string{})
 	errcode = yottadb.ErrorCode(err)
-	if yottadb.YDB_ERR_UNIMPLOP != errcode {
-		t.Error("The SubPrevE() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_UNIMPLOP, "but was", errcode)
+	if yottadb.YDB_ERR_ISVUNSUPPORTED != errcode {
+		t.Error("The SubPrevE() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_ISVUNSUPPORTED, "but was", errcode)
 	}
 	// YDB_ERR_INVSVN
 	_, err = yottadb.SubPrevE(tptoken, &errstr, "$NOTATHING", []string{})

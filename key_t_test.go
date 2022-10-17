@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	//
+// Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -108,14 +108,14 @@ func TestDataSTErrors(t *testing.T) {
 	if yottadb.YDB_ERR_INVVARNAME != errcode {
 		t.Error("The DataST() errorcode for ^ expected to be", yottadb.YDB_ERR_INVVARNAME, "but was", errcode)
 	}
-	// YDB_ERR_UNIMPLOP
+	// YDB_ERR_ISVUNSUPPORTED
 	dbkey.Alloc(8, 0, 0)
 	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "$ZCHSET")
 	Assertnoerr(err, t)
 	_, err = dbkey.DataST(tptoken, &errstr)
 	errcode = yottadb.ErrorCode(err)
-	if yottadb.YDB_ERR_UNIMPLOP != errcode {
-		t.Error("The DataST() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_UNIMPLOP, "but was", errcode)
+	if yottadb.YDB_ERR_ISVUNSUPPORTED != errcode {
+		t.Error("The DataST() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_ISVUNSUPPORTED, "but was", errcode)
 	}
 	// YDB_ERR_INVSVN
 	dbkey.Alloc(16, 0, 0)
@@ -194,14 +194,14 @@ func TestDeleteSTErrors(t *testing.T) {
 	if yottadb.YDB_ERR_INVVARNAME != errcode {
 		t.Error("The DeleteST() errorcode for ^ expected to be", yottadb.YDB_ERR_INVVARNAME, "but was", errcode)
 	}
-	// YDB_ERR_UNIMPLOP - from special variable
+	// YDB_ERR_ISVUNSUPPORTED - from special variable
 	dbkey.Alloc(8, 0, 0)
 	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "$ZCHSET")
 	Assertnoerr(err, t)
 	err = dbkey.DeleteST(tptoken, &errstr, yottadb.YDB_DEL_TREE)
 	errcode = yottadb.ErrorCode(err)
-	if yottadb.YDB_ERR_UNIMPLOP != errcode {
-		t.Error("The DeleteST() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_UNIMPLOP, "but was", errcode)
+	if yottadb.YDB_ERR_ISVUNSUPPORTED != errcode {
+		t.Error("The DeleteST() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_ISVUNSUPPORTED, "but was", errcode)
 	}
 	// YDB_ERR_INVSVN
 	dbkey.Alloc(16, 0, 0)
@@ -472,14 +472,14 @@ func TestIncrSTErrors(t *testing.T) {
 	if yottadb.YDB_ERR_INVVARNAME != errcode {
 		t.Error("The IncrST() errorcode for ^ expected to be", yottadb.YDB_ERR_INVVARNAME, "but was", errcode)
 	}
-	// YDB_ERR_UNIMPLOP
+	// YDB_ERR_ISVUNSUPPORTED
 	dbkey.Alloc(8, 0, 0)
 	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "$ZCHSET")
 	Assertnoerr(err, t)
 	err = dbkey.IncrST(tptoken, &errstr, &incrval, &retval)
 	errcode = yottadb.ErrorCode(err)
-	if yottadb.YDB_ERR_UNIMPLOP != errcode {
-		t.Error("The IncrST() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_UNIMPLOP, "but was", errcode)
+	if yottadb.YDB_ERR_ISVUNSUPPORTED != errcode {
+		t.Error("The IncrST() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_ISVUNSUPPORTED, "but was", errcode)
 	}
 	// YDB_ERR_INVSVN
 	dbkey.Alloc(16, 0, 0)
@@ -600,14 +600,14 @@ func TestLockIncrSTErrors(t *testing.T) {
 	if yottadb.YDB_ERR_INVVARNAME != errcode {
 		t.Error("The LockIncrST() errorcode for ^ expected to be", yottadb.YDB_ERR_INVVARNAME, "but was", errcode)
 	}
-	// YDB_ERR_UNIMPLOP
+	// YDB_ERR_ISVUNSUPPORTED
 	dbkey.Alloc(8, 0, 0)
 	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "$ZCHSET")
 	Assertnoerr(err, t)
 	err = dbkey.LockIncrST(tptoken, &errstr, 0)
 	errcode = yottadb.ErrorCode(err)
-	if yottadb.YDB_ERR_UNIMPLOP != errcode {
-		t.Error("The LockIncrST() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_UNIMPLOP, "but was", errcode)
+	if yottadb.YDB_ERR_ISVUNSUPPORTED != errcode {
+		t.Error("The LockIncrST() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_ISVUNSUPPORTED, "but was", errcode)
 	}
 	// YDB_ERR_INVSVN
 	dbkey.Alloc(16, 0, 0)
@@ -661,14 +661,14 @@ func TestLockIncrSTErrors(t *testing.T) {
 	if yottadb.YDB_ERR_INVVARNAME != errcode {
 		t.Error("The LockDecrST() errorcode for ^ expected to be", yottadb.YDB_ERR_INVVARNAME, "but was", errcode)
 	}
-	// YDB_ERR_UNIMPLOP
+	// YDB_ERR_ISVUNSUPPORTED
 	dbkey.Alloc(8, 0, 0)
 	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "$ZCHSET")
 	Assertnoerr(err, t)
 	err = dbkey.LockDecrST(tptoken, &errstr)
 	errcode = yottadb.ErrorCode(err)
-	if yottadb.YDB_ERR_UNIMPLOP != errcode {
-		t.Error("The LockDecrST() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_UNIMPLOP, "but was", errcode)
+	if yottadb.YDB_ERR_ISVUNSUPPORTED != errcode {
+		t.Error("The LockDecrST() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_ISVUNSUPPORTED, "but was", errcode)
 	}
 	// YDB_ERR_INVSVN
 	dbkey.Alloc(16, 0, 0)
@@ -844,14 +844,14 @@ func TestNodeNextSTErrors(t *testing.T) {
 	if yottadb.YDB_ERR_INVVARNAME != errcode {
 		t.Error("The NodeNextST() errorcode for ^ expected to be", yottadb.YDB_ERR_INVVARNAME, "but was", errcode)
 	}
-	// YDB_ERR_UNIMPLOP
+	// YDB_ERR_ISVUNSUPPORTED
 	dbkey.Alloc(8, 0, 0)
 	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "$ZCHSET")
 	Assertnoerr(err, t)
 	err = dbkey.NodeNextST(tptoken, &errstr, &retval)
 	errcode = yottadb.ErrorCode(err)
-	if yottadb.YDB_ERR_UNIMPLOP != errcode {
-		t.Error("The NodeNextST() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_UNIMPLOP, "but was", errcode)
+	if yottadb.YDB_ERR_ISVUNSUPPORTED != errcode {
+		t.Error("The NodeNextST() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_ISVUNSUPPORTED, "but was", errcode)
 	}
 	// YDB_ERR_INVSVN
 	dbkey.Alloc(16, 0, 0)
@@ -896,14 +896,14 @@ func TestNodeNextSTErrors(t *testing.T) {
 	if yottadb.YDB_ERR_INVVARNAME != errcode {
 		t.Error("The NodePrevST() errorcode for ^ expected to be", yottadb.YDB_ERR_INVVARNAME, "but was", errcode)
 	}
-	// YDB_ERR_UNIMPLOP
+	// YDB_ERR_ISVUNSUPPORTED
 	dbkey.Alloc(8, 0, 0)
 	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "$ZCHSET")
 	Assertnoerr(err, t)
 	err = dbkey.NodePrevST(tptoken, &errstr, &retval)
 	errcode = yottadb.ErrorCode(err)
-	if yottadb.YDB_ERR_UNIMPLOP != errcode {
-		t.Error("The NodePrevST() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_UNIMPLOP, "but was", errcode)
+	if yottadb.YDB_ERR_ISVUNSUPPORTED != errcode {
+		t.Error("The NodePrevST() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_ISVUNSUPPORTED, "but was", errcode)
 	}
 	// YDB_ERR_INVSVN
 	dbkey.Alloc(16, 0, 0)
@@ -1132,14 +1132,14 @@ func TestSubNextSTErrors(t *testing.T) {
 	if yottadb.YDB_ERR_INVVARNAME != errcode {
 		t.Error("The SubNextST() errorcode for ^ expected to be", yottadb.YDB_ERR_INVVARNAME, "but was", errcode)
 	}
-	// YDB_ERR_UNIMPLOP
+	// YDB_ERR_ISVUNSUPPORTED
 	dbkey.Alloc(8, 0, 0)
 	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "$ZCHSET")
 	Assertnoerr(err, t)
 	err = dbkey.SubNextST(tptoken, &errstr, &retval)
 	errcode = yottadb.ErrorCode(err)
-	if yottadb.YDB_ERR_UNIMPLOP != errcode {
-		t.Error("The SubNextST() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_UNIMPLOP, "but was", errcode)
+	if yottadb.YDB_ERR_ISVUNSUPPORTED != errcode {
+		t.Error("The SubNextST() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_ISVUNSUPPORTED, "but was", errcode)
 	}
 	// YDB_ERR_INVSVN
 	dbkey.Alloc(16, 0, 0)
@@ -1184,14 +1184,14 @@ func TestSubNextSTErrors(t *testing.T) {
 	if yottadb.YDB_ERR_INVVARNAME != errcode {
 		t.Error("The SubPrevST() errorcode for ^ expected to be", yottadb.YDB_ERR_INVVARNAME, "but was", errcode)
 	}
-	// YDB_ERR_UNIMPLOP
+	// YDB_ERR_ISVUNSUPPORTED
 	dbkey.Alloc(8, 0, 0)
 	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "$ZCHSET")
 	Assertnoerr(err, t)
 	err = dbkey.SubPrevST(tptoken, &errstr, &retval)
 	errcode = yottadb.ErrorCode(err)
-	if yottadb.YDB_ERR_UNIMPLOP != errcode {
-		t.Error("The SubPrevST() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_UNIMPLOP, "but was", errcode)
+	if yottadb.YDB_ERR_ISVUNSUPPORTED != errcode {
+		t.Error("The SubPrevST() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_ISVUNSUPPORTED, "but was", errcode)
 	}
 	// YDB_ERR_INVSVN
 	dbkey.Alloc(16, 0, 0)

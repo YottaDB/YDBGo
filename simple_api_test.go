@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	//
+// Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -62,14 +62,14 @@ func TestSimpleAPILockSTErrors(t *testing.T) {
 	if yottadb.YDB_ERR_INVVARNAME != errcode {
 		t.Error("The LockST() errorcode for ^ expected to be", yottadb.YDB_ERR_INVVARNAME, "but was", errcode)
 	}
-	// YDB_ERR_UNIMPLOP
+	// YDB_ERR_ISVUNSUPPORTED
 	dbkey.Alloc(8, 0, 0)
 	err = dbkey.Varnm.SetValStr(tptoken, &errstr, "$ZCHSET")
 	Assertnoerr(err, t)
 	err = yottadb.LockST(tptoken, nil, 0, &dbkey)
 	errcode = yottadb.ErrorCode(err)
-	if yottadb.YDB_ERR_UNIMPLOP != errcode {
-		t.Error("The LockST() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_UNIMPLOP, "but was", errcode)
+	if yottadb.YDB_ERR_ISVUNSUPPORTED != errcode {
+		t.Error("The LockST() errorcode for $ZCHSET expected to be", yottadb.YDB_ERR_ISVUNSUPPORTED, "but was", errcode)
 	}
 	// YDB_ERR_INVSVN
 	dbkey.Alloc(16, 0, 0)
