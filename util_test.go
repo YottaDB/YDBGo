@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2019-2020 YottaDB LLC and/or its subsidiaries.	//
+// Copyright (c) 2019-2022 YottaDB LLC and/or its subsidiaries.	//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -104,7 +104,6 @@ func TestCallMT(t *testing.T) {
 	var errstr yottadb.BufferT
 	errstr.Alloc(2048)
 	defer errstr.Free()
-	cmpstr := "150375522,(SimpleThreadAPI),%YDB-E-INVSTRLEN, Invalid string length 20: max 15"
 
 	/* M callin that returns 20 characters, using a 20 character buffer */
 	retval, err := yottadb.CallMT(yottadb.NOTTP, &errstr, 20, "CallMTStrTest")
@@ -118,15 +117,16 @@ func TestCallMT(t *testing.T) {
 		panic(fmt.Sprintf("CallMT() return is not the correct length. Got: %d; Expected: 20", len(retval)))
 	}
 
-	/* M callin that returns 20 characters, using a 15 character buffer; should return INVSTRLEN */
+	/* M callin that returns 20 characters, using a 15 character buffer; should return truncated string */
 	retval, err = yottadb.CallMT(yottadb.NOTTP, &errstr, 15, "CallMTStrTest")
-	out, _ := errstr.ValStr(yottadb.NOTTP, nil)
-	errCode := yottadb.ErrorCode(err)
-	if yottadb.YDB_ERR_INVSTRLEN != errCode {
-		panic(fmt.Sprintf("CallMT() returned wrong ErrorCode. Got: %d; Expected: %d", errCode, yottadb.YDB_ERR_INVSTRLEN))
+	if nil != err {
+		panic(err)
 	}
-	if out != cmpstr {
-		panic(fmt.Sprintf("CallMT() returned wrong errstr. Got: %s; Expected: %s", out, cmpstr))
+	if "a0a1a2a3a4a5a6a" != retval {
+		panic(fmt.Sprintf("CallMT() did not return the correct string. Got: %s; Expected: a0a1a2a3a4a5a6a", retval))
+	}
+	if 15 != len(retval) {
+		panic(fmt.Sprintf("CallMT() return is not the correct length. Got: %d; Expected: 15", len(retval)))
 	}
 
 }
@@ -142,7 +142,6 @@ func TestCallMDescT(t *testing.T) {
 	var errstr yottadb.BufferT
 	errstr.Alloc(2048)
 	defer errstr.Free()
-	cmpstr := "150375522,(SimpleThreadAPI),%YDB-E-INVSTRLEN, Invalid string length 20: max 15"
 
 	var callin yottadb.CallMDesc
 	callin.SetRtnName("CallMTStrTest")
@@ -161,13 +160,14 @@ func TestCallMDescT(t *testing.T) {
 
 	/* M callin that returns 20 characters, using a 15 character buffer; should return INVSTRLEN */
 	retval, err = callin.CallMDescT(yottadb.NOTTP, &errstr, 15)
-	out, _ := errstr.ValStr(yottadb.NOTTP, &errstr)
-	errCode := yottadb.ErrorCode(err)
-	if yottadb.YDB_ERR_INVSTRLEN != errCode {
-		panic(fmt.Sprintf("CallMT() returned wrong ErrorCode. Got: %d; Expected: %d", errCode, yottadb.YDB_ERR_INVSTRLEN))
+	if nil != err {
+		panic(err)
 	}
-	if out != cmpstr {
-		panic(fmt.Sprintf("CallMT() returned wrong errstr. Got: %s; Expected: %s", out, cmpstr))
+	if "a0a1a2a3a4a5a6a" != retval {
+		panic(fmt.Sprintf("CallMT() did not return the correct string. Got: %s; Expected: a0a1a2a3a4a5a6a", retval))
+	}
+	if 15 != len(retval) {
+		panic(fmt.Sprintf("CallMT() return is not the correct length. Got: %d; Expected: 15", len(retval)))
 	}
 }
 
