@@ -62,75 +62,75 @@ before_script:
 #
 # In general, test first and last minor version of each major version
 #
-go1.13_tests:
+unit_tests1.13_tests:
   extends: .unit_tests
   variables:
     GOLANG_VERSION: "1.13"
 
-go1.13.8_tests:
+unit_tests1.13.8_tests:
   extends: .unit_tests
   variables:
     GOLANG_VERSION: "1.13.8"
 
-go1.14_tests:
+unit_tests1.14_tests:
   extends: .unit_tests
   variables:
     GOLANG_VERSION: "1.14"
 
-go1.14.13_tests:
+unit_tests1.14.13_tests:
   extends: .unit_tests
   variables:
     GOLANG_VERSION: "1.14.13"
 
-go1.15_tests:
+unit_tests1.15_tests:
   extends: .unit_tests
   variables:
     GOLANG_VERSION: "1.15"
 
-go1.15.15_tests:
+unit_tests1.15.15_tests:
   extends: .unit_tests
   variables:
     GOLANG_VERSION: "1.15.15"
-
-go1.16_tests:
-  extends: .unit_tests
-  variables:
-    GOLANG_VERSION: "1.16"
-
-go1.16.10_tests:
-  extends: .unit_tests
-  variables:
-    GOLANG_VERSION: "1.16.10"
-
-go1.17_tests:
-  extends: .unit_tests
-  variables:
-    GOLANG_VERSION: "1.17"
-
-go1.17.3_tests:
-  extends: .unit_tests
-  variables:
-    GOLANG_VERSION: "1.17.3"
 
 unit_tests1.16:
   extends: .unit_tests
   variables:
     GOLANG_VERSION: "1.16"
 
-unit_tests1.16.13:
+unit_tests1.16.15:
   extends: .unit_tests
   variables:
-    GOLANG_VERSION: "1.16.13"
+    GOLANG_VERSION: "1.16.15"
 
 unit_tests1.17:
   extends: .unit_tests
   variables:
     GOLANG_VERSION: "1.17"
 
-unit_tests1.17.6:
+unit_tests1.17.13:
   extends: .unit_tests
   variables:
-    GOLANG_VERSION: "1.17.6"
+    GOLANG_VERSION: "1.17.13"
+
+unit_tests1.18:
+  extends: .unit_tests
+  variables:
+    GOLANG_VERSION: "1.18"
+
+unit_tests1.18.9:
+  extends: .unit_tests
+  variables:
+    GOLANG_VERSION: "1.18.9"
+
+unit_tests1.19:
+  extends: .unit_tests
+  variables:
+    GOLANG_VERSION: "1.19"
+
+unit_tests1.19.4:
+  extends: .unit_tests
+  variables:
+    GOLANG_VERSION: "1.19.4"
 
 
 race_detector:
