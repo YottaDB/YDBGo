@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -24,7 +24,7 @@ variables:
   #     YDBOcto repo : Dockerfile-Tests.centos
   # There might be more files to change in the future.
   # Search for "GOLANG_VERSION" name in all YDB repos to find places that need change.
-  GOLANG_VERSION: 1.13.1
+  GOLANG_VERSION: 1.13.8
 
 before_script:
   - apt-get update && apt-get install -y --no-install-recommends wget ca-certificates git g++ gcc libc6-dev make pkg-config && rm -rf /var/lib/apt/lists/*
@@ -60,78 +60,42 @@ before_script:
       - artifacts
     expire_in: 7 days
 #
-# In general, test first and last minor version of each major version
+# In general, test the latest point release of each major version
 #
-unit_tests1.13_tests:
-  extends: .unit_tests
-  variables:
-    GOLANG_VERSION: "1.13"
-
 unit_tests1.13.8_tests:
   extends: .unit_tests
   variables:
     GOLANG_VERSION: "1.13.8"
-
-unit_tests1.14_tests:
-  extends: .unit_tests
-  variables:
-    GOLANG_VERSION: "1.14"
 
 unit_tests1.14.13_tests:
   extends: .unit_tests
   variables:
     GOLANG_VERSION: "1.14.13"
 
-unit_tests1.15_tests:
-  extends: .unit_tests
-  variables:
-    GOLANG_VERSION: "1.15"
-
 unit_tests1.15.15_tests:
   extends: .unit_tests
   variables:
     GOLANG_VERSION: "1.15.15"
-
-unit_tests1.16:
-  extends: .unit_tests
-  variables:
-    GOLANG_VERSION: "1.16"
 
 unit_tests1.16.15:
   extends: .unit_tests
   variables:
     GOLANG_VERSION: "1.16.15"
 
-unit_tests1.17:
-  extends: .unit_tests
-  variables:
-    GOLANG_VERSION: "1.17"
-
 unit_tests1.17.13:
   extends: .unit_tests
   variables:
     GOLANG_VERSION: "1.17.13"
-
-unit_tests1.18:
-  extends: .unit_tests
-  variables:
-    GOLANG_VERSION: "1.18"
 
 unit_tests1.18.9:
   extends: .unit_tests
   variables:
     GOLANG_VERSION: "1.18.9"
 
-unit_tests1.19:
-  extends: .unit_tests
-  variables:
-    GOLANG_VERSION: "1.19"
-
 unit_tests1.19.4:
   extends: .unit_tests
   variables:
     GOLANG_VERSION: "1.19.4"
-
 
 race_detector:
   stage: test
