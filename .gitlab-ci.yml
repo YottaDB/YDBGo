@@ -29,12 +29,14 @@ variables:
 before_script:
   - apt-get update && apt-get install -y --no-install-recommends wget ca-certificates git g++ gcc libc6-dev make pkg-config && rm -rf /var/lib/apt/lists/*
   - export GOPATH=/go
-  - mkdir -p ${GOPATH}/src ${GOPATH}/bin && chmod -R 777 ${GOPATH}
+  - export GOBIN=${GOPATH}/bin
+  - export GO111MODULE=off
+  - mkdir -p ${GOPATH}/src ${GOBIN} && chmod -R 777 ${GOPATH}
   - mkdir -p ${GOPATH}/src/lang.yottadb.com/go/yottadb/.git ${GOPATH}/src/_/builds
   - cp -r $CI_PROJECT_DIR/* ${GOPATH}/src/lang.yottadb.com/go/yottadb
   - cp -r $CI_PROJECT_DIR/.git/* ${GOPATH}/src/lang.yottadb.com/go/yottadb/.git
   - ln -s ${GOPATH}/src/lang.yottadb.com/go/yottadb ${GOPATH}/src/_/builds/yottadb
-  - export PATH=$GOPATH/bin:/usr/local/go/bin:$PATH
+  - export PATH=${GOBIN}:/usr/local/go/bin:$PATH
   - wget -O go.tgz -q https://golang.org/dl/go${GOLANG_VERSION}.linux-amd64.tar.gz
   - tar -C /usr/local -xzf go.tgz
   - rm go.tgz
@@ -134,9 +136,12 @@ commit-verify:
 
 lint_code:
   stage: test
+  variables:
+    GOLANG_VERSION: "1.18.9"
   script:
     - go get -u golang.org/x/lint/golint
-    - golint -set_exit_status $(go list ./... | grep -v /vendor/ | grep -v /internal/)
+    - find / -name "*lint*"
+    - ${GOBIN}/golint -set_exit_status $(go list ./... | grep -v /vendor/ | grep -v /internal/)
 
 error_codes:
   stage: test
