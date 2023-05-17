@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	//
+// Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -12,7 +12,7 @@
 
 // This package is a Go wrapper for a YottaDB database using the SimplaAPI interface. While the functional part
 // of this package runs OK with Go 1.10, certain external packages are used by the internal unit tests invoked
-// by 'go test' that have been updated to use facilities only present in Go 1.13.0 and later.
+// by 'go test' that have been updated to use facilities only present in Go 1.18.0 and later.
 //
 // This wrapper makes significant use of the 'cgo' facility to interface between this Go wrapper and the YottaDB
 // engine written in C. The cgo facility is described here: https://golang.org/cmd/cgo - Note that cgo imposes
@@ -80,7 +80,7 @@ const MinimumYDBReleaseMinor int = 34
 const MinimumYDBRelease string = "r1.34"
 
 // MinimumGoRelease - (string) Minimum version of Go to fully support this wrapper (including tests)
-const MinimumGoRelease string = "go1.13"
+const MinimumGoRelease string = "go1.18"
 
 // YDBHandlerFlag type is the flag type passed to yottadb.RegisterSignalNotify() to indicate when or if the driver should run the
 // YottaDB signal handler.

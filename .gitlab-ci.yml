@@ -19,12 +19,9 @@ stages:
 variables:
   # Note: If GOLANG_VERSION below is bumped up in the future, changes would be needed to at least the following files
   #     YDBGo   repo : Dockerfile
-  #     YDBOcto repo : .gitlab-ci.yml
-  #     YDBOcto repo : Dockerfile-Tests
-  #     YDBOcto repo : Dockerfile-Tests.centos
   # There might be more files to change in the future.
   # Search for "GOLANG_VERSION" name in all YDB repos to find places that need change.
-  GOLANG_VERSION: 1.13.8
+  GOLANG_VERSION: 1.18.1
 
 before_script:
   - apt-get update && apt-get install -y --no-install-recommends wget ca-certificates git g++ gcc libc6-dev make pkg-config && rm -rf /var/lib/apt/lists/*
@@ -64,40 +61,20 @@ before_script:
 #
 # In general, test the latest point release of each major version
 #
-unit_tests1.13.8_tests:
+unit_tests1.18.10:
   extends: .unit_tests
   variables:
-    GOLANG_VERSION: "1.13.8"
+    GOLANG_VERSION: "1.18.10"
 
-unit_tests1.14.13_tests:
+unit_tests1.19.9:
   extends: .unit_tests
   variables:
-    GOLANG_VERSION: "1.14.13"
+    GOLANG_VERSION: "1.19.9"
 
-unit_tests1.15.15_tests:
+unit_tests1.20.4:
   extends: .unit_tests
   variables:
-    GOLANG_VERSION: "1.15.15"
-
-unit_tests1.16.15:
-  extends: .unit_tests
-  variables:
-    GOLANG_VERSION: "1.16.15"
-
-unit_tests1.17.13:
-  extends: .unit_tests
-  variables:
-    GOLANG_VERSION: "1.17.13"
-
-unit_tests1.18.9:
-  extends: .unit_tests
-  variables:
-    GOLANG_VERSION: "1.18.9"
-
-unit_tests1.19.4:
-  extends: .unit_tests
-  variables:
-    GOLANG_VERSION: "1.19.4"
+    GOLANG_VERSION: "1.20.4"
 
 race_detector:
   stage: test
@@ -137,7 +114,7 @@ commit-verify:
 lint_code:
   stage: test
   variables:
-    GOLANG_VERSION: "1.18.9"
+    GOLANG_VERSION: "1.18.10"
   script:
     - go get -u golang.org/x/lint/golint
     - find / -name "*lint*"
