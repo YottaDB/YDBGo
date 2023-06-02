@@ -29,6 +29,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Install go
+ENV GOPROXY https://proxy.golang.org/cached-only
 ENV GOPATH /go
 RUN mkdir /go
 ENV GOLANG_VERSION 1.18.1

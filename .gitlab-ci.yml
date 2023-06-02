@@ -25,6 +25,7 @@ variables:
 
 before_script:
   - apt-get update && apt-get install -y --no-install-recommends wget ca-certificates git g++ gcc libc6-dev make pkg-config && rm -rf /var/lib/apt/lists/*
+  - export GOPROXY=https://proxy.golang.org/cached-only
   - export GOPATH=/go
   - export GOBIN=${GOPATH}/bin
   - export GO111MODULE=off
