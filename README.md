@@ -34,6 +34,7 @@ You can also override the path used by pkg-config to find yottadb.pc with the en
 Using the package:
 
 ```sh
+go mod init myprogram
 go get lang.yottadb.com/go/yottadb
 ```
 
