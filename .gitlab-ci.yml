@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -117,9 +117,9 @@ lint_code:
   variables:
     GOLANG_VERSION: "1.18.10"
   script:
-    - go get -u golang.org/x/lint/golint
-    - find / -name "*lint*"
-    - ${GOBIN}/golint -set_exit_status $(go list ./... | grep -v /vendor/ | grep -v /internal/)
+    - export GO111MODULE=on
+    - go install golang.org/x/lint/golint@latest
+    - golint -set_exit_status $(go list ./... | grep -v /vendor/ | grep -v /internal/)
 
 error_codes:
   stage: test
