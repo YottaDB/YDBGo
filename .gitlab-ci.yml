@@ -28,7 +28,6 @@ before_script:
   - export GOPROXY=https://proxy.golang.org/cached-only
   - export GOPATH=/go
   - export GOBIN=${GOPATH}/bin
-  - export GO111MODULE=off
   - mkdir -p ${GOPATH}/src ${GOBIN} && chmod -R 777 ${GOPATH}
   - mkdir -p ${GOPATH}/src/lang.yottadb.com/go/yottadb/.git ${GOPATH}/src/_/builds
   - cp -r $CI_PROJECT_DIR/* ${GOPATH}/src/lang.yottadb.com/go/yottadb
@@ -117,7 +116,6 @@ lint_code:
   variables:
     GOLANG_VERSION: "1.18.10"
   script:
-    - export GO111MODULE=on
     - go install golang.org/x/lint/golint@latest
     - golint -set_exit_status $(go list ./... | grep -v /vendor/ | grep -v /internal/)
 
