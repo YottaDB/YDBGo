@@ -1,0 +1,31 @@
+#################################################################
+#								#
+# Copyright (c) 2024 YottaDB LLC and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+# This Dockerfile is for YottaDB's internal use to be able to debug the pipelines
+# docker build --progress=plain -f Dockerfile-test .
+FROM yottadb/yottadb-base:latest-master
+
+RUN apt-get update && apt-get install -y --no-install-recommends wget ca-certificates git g++ gcc libc6-dev make pkg-config && rm -rf /var/lib/apt/lists/*
+
+ENV ydb_dist /opt/yottadb/current
+ENV GOLANG_VERSION 1.18.1
+ENV GOPROXY https://proxy.golang.org/cached-only
+ENV PATH /usr/local/go/bin:$PATH
+
+RUN wget -O go.tgz -q https://golang.org/dl/go${GOLANG_VERSION}.linux-amd64.tar.gz
+RUN tar -C /usr/local -xzf go.tgz && rm go.tgz
+RUN go version
+
+ADD . /source
+WORKDIR /source
+ENV YDB_GO_SKIP_TIMED_TESTS "yes"
+RUN go get -t
+RUN go test -v
