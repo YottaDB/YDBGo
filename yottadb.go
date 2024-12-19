@@ -68,7 +68,7 @@ var MaximumSigAckWait time.Duration = DefaultMaximumSigAckWait
 // on new content, either the third piece of the version will be bumped to an even value or the second piece of the
 // version will be bumped by 1 and the third piece of the version set to 0. On rare occasions, we may bump the first
 // piece of the version and zero the others when the changes are significant.
-const WrapperRelease string = "v1.2.5"
+const WrapperRelease string = "v1.2.6"
 
 // MinimumYDBReleaseMajor - (int) Minimum major release number required by this wrapper of the linked YottaDB
 const MinimumYDBReleaseMajor int = 1
