@@ -33,7 +33,7 @@ RUN apt-get update && \
 ENV GOPROXY=https://proxy.golang.org/cached-only
 ENV GOPATH=/go
 RUN mkdir /go
-ENV GOLANG_VERSION=1.18.1
+ENV GOLANG_VERSION 1.24.0
 ENV PATH=$GOPATH/bin:/usr/local/go/bin:$PATH
 RUN wget -O go.tgz -q https://golang.org/dl/go${GOLANG_VERSION}.linux-amd64.tar.gz && \
     tar -C /usr/local -xzf go.tgz && \

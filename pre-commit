@@ -2,7 +2,7 @@
 #
 #################################################################
 #                                                               #
-# Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.       #
+# Copyright (c) 2020-2025 YottaDB LLC and/or its subsidiaries.  #
 # All rights reserved.                                          #
 #                                                               #
 #       This source code contains the intellectual property     #
@@ -103,12 +103,16 @@ end
 # This is fixed in go 1.11 and higher so run the "go vet" step only if go version is > 1.10
 set gover = `go version | cut -d " " -f 3`
 if (`expr "go1.11.0" \<= "$gover"`) then
-	go vet
-	@ status1 = $status
-	if ($status1) then
-		@ exitstatus = 1
-		echo "GOVET-E-FAIL : Command [go vet] failed with status : $status1"
-	endif
+	go vet || echo "GOVET-E-FAIL : Command [go vet] failed in v1 with status : $status1" `false` || @ exitstatus = 1
+	go vet -C v2 || echo "GOVET-E-FAIL : Command [go vet] failed on v2 with status : $status1" `false` || @ exitstatus = 1
 endif
+
+# ------------------------------------------------------------------------------------------
+# 4) Run "staticcheck" as linter
+# ------------------------------------------------------------------------------------------
+# Check v1 with settings compatible with "golint" which was used previously
+staticcheck -checks inherit,-ST1017,-SA4006,-S1006,-S1005,-S1000,-S1008 || @ exitstatus = 1
+# Check v2 with staticcheck. Any special config options should be added in a staticcheck.conf file
+(cd v2; staticcheck) || @ exitstatus = 1
 
 exit $exitstatus

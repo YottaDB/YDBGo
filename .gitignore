@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2018-2019 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -10,9 +10,18 @@
 #								#
 #################################################################
 
+# Ignore any executables that have been built (i.e. files without an extension).
+# Works by ignoring everything except directories and files with a dot.
+# NOTE: Must be first in the .gitignore file
+# From recipe here: https://stackoverflow.com/questions/19023550/how-do-i-add-files-without-dots-in-them-all-extension-less-files-to-the-gitign
+*
+!*/
+!*.*
+
 *~
 *.dat
 *.gld
 **/#*#
 *.o
-/go.sum
+go.work
+go.work.sum

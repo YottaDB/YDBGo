@@ -29,7 +29,7 @@ if ! [ -e "$file" ]; then
 	exit 1
 fi
 
-skipextensions="mod ci"	# List of extensions that cannot have copyrights.
+skipextensions="mod ci sum md"	# List of extensions that cannot have copyrights.
 	# .mod -> e.g. go.mod is an auto-generated file and
 	# .ci  -> e.g. calltab.ci stores the call-in table but currently YDB repo
 	#	does not have a provision for comment characters in that file).
@@ -39,7 +39,7 @@ if echo "$skipextensions" | grep -q -w "$(echo "$file" | awk -F . '{print $NF}')
 fi
 
 # Below is a list of specific files that do not have a copyright so ignore them
-skiplist="COPYING README.md error_codes.go, error_codes.h"
+skiplist="COPYING README.md error_codes.go, v2/error_codes.go v2/error_codes.h"
 if echo "$skiplist" | grep -q -w "$file"; then
 	exit 1
 fi
