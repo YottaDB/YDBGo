@@ -2,7 +2,7 @@
 
 #################################################################
 #								#
-# Copyright (c) 2020 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2020-2025 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -39,7 +39,7 @@ if echo "$skipextensions" | grep -q -w "$(echo "$file" | awk -F . '{print $NF}')
 fi
 
 # Below is a list of specific files that do not have a copyright so ignore them
-skiplist="COPYING README.md error_codes.go"
+skiplist="COPYING README.md error_codes.go, error_codes.h"
 if echo "$skiplist" | grep -q -w "$file"; then
 	exit 1
 fi

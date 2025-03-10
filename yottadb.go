@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	//
+// Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -64,7 +64,7 @@ var MaximumSigAckWait time.Duration = DefaultMaximumSigAckWait
 // Release version constants - be sure to change all of them appropriately
 
 // WrapperRelease - (string) The Go wrapper release value for YottaDB SimpleAPI. Note the third piece of this version
-// will be even for a production release and odd for a development release (branch develop). When released, depending
+// will be even for a production release and odd for a development release. When released, depending
 // on new content, either the third piece of the version will be bumped to an even value or the second piece of the
 // version will be bumped by 1 and the third piece of the version set to 0. On rare occasions, we may bump the first
 // piece of the version and zero the others when the changes are significant.
