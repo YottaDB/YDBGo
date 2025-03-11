@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	//
+// Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -180,14 +180,35 @@ func Init() {
 	}
 }
 
-// Exit is a function to drive YDB's exit handler in case of panic or other non-normal shutdown that bypasses
-// atexit() that would normally drive the exit handler.
+// Exit invokes YottaDB's exit handler ydb_exit() to shut down the database properly.
+// It MUST be called prior to process termination by any application that modifies the database.
+// This is necessary particularly in Go because Go does not call the C atexit() handler (unless building with certain test options),
+// so YottaDB itself cannot automatically ensure correct rundown of the database.
 //
-// Note this function is guarded with a mutex and has a "exitRun" flag indicating it has been run. This is because we have seen
-// the Exit() routine being run multiple times by multiple goroutines which causes hangs. So it is now controlled with a mutex and
-// the already-been-here global flag "exitRun". Once this routine calls C.ydb_exit(), even if it gets stuck, the goroutine is still
-// active so if the engine lock becomes available prior to process demise, this routine will wake up and complete the rundown
+// If Exit() is not called prior to process termination, steps must be taken to ensure database integrity as documented in [Database Integrity]
+// and unreleased locks may cause small subsequent delays (see [relevant LKE documentation]).
+//
+// Recommended behaviour is for your main routine to defer yottadb.Exit() early in the main routine's initialization, and then for the main routine
+// to confirm that all goroutines have stopped or have completely finished accessing the database before returning.
+//   - If Go routines that access the database are spawned, it is the main routine's responsibility to ensure that all such threads have
+//     finished using the database before it calls yottadb.Exit().
+//   - The application must not call Go's os.Exit() function which is a very low-level function that bypasses any defers.
+//   - Care must be taken with any signal notifications (see [Go Using Signals]) to prevent them from causing premature exit.
+//   - Note that Go *will* run defers on panic, but not on fatal signals such as SIGSEGV.
+//
+// Exit() may be called multiple times by different threads during an application shutdown.
+//
+// [Database Integrity]: https://docs.yottadb.com/MultiLangProgGuide/goprogram.html#database-integrity
+// [relevant LKE documentation]: https://docs.yottadb.com/AdminOpsGuide/mlocks.html#introduction
+// [Go Using Signals]: https://docs.yottadb.com/MultiLangProgGuide/goprogram.html#go-using-signals
+//
+// [exceptions]: https://github.com/golang/go/issues/20713#issuecomment-1518197679
 func Exit() error {
+	// Note this function is guarded with a mutex and has a "exitRun" flag indicating it has been run. This is because we have seen
+	// the Exit() routine being run multiple times by multiple goroutines which causes hangs. So it is now controlled with a mutex and
+	// the already-been-here global flag "exitRun". Once this routine calls C.ydb_exit(), even if it is blocked by the YottaDB engine lock,
+	// the goroutine that called Exit is still active, so if the engine lock becomes available prior to process demise, this routine will
+	// wake up and complete the rundown.
 	var errstr string
 	var errNum int
 
