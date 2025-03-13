@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2019-2024 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2019-2025 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #   This source code contains the intellectual property		#
@@ -30,15 +30,15 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Install go
-ENV GOPROXY https://proxy.golang.org/cached-only
-ENV GOPATH /go
+ENV GOPROXY=https://proxy.golang.org/cached-only
+ENV GOPATH=/go
 RUN mkdir /go
-ENV GOLANG_VERSION 1.18.1
+ENV GOLANG_VERSION=1.18.1
 ENV PATH=$GOPATH/bin:/usr/local/go/bin:$PATH
 RUN wget -O go.tgz -q https://golang.org/dl/go${GOLANG_VERSION}.linux-amd64.tar.gz && \
     tar -C /usr/local -xzf go.tgz && \
     rm go.tgz
 
 # Setup YottaDB
-ENV ydb_dir /data
-ENV ydb_dist /opt/yottadb/current
+ENV ydb_dir=/data
+ENV ydb_dist=/opt/yottadb/current
