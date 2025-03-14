@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2018-2024 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -105,7 +105,7 @@ commit-verify:
     # Copy commit gpg key verify script to build directory and execute
     - wget https://gitlab.com/YottaDB/DB/YDB/-/raw/master/ci/commit_verify.sh
     - chmod +x commit_verify.sh
-    - ./commit_verify.sh scripts/needs_copyright.sh https://gitlab.com/YottaDB/Lang/YDBGo develop
+    - ./commit_verify.sh scripts/needs_copyright.sh https://gitlab.com/YottaDB/Lang/YDBGo
 
 lint_code:
   stage: test
