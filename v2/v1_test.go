@@ -15,6 +15,7 @@
 package yottadb_test
 
 import (
+	assert "github.com/stretchr/testify/require"
 	"testing"
 )
 
@@ -22,88 +23,137 @@ import (
 import yottadb "lang.yottadb.com/go/yottadb"
 import v2 "lang.yottadb.com/go/yottadb/v2"
 
-func BenchmarkEasy(b *testing.B) {
+func BenchmarkV1Easy(b *testing.B) {
 	b.Run("Set", func(b *testing.B) {
 		for i := 0; b.Loop(); i++ {
-			err := yottadb.SetValE(yottadb.NOTTP, nil, v2.Randstr(), "x", []string{})
-			if err != nil {
-				panic(err)
-			}
+			err := yottadb.SetValE(yottadb.NOTTP, nil, v2.Randstr(), "var", []string{})
+			assert.Nil(b, err)
 		}
 	})
 }
 
-// Benchmark Setting a node repeatedly to new values each time.
+// Benchmark setting a node repeatedly to set new values each time
 func smplBenchmarkSet(b *testing.B) {
-	// Set up database key named `x`
+	// Set up database key named `var`
 	var k yottadb.KeyT
 	k.Alloc(100, 10, 100) // varname length 100, up to 10 subscripts, of up to 100 chars each
 	defer k.Free()
 	k.Subary.SetElemUsed(yottadb.NOTTP, nil, 0) // just varname; no subscripts
-	err := k.Varnm.SetValStr(yottadb.NOTTP, nil, "x")
-	if err != nil {
-		panic(err)
-	}
+	err := k.Varnm.SetValStr(yottadb.NOTTP, nil, "var")
+	assert.Nil(b, err)
 
-	// Set up buffer for value to store into `x`
+	// Set up buffer for value to store into `var`
 	var value yottadb.BufferT
 	value.Alloc(100) // allow a value of up to this many chars
 	defer value.Free()
 
 	// Iterate the SET command to benchmark it
-	for i := 0; b.Loop(); i++ {
+	for b.Loop() {
 		err = value.SetValStr(yottadb.NOTTP, nil, v2.Randstr())
-		if err != nil {
-			panic(err)
-		}
+		assert.Nil(b, err)
 		err = k.SetValST(yottadb.NOTTP, nil, &value)
-		if err != nil {
-			panic(err)
-		}
+		assert.Nil(b, err)
 	}
 }
 
-// Benchmark Setting a node with randomly located node, where each node has 5 random subscripts.
-func smplBenchmarkSetVariantSubscripts(b *testing.B) {
-	// Set up buffer for value to store into `x`
+// Benchmark getting a node repeatedly
+func smplBenchmarkGet(b *testing.B) {
+	// Set up database key named `var`
+	var k yottadb.KeyT
+	k.Alloc(100, 10, 100) // varname length 100, up to 10 subscripts, of up to 100 chars each
+	defer k.Free()
+	k.Subary.SetElemUsed(yottadb.NOTTP, nil, 0) // just varname; no subscripts
+	err := k.Varnm.SetValStr(yottadb.NOTTP, nil, "var")
+	assert.Nil(b, err)
+
+	// Set up buffer for received value
 	var value yottadb.BufferT
 	value.Alloc(100) // allow a value of up to this many chars
 	defer value.Free()
 
+	// Iterate the GET command to benchmark it
+	for b.Loop() {
+		err = k.ValST(yottadb.NOTTP, nil, &value)
+		assert.Nil(b, err)
+		_, err = value.ValStr(yottadb.NOTTP, nil)
+		assert.Nil(b, err)
+	}
+}
+
+// Benchmark setting a node with randomly located node, where each node has 5 random subscripts.
+func smplBenchmarkSetVariantSubscripts(b *testing.B) {
+	// Set up buffer for value to store into `var`
+	var value yottadb.BufferT
+	value.Alloc(100) // allow a value of up to this many chars
+	defer value.Free()
+
+	v2.RandstrReset() // access the same nodes to be subsequently fetched by matching Get() benchmark
 	const nSubs = 5
-	for i := 0; b.Loop(); i++ {
+	for b.Loop() {
 		var k yottadb.KeyT
 		k.Alloc(100, nSubs, 100)
 		// Store varname
 		err := k.Varnm.SetValStr(yottadb.NOTTP, nil, "var")
-		if err != nil {
-			panic(err)
-		}
+		assert.Nil(b, err)
 		// Store each subscript
 		subs := k.Subary
 		for j := range nSubs {
 			sub := v2.Randstr()
 			err := subs.SetValStr(yottadb.NOTTP, nil, uint32(j), sub)
-			if err != nil {
-				panic(err)
-			}
+			assert.Nil(b, err)
 		}
 		subs.SetElemUsed(yottadb.NOTTP, nil, nSubs)
 
 		err = value.SetValStr(yottadb.NOTTP, nil, v2.Randstr())
-		if err != nil {
-			panic(err)
-		}
+		assert.Nil(b, err)
 		err = k.SetValST(yottadb.NOTTP, nil, &value)
-		if err != nil {
-			panic(err)
-		}
+		assert.Nil(b, err)
 
 		k.Free()
 	}
 }
 
-func BenchmarkSmpl(b *testing.B) {
+// Benchmark getting a node with randomly located node, where each node has 5 random subscripts.
+func smplBenchmarkGetVariantSubscripts(b *testing.B) {
+	// Set up buffer for value to store into `var`
+	var value yottadb.BufferT
+	value.Alloc(100) // allow a value of up to this many chars
+	defer value.Free()
+
+	v2.RandstrReset() // access the same nodes previously stored by matching Set() benchmark
+	const nSubs = 5
+	for b.Loop() {
+		var k yottadb.KeyT
+		// In this case we could re-use the allocation each loop, but the purpose of this
+		// benchmark is to simulate allocation of new arbitrary nodes like in a real application
+		k.Alloc(100, nSubs, 100)
+		// Store varname
+		err := k.Varnm.SetValStr(yottadb.NOTTP, nil, "var")
+		assert.Nil(b, err)
+		// Store each subscript
+		subs := k.Subary
+		for j := range nSubs {
+			sub := v2.Randstr()
+			err := subs.SetValStr(yottadb.NOTTP, nil, uint32(j), sub)
+			assert.Nil(b, err)
+		}
+		subs.SetElemUsed(yottadb.NOTTP, nil, nSubs)
+
+		v2.Randstr() // increment random string index to match strings with Set() benchmark
+		err = k.ValST(yottadb.NOTTP, nil, &value)
+		if err != nil {
+			assert.Nil(b, err, "Make sure to run the Set benchmark first to init values to read")
+		}
+		_, err = value.ValStr(yottadb.NOTTP, nil)
+		assert.Nil(b, err)
+
+		k.Free()
+	}
+}
+
+func BenchmarkV1Simple(b *testing.B) {
 	b.Run("Set", smplBenchmarkSet)
 	b.Run("SetVariantSubscripts", smplBenchmarkSetVariantSubscripts)
+	b.Run("Get", smplBenchmarkGet)
+	b.Run("GetVariantSubscripts", smplBenchmarkGetVariantSubscripts)
 }

@@ -15,9 +15,9 @@ package yottadb
 // The code in this module is necesitated by cgo restrictions. Go/cgo does not allow us to pass function pointers to Go
 // functions in to C routines. Because of this we need small C wrapper routines for any such parms we are going to be passing.
 // Then, we need another small C routine to fetch the address of the C wrapper routine. So init.go calls the
-// ydb_get_gowrapper_panic_callback_funcvp() routine to fetch the address of the ydb_gowrapper_panic_callback() routine and
-// passes the returned function pointer in to C. Then C will call ydb_gowrapper_panic_callback() which then can directly drive
-// the Go routine YDBWrapperPanic().
+// ydb_get_gowrapper_panic_callback() routine to fetch the address of YDBWrapperPanicCallback() and
+// passes the returned function pointer in to C. Then C can call the Go routine YDBWrapperPanicCallback().
+// (which is itself a C wrapper for a Go routine that is created by the export of it in init.go
 //
 // Also, if these routines are included in init.go we run into yet another known issue with Go with the compile giving duplicate
 // entry point errors so these routines are placed in their own module.

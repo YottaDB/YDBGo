@@ -23,32 +23,43 @@ var conn *Conn // global connection for use in testing
 
 // ---- Utility functions for tests
 
-// assert processes panic errors that occur during test.
-func assert(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
-
-var randstr = make([]string, 0, 10000) // Array of random strings for use in testing
+var randstrArray = make([]string, 0, 10000) // Array of random strings for use in testing
 var randstrIndex = 0
 
 // initRandstr prepares a list of many random strings.
 func initRandstr() {
-	if len(randstr) > 0 {
-		return // early return if already filled randstr
+	if len(randstrArray) > 0 {
+		return // early return if already filled randstrArray
 	}
 	rnd := rand.New(rand.NewChaCha8([32]byte{}))
-	for range cap(randstr) {
+	for range cap(randstrArray) {
 		s := fmt.Sprintf("%x", rnd.Uint32())
-		randstr = append(randstr, s)
+		randstrArray = append(randstrArray, s)
 	}
 }
 
-// Randstr fetches a random string from our cache of pre-calculated random strings.
+// randstr fetches a random string from our cache of pre-calculated random strings.
 func Randstr() string {
-	randstrIndex = (randstrIndex + 1) % len(randstr)
-	return randstr[randstrIndex]
+	randstrIndex = (randstrIndex + 1) % len(randstrArray)
+	return randstrArray[randstrIndex]
+}
+
+func RandstrReset() {
+	randstrIndex = 0
+}
+
+// multi returns multiple parameters as a single slice of interfaces.
+// Useful, for example, in asserting test validity of functions that return both a value and an error.
+func multi(v ...interface{}) []interface{} {
+	return v
+}
+
+// ---- Initialize test system
+
+// This benchmark is purely to provide a long name that causes benchmark outputs to align.
+// It calls skip which prevents it from running.
+func Benchmark________________________________(b *testing.B) {
+	b.Skip()
 }
 
 // _testMain is factored out of TestMain to let us defer Init() properly

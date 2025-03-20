@@ -75,7 +75,15 @@ Now you can modify the YottaDB Go wrapper on your local file system, and it will
 To test this wrapper:
 
 - `go build` only does a test compilation; it does not produce any files; `go install` has no effect.
-- To run tests, run `go get -t`, then `go test -v`.
+- To run tests, run `make test`
+- To run benchmarks, run `make bench`
+
+Notes:
+
+* For example, some CPUs gradually warm up during benchmarking, making the first few tests unfairly faster. Benchmark results are a lot more accurate and fair if you install [`perflock`](https://github.com/aclements/perflock), which `make bench` will invoke automatically.
+* Perflock is apparently less effective on some CPUs. You can test whether it's working to produce consistent results by running  `make check` which will run each benchmark several times so that you can see whether you're experiencing warm-up effects.
+
+## Contributing
 
 Last, if you plan to commit, you should set-up pre-commit hooks.
 

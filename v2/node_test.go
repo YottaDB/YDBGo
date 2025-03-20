@@ -14,6 +14,7 @@ package yottadb
 
 import (
 	"fmt"
+	assert "github.com/stretchr/testify/require"
 	"testing"
 )
 
@@ -40,35 +41,57 @@ func TestNode(t *testing.T) {
 	})
 }
 
-func TestGetSet(t *testing.T) {
-	n := conn.Node("var") // or: db.New("varname", "sub1", "sub2")
-	assert(n.Set(Randstr()))
+func TestSetGet(t *testing.T) {
+	n := conn.Node("var")
+	assert.Nil(t, n.Set("value"))
+	assert.Equal(t, multi("value", nil), multi(n.Get()))
 }
 
 // ---- Benchmarks
 
-// Benchmark Setting a node repeatedly to new values each time.
-func benchmarkSet(b *testing.B) {
-	n := conn.Node("var") // or: db.New("varname", "sub1", "sub2")
-	for i := 0; b.Loop(); i++ {
-		assert(n.Set(Randstr()))
+// Benchmark setting a node repeatedly to new values each time.
+func BenchmarkSet(b *testing.B) {
+	n := conn.Node("var")
+	for b.Loop() {
+		assert.Nil(b, n.Set(Randstr()))
 	}
 }
 
-// Benchmark Setting a node with randomly located node, where each node has 5 random subscripts.
-func benchmarkSetVariantSubscripts(b *testing.B) {
+// Benchmark getting a node repeatedly.
+func BenchmarkGet(b *testing.B) {
+	n := conn.Node("var")
+	for b.Loop() {
+		_, err := n.Get()
+		assert.Nil(b, err)
+	}
+}
+
+// Benchmark setting a node with randomly located node, where each node has 5 random subscripts.
+func BenchmarkSetVariantSubscripts(b *testing.B) {
 	subs := make([]string, 5)
-	for i := 0; b.Loop(); i++ {
+	RandstrReset() // access the same nodes to be subsequently fetched by matching Get() benchmark
+	for b.Loop() {
 		for j := range subs {
 			subs[j] = Randstr()
 		}
 		n := conn.Node("var", subs...)
-		assert(n.Set(Randstr()))
+		assert.Nil(b, n.Set(Randstr()))
 	}
 }
 
-// Run all Node benchmarks.
-func BenchmarkNode(b *testing.B) {
-	b.Run("Set", benchmarkSet)
-	b.Run("SetVariantSubscripts", benchmarkSetVariantSubscripts)
+// Benchmark getting a node with randomly located node, where each node has 5 random subscripts.
+func BenchmarkGetVariantSubscripts(b *testing.B) {
+	subs := make([]string, 5)
+	RandstrReset() // access the same nodes previously stored by matching Set() benchmark
+	for b.Loop() {
+		for j := range subs {
+			subs[j] = Randstr()
+		}
+		n := conn.Node("var", subs...)
+		Randstr() // increment random string index to match strings with Set() benchmark
+		_, err := n.Get()
+		if err != nil {
+			assert.Nil(b, err, "Make sure to run the Set benchmark first to init values to read")
+		}
+	}
 }
