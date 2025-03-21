@@ -127,8 +127,8 @@ func validateNotifySignal(sig syscall.Signal, entryPoint ydbEntryPoint) error {
 // complete.
 func RegisterSignalNotify(sig syscall.Signal, notifyChan, ackChan chan bool, notifyWhen YDBHandlerFlag) error {
 	// Although this routine itself does not interact with the YottaDB runtime, use of this routine has an expectation that
-	// the runtime is going to handle signals so make sure it gets initialized.
-	initializeYottaDB()
+	// the runtime is going to handle signals so make sure it is initialized.
+	initCheck()
 	err := validateNotifySignal(sig, ydbEntryRegisterSigNotify)
 	if nil != err {
 		panic(fmt.Sprintf("YDB: %v", err))
@@ -221,7 +221,8 @@ func shutdownSignalGoroutines() {
 	}
 }
 
-// YDBWrapperPanicCallback is a function called from C code. The C code routine address is passed to YottaDB via the ydb_main_lang_init()
+// YDBWrapperPanicCallback is a function called from C code.
+// The C code routine address is passed to YottaDB via the ydb_main_lang_init()
 // call in initializeYottaDB() below and is called by YottaDB when it has completed processing a deferred fatal signal
 // and needs to exit in a "Go-ish" manner. The parameter determines the type of panic that gets raised.
 //
@@ -232,13 +233,14 @@ func YDBWrapperPanicCallback(sigNum C.int) {
 	printEntry("YDBWrapperPanic()")
 	ydbSigPanicCalled.Store(true) // Need "atomic" usage to avoid read/write DATA RACE issues
 	shutdownSignalGoroutines()    // Close the goroutines down with their signal notification channels
-	sig = syscall.Signal(sigNum)  // Convert numeric signal number to Signal type for use in panic() messagee
+	sig = syscall.Signal(sigNum)  // Convert numeric signal number to Signal type for use in panic() message
 	panic(fmt.Sprintf("YDB: Fatal signal %d (%v) occurred", sig, sig))
 }
 
 var inInit atomic.Bool // We are in initializeYottaDB() so don't recurse when called from NewConn()
 
-// initializeYottaDB initializes the YottaDB engine. This is an atypical method of doing simple API initialization compared to
+// initializeYottaDB initializes the YottaDB engine if necessary.
+// This is an atypical method of doing simple API initialization compared to
 // other language APIs, where you can just make any API call, and initialization is automatic.
 // But the Go wrapper needs to do its initialization differently to setup signal handling differently. Usually,
 // YottaDB sets up its signal handling, but to work well with Go, Go itself needs to do the signal handling and
@@ -507,6 +509,12 @@ func waitForAndProcessSignal(shutdownChannelIndx int) {
 	atomic.StoreUint32(&ydbShutdownComplete[shutdownChannelIndx], 1) // Indicate this channel is closed
 
 	ydbShutdownCheck <- 0 // Notify shutdownSignalGoroutines that it needs to check if all channels closed now
+}
+
+func initCheck() {
+	if !ydbInitialized.Load() {
+		panic("YDB: Init() must be called first")
+	}
 }
 
 // DbHandle is the type returned by Init() which must be passed to Exit().

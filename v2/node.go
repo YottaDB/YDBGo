@@ -52,7 +52,7 @@ type Conn struct {
 
 // NewConn creates a new connection for the current thread.
 func NewConn() *Conn {
-	initializeYottaDB() // init if necessary
+	initCheck()
 
 	// TODO: This is set to YDB_MAX_STR (1MB) for the initial version only. Later we can reduce its initial value and create logic to reallocate it when necessary,
 	//       e.g. in n.Set()
