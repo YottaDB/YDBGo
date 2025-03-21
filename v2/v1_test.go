@@ -151,9 +151,34 @@ func smplBenchmarkGetVariantSubscripts(b *testing.B) {
 	}
 }
 
+func smplBenchmarkStr2Zwr(b *testing.B) {
+	// Set up output buffer
+	var out yottadb.BufferT
+	out.Alloc(100)
+	defer out.Free()
+
+	// Set up value to convert into ZWR format
+	var in yottadb.BufferT
+	in.Alloc(100)
+	defer in.Free()
+	err := in.SetValStr(yottadb.NOTTP, nil, `"X"_$C(0)_"ABC"`)
+	if err != nil {
+		panic(err)
+	}
+
+	// Iterate the command to benchmark it
+	for b.Loop() {
+		err = in.Str2ZwrST(yottadb.NOTTP, nil, &out)
+		assert.Nil(b, err)
+		_, err = out.ValStr(yottadb.NOTTP, nil)
+		assert.Nil(b, err)
+	}
+}
+
 func BenchmarkV1Simple(b *testing.B) {
 	b.Run("Set", smplBenchmarkSet)
 	b.Run("SetVariantSubscripts", smplBenchmarkSetVariantSubscripts)
 	b.Run("Get", smplBenchmarkGet)
 	b.Run("GetVariantSubscripts", smplBenchmarkGetVariantSubscripts)
+	b.Run("smplStr2Zwr", smplBenchmarkStr2Zwr)
 }

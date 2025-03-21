@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	//
+// Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -429,8 +429,7 @@ func (buft *BufferT) Str2ZwrST(tptoken uint64, errstr *BufferT, zwr *BufferT) er
 // If the C.ydb_buffer_t structure referenced by cbuft has not yet been allocated, return the STRUCTUNALLOCD error.
 // If len_alloc is not large enough, set len_used to the required length, and return an INVSTRLEN error. In this case,
 // len_used will be greater than len_alloc until corrected by application code. If str has errors and is not in valid zwrite format, set
-// len_used to zero, and return the error code returned by ydb_zwr2str_s() e.g., INVZWRITECHAR. Otherwise, set the buffer referenced
-// by buf_addr to the unencoded string, set len_used to the length.
+// len_used to zero. Otherwise, set the buffer referenced by buf_addr to the unencoded string and set len_used to its length.
 //
 // Note that the length of a string in zwrite format is always greater than or equal to the string in its original, unencoded format.
 func (buft *BufferT) Zwr2StrST(tptoken uint64, errstr *BufferT, str *BufferT) error {

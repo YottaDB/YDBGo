@@ -412,7 +412,7 @@ func waitForAndProcessSignal(shutdownChannelIndx int) {
 	if nil != err {
 		panic(fmt.Sprintf("YDB: Unexpected error translating signal to numeric: %v", csignum))
 	}
-	cbuft = (*C.ydb_buffer_t)(&conn.c.errstr) // Get pointer to ydb_buffer_t embedded conn; to pass to C
+	cbuft = &conn.cconn.errstr // Get pointer to ydb_buffer_t embedded in conn; to pass to C
 	allDone = false
 	for !allDone {
 		select {
@@ -511,8 +511,10 @@ func waitForAndProcessSignal(shutdownChannelIndx int) {
 	ydbShutdownCheck <- 0 // Notify shutdownSignalGoroutines that it needs to check if all channels closed now
 }
 
+// initCheck Panics if Init() has not been called
 func initCheck() {
-	if !ydbInitialized.Load() {
+	// Don't require init if we're already running init.
+	if !ydbInitialized.Load() && !inInit.Load() {
 		panic("YDB: Init() must be called first")
 	}
 }

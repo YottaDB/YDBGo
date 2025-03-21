@@ -20,9 +20,26 @@ import (
 
 // ---- Examples (testable)
 
+// Example of converting a ZWRITE-formatted string to a Go string
+func ExampleConn_Zwr2Str() {
+	conn := NewConn()
+	str, _ := conn.Zwr2Str(`"X"_$C(0)_"ABC"`)
+	fmt.Printf("%#v", str)
+	// Output: "X\x00ABC"
+}
+
+// Example of converting a Go string to a ZWRITE-formatted string
+func ExampleConn_Str2Zwr() {
+	conn := NewConn()
+	str, _ := conn.Str2Zwr("X\x00ABC")
+	fmt.Printf("%v", str)
+	// Output: "X"_$C(0)_"ABC"
+}
+
 // Example of viewing a Node instance as a string.
 func ExampleNode_String() {
-	n := NewConn().Node("var", "sub1", "sub2")
+	conn := NewConn()
+	n := conn.Node("var", "sub1", "sub2")
 	fmt.Println(n)
 	// Output: var("sub1")("sub2")
 }
@@ -32,7 +49,7 @@ func ExampleNode_String() {
 // Test Node creation.
 func TestNode(t *testing.T) {
 	t.Run("String", func(t *testing.T) {
-		n := NewConn().Node("var", "sub1", "sub2")
+		n := tconn.Node("var", "sub1", "sub2")
 		ans := fmt.Sprintf("%v", n)
 		expect := "var(\"sub1\")(\"sub2\")"
 		if ans != expect {
@@ -42,7 +59,7 @@ func TestNode(t *testing.T) {
 }
 
 func TestSetGet(t *testing.T) {
-	n := conn.Node("var")
+	n := tconn.Node("var")
 	assert.Nil(t, n.Set("value"))
 	assert.Equal(t, multi("value", nil), multi(n.Get()))
 }
@@ -51,7 +68,7 @@ func TestSetGet(t *testing.T) {
 
 // Benchmark setting a node repeatedly to new values each time.
 func BenchmarkSet(b *testing.B) {
-	n := conn.Node("var")
+	n := tconn.Node("var")
 	for b.Loop() {
 		assert.Nil(b, n.Set(Randstr()))
 	}
@@ -59,7 +76,7 @@ func BenchmarkSet(b *testing.B) {
 
 // Benchmark getting a node repeatedly.
 func BenchmarkGet(b *testing.B) {
-	n := conn.Node("var")
+	n := tconn.Node("var")
 	for b.Loop() {
 		_, err := n.Get()
 		assert.Nil(b, err)
@@ -74,7 +91,7 @@ func BenchmarkSetVariantSubscripts(b *testing.B) {
 		for j := range subs {
 			subs[j] = Randstr()
 		}
-		n := conn.Node("var", subs...)
+		n := tconn.Node("var", subs...)
 		assert.Nil(b, n.Set(Randstr()))
 	}
 }
@@ -87,11 +104,19 @@ func BenchmarkGetVariantSubscripts(b *testing.B) {
 		for j := range subs {
 			subs[j] = Randstr()
 		}
-		n := conn.Node("var", subs...)
+		n := tconn.Node("var", subs...)
 		Randstr() // increment random string index to match strings with Set() benchmark
 		_, err := n.Get()
 		if err != nil {
 			assert.Nil(b, err, "Make sure to run the Set benchmark first to init values to read")
 		}
+	}
+}
+
+func BenchmarkZwr2Str(b *testing.B) {
+	str := `"X"_$C(0)_"ABC"`
+	for b.Loop() {
+		_, err := tconn.Zwr2Str(str)
+		assert.Nil(b, err)
 	}
 }

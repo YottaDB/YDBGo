@@ -14,12 +14,13 @@ package yottadb
 
 import (
 	"fmt"
+	v1 "lang.yottadb.com/go/yottadb"
 	"math/rand/v2"
 	"os"
 	"testing"
 )
 
-var conn *Conn // global connection for use in testing
+var tconn *Conn // global connection for use in testing
 
 // ---- Utility functions for tests
 
@@ -65,9 +66,13 @@ func Benchmark________________________________(b *testing.B) {
 // _testMain is factored out of TestMain to let us defer Init() properly
 // since os.Exit() must not be run in the same function as defer.
 func _testMain(m *testing.M) int {
+	// run init/exit for both v1 and v2 code so we can compare them
+	// Run v2 code last so that it sets signals to point to itself
+	v1.Init()
+	defer v1.Exit()
 	defer Exit(Init())
 	initRandstr()
-	conn = NewConn()
+	tconn = NewConn() // populate test connection variable
 	return m.Run()
 }
 
