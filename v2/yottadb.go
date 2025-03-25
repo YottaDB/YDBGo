@@ -82,10 +82,10 @@ var MaximumSigAckWait time.Duration = defaultMaximumSigAckWait
 type YDBHandlerFlag int
 
 const (
-	NotifyBeforeYDBSigHandler YDBHandlerFlag = iota + 1 // Request sending notification BEFORE running YDB signal handler
-	NotifyAfterYDBSigHandler // Request sending notification AFTER running YDB signal handler
-	NotifyAsyncYDBSigHandler // Notify user and run YDB handler simultaneously (non-fatal signals only)
-	NotifyInsteadOfYDBSigHandler // Do the signal notification but do NOT drive the YDB handler
+	NotifyBeforeYDBSigHandler    YDBHandlerFlag = iota + 1 // Request sending notification BEFORE running YDB signal handler
+	NotifyAfterYDBSigHandler                               // Request sending notification AFTER running YDB signal handler
+	NotifyAsyncYDBSigHandler                               // Notify user and run YDB handler simultaneously (non-fatal signals only)
+	NotifyInsteadOfYDBSigHandler                           // Do the signal notification but do NOT drive the YDB handler
 )
 
 const dbgSigHandling bool = false // Print extra info when running if true
