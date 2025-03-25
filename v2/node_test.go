@@ -23,7 +23,10 @@ import (
 // Example of converting a ZWRITE-formatted string to a Go string
 func ExampleConn_Zwr2Str() {
 	conn := NewConn()
-	str, _ := conn.Zwr2Str(`"X"_$C(0)_"ABC"`)
+	str, err := conn.Zwr2Str(`"X"_$C(0)_"ABC"`)
+	if err != nil {
+		panic(err)
+	}
 	fmt.Printf("%#v", str)
 	// Output: "X\x00ABC"
 }
@@ -31,7 +34,10 @@ func ExampleConn_Zwr2Str() {
 // Example of converting a Go string to a ZWRITE-formatted string
 func ExampleConn_Str2Zwr() {
 	conn := NewConn()
-	str, _ := conn.Str2Zwr("X\x00ABC")
+	str, err := conn.Str2Zwr("X\x00ABC")
+	if err != nil {
+		panic(err)
+	}
 	fmt.Printf("%v", str)
 	// Output: "X"_$C(0)_"ABC"
 }

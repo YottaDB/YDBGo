@@ -53,6 +53,10 @@ import "C"
 
 // ---- Conn connection object
 
+// Amount to overallocate string spaces for potential future use with larger strings.
+// This could be set to C.YDB_MAX_STR to avoid any reallocation, but that would make all new connections large.
+const overalloc = 1024
+
 // Conn creates a thread-specific 'connection' object for calling the YottaDB API.
 // You must use a different connection for each thread.
 // Wrap C.conn in a Go struct so we can add methods to it.
@@ -65,24 +69,22 @@ type Conn struct {
 func NewConn() *Conn {
 	initCheck()
 
-	// TODO: This is set to YDB_MAX_STR (1MB) for the initial version only. Later we can reduce its initial value and create logic to reallocate it when necessary,
-	//       e.g. in n.Set()
-	const initialSpace = C.YDB_MAX_STR
 	var conn Conn
-	// This initial call must be to calloc() to get initialized (cleared) storage. We cannot allocate it and then
-	// do another call to initialize it as that means uninitialized memory is traversing the cgo boundary which
-	// is what triggers the cgo bug mentioned in the cgo docs (https://golang.org/cmd/cgo/#hdr-Passing_pointers).
-	// TODO: but if we retain calloc, we need to check for memory error because Go doesn't create a wrapper for C.calloc like it does for C.malloc (cf. https://pkg.go.dev/cmd/cgo#hdr-Passing_pointers:~:text=C.malloc%20cannot%20fail)
-	// Alternatively, we could call malloc and then memset to clear just the ydb_buffer_t parts, but test which is faster.
+	// This initial call must be to calloc() to get initialized (cleared) storage: due to a documented cgo bug
+	// we must not let Go store pointer values in uninitialized C-allocated memory or errors may result.
+	// See the cgo bug mentioned at https://golang.org/cmd/cgo/#hdr-Passing_pointers.
 	conn.cconn = (*C.conn)(C.calloc(1, C.sizeof_conn))
+	if conn.cconn == nil {
+		panic("YDB: out of memory when allocating new database connection")
+	}
 	conn.cconn.tptoken = C.YDB_NOTTP
 	// Create space for err
 	conn.cconn.errstr.buf_addr = (*C.char)(C.malloc(C.YDB_MAX_ERRORMSG))
 	conn.cconn.errstr.len_alloc = C.YDB_MAX_ERRORMSG
 	conn.cconn.errstr.len_used = 0
 	// Create initial space for value used by various API call/return
-	conn.cconn.value.buf_addr = (*C.char)(C.malloc(initialSpace))
-	conn.cconn.value.len_alloc = C.uint(initialSpace)
+	conn.cconn.value.buf_addr = (*C.char)(C.malloc(overalloc))
+	conn.cconn.value.len_alloc = C.uint(overalloc)
 	conn.cconn.value.len_used = 0
 
 	runtime.AddCleanup(&conn, func(cn *C.conn) {
@@ -93,12 +95,27 @@ func NewConn() *Conn {
 	return &conn
 }
 
+// ensureValueSize reallocates value.buf_addr if necessary to fit a string of size.
+func (conn *Conn) ensureValueSize(cap int) {
+	if cap > C.YDB_MAX_STR {
+		panic("YDB: tried to set database value to a string longer than the maximum length YDB_MAX_STR")
+	}
+	value := &conn.cconn.value
+	if cap > int(value.len_alloc) {
+		cap += overalloc // allocate some extra for potential future use
+		addr := (*C.char)(C.realloc(unsafe.Pointer(value.buf_addr), C.size_t(cap)))
+		if addr == nil {
+			panic("YDB: out of memory when allocating more space for string data transfer to YottaDB")
+		}
+		value.buf_addr = addr
+		value.len_alloc = C.uint(cap)
+	}
+}
+
 func (conn *Conn) setValue(val string) *C.ydb_buffer_t {
 	cconn := conn.cconn
-	if C.fill_buffer(&cconn.value, val) == 0 {
-		// TODO: fix the following to realloc
-		panic("YDB: have not yet implemented reallocating cconn.value to fit a large returned string")
-	}
+	conn.ensureValueSize(len(val))
+	C.fill_buffer(&cconn.value, val)
 	return &cconn.value
 }
 
@@ -128,15 +145,20 @@ func (conn *Conn) GetError(code C.int) error {
 func (conn *Conn) Zwr2Str(zstr string) (string, error) {
 	cconn := conn.cconn
 	cbuf := conn.setValue(zstr)
-	ret := C.ydb_zwr2str_st(cconn.tptoken, &cconn.errstr, cbuf, cbuf)
-	if ret == C.YDB_ERR_INVSTRLEN {
-		// TODO: fix the following to realloc
-		panic("YDB: have not yet implemented reallocating cconn.value to fit a large returned string")
+	err := C.ydb_zwr2str_st(cconn.tptoken, &cconn.errstr, cbuf, cbuf)
+	if err == C.YDB_ERR_INVSTRLEN {
+		// Allocate more space and retry the call
+		conn.ensureValueSize(int(cconn.value.len_used))
+		err = C.ydb_zwr2str_st(cconn.tptoken, &cconn.errstr, cbuf, cbuf)
 	}
-	if ret != YDB_OK {
-		return "", conn.GetError(ret)
+	if err != YDB_OK {
+		return "", conn.GetError(err)
 	}
-	return conn.getValue(), nil
+	val := conn.getValue()
+	if val == "" && zstr != "" {
+		return "", NewError(0, "string has invalid ZWRITE-format")
+	}
+	return val, nil
 }
 
 // Str2Zwr takes the given Go string and converts it to return a ZWRITE-formatted string
@@ -148,8 +170,10 @@ func (conn *Conn) Str2Zwr(str string) (string, error) {
 	cbuf := conn.setValue(str)
 	ret := C.ydb_str2zwr_st(cconn.tptoken, &cconn.errstr, cbuf, cbuf)
 	if ret == C.YDB_ERR_INVSTRLEN {
-		// TODO: fix the following to realloc
-		panic("YDB: have not yet implemented reallocating cconn.value to fit a large returned string")
+		// Allocate more space and retry the call
+		conn.ensureValueSize(int(cconn.value.len_used))
+		cbuf := conn.setValue(str)
+		ret = C.ydb_str2zwr_st(cconn.tptoken, &cconn.errstr, cbuf, cbuf)
 	}
 	if ret != YDB_OK {
 		return "", conn.GetError(ret)
@@ -184,14 +208,15 @@ func (conn *Conn) Node(varname string, subscripts ...string) (n *Node) {
 	}
 
 	size := C.sizeof_node + C.sizeof_ydb_buffer_t*len(subscripts) + joiner.Len()
-	// This initial call must be to calloc() to get initialized (cleared) storage. We cannot allocate it and then
-	// do another call to initialize it as that means uninitialized memory is traversing the cgo boundary which
-	// is what triggers the cgo bug mentioned in the cgo docs (https://golang.org/cmd/cgo/#hdr-Passing_pointers).
-	// TODO: but if we retain calloc, we need to check for memory error because Go doesn't create a wrapper for C.calloc like it does for C.malloc (cf. https://pkg.go.dev/cmd/cgo#hdr-Passing_pointers:~:text=C.malloc%20cannot%20fail)
-	// Alternatively, we could call malloc and then memset to clear just the ydb_buffer_t parts, but test which is faster.
 	var goNode Node
 	n = &goNode
+	// This initial call must be to calloc() to get initialized (cleared) storage: due to a documented cgo bug
+	// we must not let Go store pointer values in uninitialized C-allocated memory or errors may result.
+	// See the cgo bug mentioned at https://golang.org/cmd/cgo/#hdr-Passing_pointers.
 	n.n = (*C.node)(C.calloc(1, C.size_t(size)))
+	if n.n == nil {
+		panic("YDB: out of memory when allocating new reference to database node")
+	}
 	// Queue the cleanup function to free it
 	runtime.AddCleanup(n, func(cnode *C.node) {
 		C.free(unsafe.Pointer(cnode))
@@ -244,9 +269,6 @@ func (n *Node) Set(val string) error {
 	// Create a ydb_buffer_t pointing to go string
 	cnode := n.n // access C.node from Go node
 	cconn := cnode.conn
-	if len(val) > int(cconn.value.len_alloc) {
-		panic("YDB: tried to set database value to a string longer than the maximum database value length")
-	}
 	n.conn.setValue(val)
 	ret := C.ydb_set_st(cconn.tptoken, &cconn.errstr, &cnode.buffers[0], cnode.len-1, (*C.ydb_buffer_t)(unsafe.Add(unsafe.Pointer(&cnode.buffers[0]), C.sizeof_ydb_buffer_t)), &cconn.value)
 
@@ -261,8 +283,9 @@ func (n *Node) Get(deflt ...string) (string, error) {
 	cconn := cnode.conn
 	err := C.ydb_get_st(cconn.tptoken, &cconn.errstr, &cnode.buffers[0], cnode.len-1, (*C.ydb_buffer_t)(unsafe.Add(unsafe.Pointer(&cnode.buffers[0]), C.sizeof_ydb_buffer_t)), &cconn.value)
 	if err == C.YDB_ERR_INVSTRLEN {
-		// TODO: fix the following to realloc
-		panic("YDB: have not yet implemented reallocating cconn.value to fit a large returned string")
+		// Allocate more space and retry the call
+		n.conn.ensureValueSize(int(cconn.value.len_used))
+		err = C.ydb_get_st(cconn.tptoken, &cconn.errstr, &cnode.buffers[0], cnode.len-1, (*C.ydb_buffer_t)(unsafe.Add(unsafe.Pointer(&cnode.buffers[0]), C.sizeof_ydb_buffer_t)), &cconn.value)
 	}
 	if len(deflt) > 0 && (err == C.YDB_ERR_GVUNDEF || err == C.YDB_ERR_LVUNDEF) {
 		return deflt[0], nil
