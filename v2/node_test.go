@@ -54,6 +54,7 @@ func ExampleNode_String() {
 
 // Test Node creation.
 func TestNode(t *testing.T) {
+	tconn := NewConn()
 	t.Run("String", func(t *testing.T) {
 		n := tconn.Node("var", "sub1", "sub2")
 		ans := fmt.Sprintf("%v", n)
@@ -65,6 +66,7 @@ func TestNode(t *testing.T) {
 }
 
 func TestSetGet(t *testing.T) {
+	tconn := NewConn()
 	n := tconn.Node("var")
 	assert.Nil(t, n.Set("value"))
 	assert.Equal(t, multi("value", nil), multi(n.Get()))
@@ -74,6 +76,7 @@ func TestSetGet(t *testing.T) {
 
 // Benchmark setting a node repeatedly to new values each time.
 func BenchmarkSet(b *testing.B) {
+	tconn := NewConn()
 	n := tconn.Node("var")
 	for b.Loop() {
 		assert.Nil(b, n.Set(Randstr()))
@@ -82,6 +85,7 @@ func BenchmarkSet(b *testing.B) {
 
 // Benchmark getting a node repeatedly.
 func BenchmarkGet(b *testing.B) {
+	tconn := NewConn()
 	n := tconn.Node("var")
 	for b.Loop() {
 		_, err := n.Get()
@@ -91,6 +95,7 @@ func BenchmarkGet(b *testing.B) {
 
 // Benchmark setting a node with randomly located node, where each node has 5 random subscripts.
 func BenchmarkSetVariantSubscripts(b *testing.B) {
+	tconn := NewConn()
 	subs := make([]string, 5)
 	RandstrReset() // access the same nodes to be subsequently fetched by matching Get() benchmark
 	for b.Loop() {
@@ -104,6 +109,7 @@ func BenchmarkSetVariantSubscripts(b *testing.B) {
 
 // Benchmark getting a node with randomly located node, where each node has 5 random subscripts.
 func BenchmarkGetVariantSubscripts(b *testing.B) {
+	tconn := NewConn()
 	subs := make([]string, 5)
 	RandstrReset() // access the same nodes previously stored by matching Set() benchmark
 	for b.Loop() {
@@ -120,6 +126,7 @@ func BenchmarkGetVariantSubscripts(b *testing.B) {
 }
 
 func BenchmarkZwr2Str(b *testing.B) {
+	tconn := NewConn()
 	str := `"X"_$C(0)_"ABC"`
 	for b.Loop() {
 		_, err := tconn.Zwr2Str(str)

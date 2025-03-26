@@ -25,14 +25,14 @@ import (
 	v1 "lang.yottadb.com/go/yottadb"
 )
 
-var tconn *Conn // global connection for use in testing
-
 // ---- Utility functions for tests
 
 var randstrArray = make([]string, 0, 10000) // Array of random strings for use in testing
 var randstrIndex = 0
 
 // initRandstr prepares a list of many random strings.
+// Note that tests that use this may not currently run in parallel.
+// This would be fixed if randstrIndex were thread-local, but Go frowns upon thread-local state.
 func initRandstr() {
 	if len(randstrArray) > 0 {
 		return // early return if already filled randstrArray
@@ -109,7 +109,7 @@ func createDatabase() (string, bool, *log.Logger, *os.File) {
 	os.Setenv("ydb_gbldir", ydb_gbldir)
 	ydb_dist := os.Getenv("ydb_dist")
 	if ydb_dist == "" {
-		log.Fatal("ydb_dist not set")
+		panic("ydb_dist must be set")
 	}
 	mumps_exe := filepath.Join(ydb_dist, "mumps")
 	mupip_exe := filepath.Join(ydb_dist, "mupip")
@@ -162,7 +162,6 @@ func _testMain(m *testing.M) int {
 	defer v1.Exit()
 	defer Exit(Init())
 	initRandstr()
-	tconn = NewConn() // populate test connection variable
 	ret := m.Run()
 
 	// Cleanup the temp directory, but leave it if we are in verbose mode or the test failed
