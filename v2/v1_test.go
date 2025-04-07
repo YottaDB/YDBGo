@@ -15,13 +15,15 @@
 package yottadb_test
 
 import (
-	assert "github.com/stretchr/testify/require"
 	"testing"
-)
 
-// Import YDBGo v1 to benchmark EasyAPI and SimpleAPI
-import yottadb "lang.yottadb.com/go/yottadb"
-import v2 "lang.yottadb.com/go/yottadb/v2"
+	assert "github.com/stretchr/testify/require"
+
+	// Import YDBGo v1 to benchmark EasyAPI and SimpleAPI
+	yottadb "lang.yottadb.com/go/yottadb"
+
+	v2 "lang.yottadb.com/go/yottadb/v2"
+)
 
 func BenchmarkV1Easy(b *testing.B) {
 	b.Run("Set", func(b *testing.B) {

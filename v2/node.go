@@ -59,13 +59,15 @@ const overalloc = 1024
 
 // Conn creates a thread-specific 'connection' object for calling the YottaDB API.
 // You must use a different connection for each thread.
-// Wrap C.conn in a Go struct so we can add methods to it.
+//
+// This struct wraps C.conn in a Go struct so Go can add methods to it.
 type Conn struct {
 	// Pointer to C.conn rather than the item itself so we can malloc it and point to it from C without Go moving it.
 	cconn *C.conn
 }
 
-// NewConn creates a new connection for the current thread.
+// NewConn creates a new database connection for the current goroutine.
+// Each goroutine must have its own connection.
 func NewConn() *Conn {
 	initCheck()
 
@@ -183,20 +185,24 @@ func (conn *Conn) Str2Zwr(str string) (string, error) {
 
 // ---- Node object
 
-// Node is an object containing strings that represents a YottaDB node, supporting fast calls to the YottaDB C API.
+// Node is an object containing strings that represents a YottaDB node.
 // Stores all the supplied strings (varname and subscripts) in the Node object along with array of C.ydb_buffer_t
 // structs that point to each successive string, to provide fast access to YottaDB API functions.
-// Thread Safety: Regular Nodes are immutable, so are thread-safe (one thread cannot change a Node used by
-// another thread). There is a mutable version of Node emitted by Node iterators (FOR loops over Node), which
-// may not be shared with other threads except by first taking an immutable Node.Copy() of it.
-// Wraps C.node in a Go struct so we can add methods to it.
+// Regular Nodes are immutable. There is a mutable version of Node emitted by Node iterators, which
+// will change each loop. If you need to take a snapshot of a mutable node this may be done with node.Clone().
+//
+// Thread Safety: Do not run database actions on node objects created in another thread. If you want to
+// act on a node object passed in from another thread, first call node.Clone(conn) to make a copy of the
+// other thread's node object using the current thread's connection `conn`. Then perform methods on that.
+
+// This struct wraps a C.node struct in a Go struct so Go can add methods to it.
 type Node struct {
 	// Pointer to C.node rather than the item itself so we can point to it from C without Go moving it.
 	n    *C.node
 	conn *Conn // Node.conn points to the Go conn; Node.n.conn will point directly to the C.conn
 }
 
-// Node creates a `Node` type instance that represents a database node with class methods for fast calls to YottaDB.
+// Creates a `Node` type instance that represents a database node with class methods for fast calls to YottaDB.
 // The strings and array are stored in C-allocated space to give Node methods fast access to YottaDB API functions.
 func (conn *Conn) Node(varname string, subscripts ...string) (n *Node) {
 	// Concatenate strings the fastest Go way.
@@ -264,9 +270,8 @@ func (n *Node) String() string {
 	return bld.String()
 }
 
-// Set the value of a database node.
+// Set the value of a database node to val.
 func (n *Node) Set(val string) error {
-	// Create a ydb_buffer_t pointing to go string
 	cnode := n.n // access C.node from Go node
 	cconn := cnode.conn
 	n.conn.setValue(val)
@@ -276,7 +281,7 @@ func (n *Node) Set(val string) error {
 }
 
 // Get the value of a database node.
-// On error return value "" and error
+// On error return the empty string and the error.
 // If deflt is supplied return string deflt[0] instead of GVUNDEF or LVUNDEF errors.
 func (n *Node) Get(deflt ...string) (string, error) {
 	cnode := n.n // access C.node from Go node
@@ -296,4 +301,68 @@ func (n *Node) Get(deflt ...string) (string, error) {
 	// take a copy of the string so that we can release `space`
 	value := C.GoStringN(cconn.value.buf_addr, C.int(cconn.value.len_used))
 	return value, nil
+}
+
+// Data returns whether the database node has a value or subnodes as follows:
+//   - 0: node has neither a value nor a subtree, i.e., it is undefined.
+//   - 1: node has a value, but no subtree
+//   - 10: node has no value, but does have a subtree
+//   - 11: node has both value and subtree
+func (n *Node) Data() (int, error) {
+	cnode := n.n // access C.node from Go node
+	cconn := cnode.conn
+	var val C.uint
+	err := C.ydb_data_st(cconn.tptoken, &cconn.errstr, &cnode.buffers[0], cnode.len-1, (*C.ydb_buffer_t)(unsafe.Add(unsafe.Pointer(&cnode.buffers[0]), C.sizeof_ydb_buffer_t)), &val)
+	if err == C.YDB_ERR_INVSTRLEN {
+		// Allocate more space and retry the call
+		n.conn.ensureValueSize(int(cconn.value.len_used))
+		err = C.ydb_get_st(cconn.tptoken, &cconn.errstr, &cnode.buffers[0], cnode.len-1, (*C.ydb_buffer_t)(unsafe.Add(unsafe.Pointer(&cnode.buffers[0]), C.sizeof_ydb_buffer_t)), &cconn.value)
+	}
+	return int(val), n.conn.GetError(err)
+}
+
+// Returns whether the database node has a value.
+// Use this in preference to node.Data()
+func (n *Node) HasValue() (bool, error) {
+	ret, err := n.Data()
+	return (ret & 1) == 1, err
+}
+
+// Returns whether the database node has a tree of subscripts containing data.
+// Use this in preference to node.Data()
+func (n *Node) HasTree() (bool, error) {
+	ret, err := n.Data()
+	return (ret & 10) == 10, err
+}
+
+// Returns whether the database node has both tree and value.
+// Use this in preference to node.Data()
+func (n *Node) HasTreeAndValue() (bool, error) {
+	ret, err := n.Data()
+	return (ret & 11) == 11, err
+}
+
+// Returns whether the database node has neither tree nor value.
+// Use this in preference to node.Data()
+func (n *Node) Empty() (bool, error) {
+	ret, err := n.Data()
+	return (ret & 11) == 0, err
+}
+
+// Kill deletes a database node including its value and any subtree.
+// To delete only the value of a node use node.Clear()
+func (n *Node) Kill() error {
+	cnode := n.n // access C.node from Go node
+	cconn := cnode.conn
+	ret := C.ydb_delete_st(cconn.tptoken, &cconn.errstr, &cnode.buffers[0], cnode.len-1, (*C.ydb_buffer_t)(unsafe.Add(unsafe.Pointer(&cnode.buffers[0]), C.sizeof_ydb_buffer_t)), C.YDB_DEL_TREE)
+	return n.conn.GetError(ret)
+}
+
+// Delete the node value, not its child subscripts.
+// Equivalent to YottaDB M command ZKILL
+func (n *Node) Clear() error {
+	cnode := n.n // access C.node from Go node
+	cconn := cnode.conn
+	ret := C.ydb_delete_st(cconn.tptoken, &cconn.errstr, &cnode.buffers[0], cnode.len-1, (*C.ydb_buffer_t)(unsafe.Add(unsafe.Pointer(&cnode.buffers[0]), C.sizeof_ydb_buffer_t)), C.YDB_DEL_NODE)
+	return n.conn.GetError(ret)
 }

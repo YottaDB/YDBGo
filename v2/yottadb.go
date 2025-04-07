@@ -29,51 +29,48 @@ import "C"
 
 // ---- Release version constants - be sure to change all of them appropriately
 
+// MinimumGoRelease - Minimum version of Go to fully support this wrapper (including tests).
+// Note: this is not checked at runtime. The compile will fail if undefined Go features are used.
+const MinimumGoRelease string = "go1.24"
+
+//	go 1.24 required to run tests: testing.Loop
+//	go 1.23 required for iterators, used to iterate database subscripts
+//	go 1.22 required for the range clause
+//	go 1.19 required for sync/atomic -- safer than
+
+// MinimumYDBRelease - (string) Minimum YottaDB release name required by this wrapper.
+// This is checked on init.
+const MinimumYDBRelease string = "r1.34"
+
 // WrapperRelease - (string) The Go wrapper release version for YottaDB SimpleAPI. Note the third piece of this version
 // will be even for a production release and odd for a development release. When released, depending
 // on new content, either the third piece of the version will be bumped to an even value or the second piece of the
 // version will be bumped by 1 and the third piece of the version set to 0. On rare occasions, we may bump the first
 // piece of the version and zero the others when the changes are significant.
-const WrapperRelease string = "v1.2.6"
-
-// MinimumYDBRelease - (string) Minimum YottaDB release name required by this wrapper
-// This is checked on init
-const MinimumYDBRelease string = "r1.34"
-
-// MinimumGoRelease - Minimum version of Go to fully support this wrapper (including tests)
-//
-//	go 1.24 required to run tests: testing.Loop
-//	go 1.23 required for iterators, used to iterate database subscripts
-//	go 1.22 required for the range clause
-//	go 1.19 required for sync/atomic -- safer than
-//
-// Note: this is not checked at runtime. The compile will fail if undefined Go features are used
-const MinimumGoRelease string = "go1.24"
+const WrapperRelease string = "v2.0.1"
 
 // ---- Wait times
 
-const defaultMaximumPanicExitWait time.Duration = 3   // wait in seconds
-const defaultMaximumNormalExitWait time.Duration = 60 // wait in seconds
-const defaultMaximumSigShutDownWait time.Duration = 5 // wait in seconds
-const defaultMaximumSigAckWait time.Duration = 10     // wait in seconds
+// Set default exit wait times. The user may change these.
+var (
+	// MaximumPanicExitWait is the maximum wait when a panic caused by a signal has occured (likely unable to run Exit().
+	// It specifies the wait in seconds that yottadb.Exit() will wait for ydb_exit() to run before
+	// giving up and forcing the process to exit. Note the normal exit wait is longer as we expect ydb_exit() to be
+	// successful so can afford to wait as long as needed to do the sync but for a signal exit, the rundown is likely
+	// already done (exit handler called by the signal processing itself) but if ydb_exit() is not able to get
+	// the system lock and is likely to hang, 3 seconds is about as much as we can afford to wait.
+	MaximumPanicExitWait time.Duration = 3 // seconds
 
-// MaximumPanicExitWait is the maximum wait when a panic caused by a signal has occured (likely unable to run Exit().
-// It specifies the wait in seconds that yottadb.Exit() will wait for ydb_exit() to run before
-// giving up and forcing the process to exit. Note the normal exit wait is longer as we expect ydb_exit() to be
-// successful so can afford to wait as long as needed to do the sync but for a signal exit, the rundown is likely
-// already done (exit handler called by the signal processing itself) but if ydb_exit() is not able to get
-// the system lock and is likely to hang, 3 seconds is about as much as we can afford to wait.
-var MaximumPanicExitWait time.Duration = defaultMaximumPanicExitWait
+	// MaximumNormalExitWait is maximum wait for a normal shutdown when no system lock hang in Exit() is likely.
+	MaximumNormalExitWait time.Duration = 60 // seconds
 
-// MaximumNormalExitWait is maximum wait for a normal shutdown when no system lock hang in Exit() is likely.
-var MaximumNormalExitWait time.Duration = defaultMaximumNormalExitWait
+	// MaximumSigShutDownWait is maximum wait to close down signal handling goroutines (shouldn't take this long).
+	MaximumSigShutDownWait time.Duration = 5 // seconds
 
-// MaximumSigShutDownWait is maximum wait to close down signal handling goroutines (shouldn't take this long).
-var MaximumSigShutDownWait time.Duration = defaultMaximumSigShutDownWait
-
-// MaximumSigAckWait is maximum wait for notify via acknowledgement channel that a notified signal handler is
-// done handling the signal.
-var MaximumSigAckWait time.Duration = defaultMaximumSigAckWait
+	// MaximumSigAckWait is maximum wait for notify via acknowledgement channel that a notified signal handler is
+	// done handling the signal.
+	MaximumSigAckWait time.Duration = 10 // seconds
+)
 
 // ---- Enums for signal functions
 

@@ -23,7 +23,7 @@ type YDBError struct {
 	Message string // The error string - generally from $ZSTATUS when available
 }
 
-// Error is a method to return the expected error message string.
+// Error is a type method of YDBError to return the expected error message string.
 func (err *YDBError) Error() string {
 	return fmt.Sprintf("YDB: %s", err.Message)
 }
@@ -35,10 +35,8 @@ func NewError(code int, message string) error {
 
 // ---- Simulate YDB error messages for certain Go-specific error conditions
 
-// Global constants containing the Go-specific error ids.
+// Go-specific error constants used in syslog messaging.
 const (
-	YDB_ERR_STRUCTUNALLOCD  = -151552010
-	YDB_ERR_INVLKNMPAIRLIST = -151552018
 	YDB_ERR_DBRNDWNBYPASS   = -151552026
 	YDB_ERR_SIGACKTIMEOUT   = -151552034
 	YDB_ERR_SIGGORTNTIMEOUT = -151552040
@@ -47,8 +45,6 @@ const (
 // ydbGoErrors is a map of error messages for the Go-specific set of errors.
 // These are sent to syslog, so are formatted in the same way as other YDB messages to syslog.
 var ydbGoErrors = map[int]string{
-	-YDB_ERR_STRUCTUNALLOCD:  "%YDB-E-STRUCTNUNALLOCD, Structure not previously called with Alloc() method",
-	-YDB_ERR_INVLKNMPAIRLIST: "%YDB-E-INVLKNMPAIRLIST, Invalid lockname/subscript pair list (uneven number of lockname/subscript parameters)",
 	-YDB_ERR_DBRNDWNBYPASS:   "%YDB-E-DBRNDWNBYPASS, YDB-W-DBRNDWNBYPASS YottaDB database rundown may have been bypassed due to timeout - run MUPIP JOURNAL ROLLBACK BACKWARD / MUPIP JOURNAL RECOVER BACKWARD / MUPIP RUNDOWN",
 	-YDB_ERR_SIGACKTIMEOUT:   "%YDB-E-SIGACKTIMEOUT, Signal completion acknowledgement timeout: !AD",
 	-YDB_ERR_SIGGORTNTIMEOUT: "%YDB-W-ERR_SIGGORTNTIMEOUT, Shutdown of signal goroutines timed out",

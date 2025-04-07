@@ -14,8 +14,10 @@ package yottadb
 
 import (
 	"fmt"
+	"log/syslog"
 	"os"
 	"os/signal"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -73,6 +75,11 @@ type sigNotificationMapEntry struct {
 
 var sigNotificationMap map[syscall.Signal]sigNotificationMapEntry
 
+// Exit globals
+var mtxInExit sync.Mutex
+var exitRun bool
+var wgexit sync.WaitGroup
+
 var wgSigInit sync.WaitGroup           // Used to make sure signals are setup before initializeYottaDB() exits
 var wgSigShutdown sync.WaitGroup       // Used to wait for all signal threads to shutdown
 var ydbInitMutex sync.Mutex            // Mutex for access to initialization
@@ -83,6 +90,44 @@ var shutdownSigGortnsMutex sync.Mutex  // Serialize access to shutdownSignalGoro
 var sigNotificationMapMutex sync.Mutex // Mutex for access to user sig handler map
 var ydbSignalActive []uint32           // Array of indicators indicating indexed signal handlers are active
 var ydbShutdownComplete []uint32       // Array of flags that indexed signal goroutine shutdown is complete
+
+// printEntry is a function to print the entry point of the function, when entered, if the printEPHdrs flag is enabled.
+func printEntry(funcName string) {
+	if dbgPrintEPHdrs {
+		_, file, line, ok := runtime.Caller(2)
+		if ok {
+			fmt.Println("Entered ", funcName, " from ", file, " at line ", line)
+		} else {
+			fmt.Println("Entered ", funcName)
+		}
+	}
+}
+
+// syslogEntry records the given message in the syslog. Since these are rare or one-time per process type errors
+// that get recorded here, we open a new syslog handle each time to reduce complexity of single threading access
+// across goroutines.
+func syslogEntry(logMsg string) {
+	syslogr, err := syslog.New(syslog.LOG_INFO+syslog.LOG_USER, "[YottaDB-Go-Wrapper]")
+	if nil != err {
+		panic(fmt.Sprintf("syslog.New() failed unexpectedly with error: %s", err))
+	}
+	err = syslogr.Info(logMsg)
+	if nil != err {
+		panic(fmt.Sprintf("syslogr.Info() failed unexpectedly with error: %s", err))
+	}
+	err = syslogr.Close()
+	if nil != err {
+		panic(fmt.Sprintf("syslogr.Close() failed unexpectedly with error: %s", err))
+	}
+}
+
+// selectString returns the first string parm if the expression is true and the second if it is false
+func selectString(boolVal bool, trueString, falseString string) string {
+	if boolVal {
+		return trueString
+	}
+	return falseString
+}
 
 // validateNotifySignal verifies that the specified signal is valid for RegisterSignalNotify()/UnregisterSignalNotify()
 func validateNotifySignal(sig syscall.Signal, entryPoint ydbEntryPoint) error {
@@ -520,13 +565,13 @@ func initCheck() {
 }
 
 // DbHandle is the type returned by Init() which must be passed to Exit().
-// It is used as a clue to user that they must not forget to Exit()
+// It is used as a clue to the user that they must not forget to Exit()
 type DbHandle interface{}
 
 // Init YottaDB access and return an exit function that should be deferred.
 // Users should `defer yottadb.Exit(yottadb.Init())` from their main routine before using any other database function.
-// Although Init could be called automatically, this manual clarifies that Exit() MUST be called before process exit.
-// See Exit for more detail.
+// Although Init could be made to be called automatically, this more explicit approach clarifies that Exit() MUST be
+// called before process exit. See Exit for more detail.
 // Init returns a value of type DbHandle that must be passed to the Exit function.
 func Init() DbHandle {
 	initializeYottaDB()

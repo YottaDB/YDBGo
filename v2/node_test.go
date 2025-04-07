@@ -14,8 +14,9 @@ package yottadb
 
 import (
 	"fmt"
-	assert "github.com/stretchr/testify/require"
 	"testing"
+
+	assert "github.com/stretchr/testify/require"
 )
 
 // ---- Examples (testable)
