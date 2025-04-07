@@ -12,14 +12,18 @@
 
 package yottadb
 
-import "fmt"
+import (
+	"fmt"
+
+	"lang.yottadb.com/go/yottadb/v2/ydberr"
+)
 
 // ---- YDBError type to contain/manage wrapper errors
 
 // YDBError is a structure that defines the error message format which includes both the formated $ZSTATUS
 // type message and the numeric error value.
 type YDBError struct {
-	Code    int    // The error value (e.g. YDB_ERR_DBFILERR, etc)
+	Code    int    // The error value (e.g. ydberr.DBFILERR, etc)
 	Message string // The error string - generally from $ZSTATUS when available
 }
 
@@ -35,19 +39,12 @@ func NewError(code int, message string) error {
 
 // ---- Simulate YDB error messages for certain Go-specific error conditions
 
-// Go-specific error constants used in syslog messaging.
-const (
-	YDB_ERR_DBRNDWNBYPASS   = -151552026
-	YDB_ERR_SIGACKTIMEOUT   = -151552034
-	YDB_ERR_SIGGORTNTIMEOUT = -151552040
-)
-
 // ydbGoErrors is a map of error messages for the Go-specific set of errors.
 // These are sent to syslog, so are formatted in the same way as other YDB messages to syslog.
 var ydbGoErrors = map[int]string{
-	-YDB_ERR_DBRNDWNBYPASS:   "%YDB-E-DBRNDWNBYPASS, YDB-W-DBRNDWNBYPASS YottaDB database rundown may have been bypassed due to timeout - run MUPIP JOURNAL ROLLBACK BACKWARD / MUPIP JOURNAL RECOVER BACKWARD / MUPIP RUNDOWN",
-	-YDB_ERR_SIGACKTIMEOUT:   "%YDB-E-SIGACKTIMEOUT, Signal completion acknowledgement timeout: !AD",
-	-YDB_ERR_SIGGORTNTIMEOUT: "%YDB-W-ERR_SIGGORTNTIMEOUT, Shutdown of signal goroutines timed out",
+	-ydberr.DBRNDWNBYPASS:   "%YDB-E-DBRNDWNBYPASS, YDB-W-DBRNDWNBYPASS YottaDB database rundown may have been bypassed due to timeout - run MUPIP JOURNAL ROLLBACK BACKWARD / MUPIP JOURNAL RECOVER BACKWARD / MUPIP RUNDOWN",
+	-ydberr.SIGACKTIMEOUT:   "%YDB-E-SIGACKTIMEOUT, Signal completion acknowledgement timeout: !AD",
+	-ydberr.SIGGORTNTIMEOUT: "%YDB-W-ERR_SIGGORTNTIMEOUT, Shutdown of signal goroutines timed out",
 }
 
 // getWrapperErrorMsg returns a Go-specific YottaDB-formatted error message given its error number.

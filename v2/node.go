@@ -19,6 +19,8 @@ import (
 	"runtime"
 	"strings"
 	"unsafe"
+
+	"lang.yottadb.com/go/yottadb/v2/ydberr"
 )
 
 /* #include "libyottadb.h"
@@ -148,7 +150,7 @@ func (conn *Conn) Zwr2Str(zstr string) (string, error) {
 	cconn := conn.cconn
 	cbuf := conn.setValue(zstr)
 	err := C.ydb_zwr2str_st(cconn.tptoken, &cconn.errstr, cbuf, cbuf)
-	if err == C.YDB_ERR_INVSTRLEN {
+	if err == ydberr.INVSTRLEN {
 		// Allocate more space and retry the call
 		conn.ensureValueSize(int(cconn.value.len_used))
 		err = C.ydb_zwr2str_st(cconn.tptoken, &cconn.errstr, cbuf, cbuf)
@@ -164,14 +166,14 @@ func (conn *Conn) Zwr2Str(zstr string) (string, error) {
 }
 
 // Str2Zwr takes the given Go string and converts it to return a ZWRITE-formatted string
-// If the returned zwrite-formatted string does not fit within the maximum YottaDB string size, return error code YDB_ERR_INVSTRLEN.
+// If the returned zwrite-formatted string does not fit within the maximum YottaDB string size, return error code ydberr.INVSTRLEN.
 // Otherwise, return the ZWRITE-formatted string.
 // Note that the length of a string in zwrite format is always greater than or equal to the string in its original, unencoded format.
 func (conn *Conn) Str2Zwr(str string) (string, error) {
 	cconn := conn.cconn
 	cbuf := conn.setValue(str)
 	ret := C.ydb_str2zwr_st(cconn.tptoken, &cconn.errstr, cbuf, cbuf)
-	if ret == C.YDB_ERR_INVSTRLEN {
+	if ret == ydberr.INVSTRLEN {
 		// Allocate more space and retry the call
 		conn.ensureValueSize(int(cconn.value.len_used))
 		cbuf := conn.setValue(str)
@@ -287,12 +289,12 @@ func (n *Node) Get(deflt ...string) (string, error) {
 	cnode := n.n // access C.node from Go node
 	cconn := cnode.conn
 	err := C.ydb_get_st(cconn.tptoken, &cconn.errstr, &cnode.buffers[0], cnode.len-1, (*C.ydb_buffer_t)(unsafe.Add(unsafe.Pointer(&cnode.buffers[0]), C.sizeof_ydb_buffer_t)), &cconn.value)
-	if err == C.YDB_ERR_INVSTRLEN {
+	if err == ydberr.INVSTRLEN {
 		// Allocate more space and retry the call
 		n.conn.ensureValueSize(int(cconn.value.len_used))
 		err = C.ydb_get_st(cconn.tptoken, &cconn.errstr, &cnode.buffers[0], cnode.len-1, (*C.ydb_buffer_t)(unsafe.Add(unsafe.Pointer(&cnode.buffers[0]), C.sizeof_ydb_buffer_t)), &cconn.value)
 	}
-	if len(deflt) > 0 && (err == C.YDB_ERR_GVUNDEF || err == C.YDB_ERR_LVUNDEF) {
+	if len(deflt) > 0 && (err == ydberr.GVUNDEF || err == ydberr.LVUNDEF) {
 		return deflt[0], nil
 	}
 	if err != C.YDB_OK {
@@ -313,7 +315,7 @@ func (n *Node) Data() (int, error) {
 	cconn := cnode.conn
 	var val C.uint
 	err := C.ydb_data_st(cconn.tptoken, &cconn.errstr, &cnode.buffers[0], cnode.len-1, (*C.ydb_buffer_t)(unsafe.Add(unsafe.Pointer(&cnode.buffers[0]), C.sizeof_ydb_buffer_t)), &val)
-	if err == C.YDB_ERR_INVSTRLEN {
+	if err == ydberr.INVSTRLEN {
 		// Allocate more space and retry the call
 		n.conn.ensureValueSize(int(cconn.value.len_used))
 		err = C.ydb_get_st(cconn.tptoken, &cconn.errstr, &cnode.buffers[0], cnode.len-1, (*C.ydb_buffer_t)(unsafe.Add(unsafe.Pointer(&cnode.buffers[0]), C.sizeof_ydb_buffer_t)), &cconn.value)

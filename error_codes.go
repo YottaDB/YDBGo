@@ -5,8 +5,9 @@ package yottadb
 // #include "error_codes.h"
 import "C"
 
+// Define constants exported by YottaDB
 const (
-	// Enum constants
+	// YottaDB Enum constants
 	YDB_DEL_NODE               = C.YDB_DEL_NODE
 	YDB_DEL_TREE               = C.YDB_DEL_TREE
 	YDB_SEVERITY_ERROR         = C.YDB_SEVERITY_ERROR         /* Error - Something is definitely incorrect */
@@ -43,8 +44,10 @@ const (
 	YDB_RELEASE        = C.YDB_RELEASE /* Corresponds to YottaDB release r1.24 (i.e. YDB_ZYRELEASE in sr_linux/release_name.h) */
 	YDB_TP_RESTART     = C.YDB_TP_RESTART
 	YDB_TP_ROLLBACK    = C.YDB_TP_ROLLBACK
+)
 
-	// Error constants
+// YottaDB Error constants
+const (
 	YDB_ERR_ABNCOMPTINC           = C.YDB_ERR_ABNCOMPTINC
 	YDB_ERR_ACK                   = C.YDB_ERR_ACK
 	YDB_ERR_ACOMPTBINC            = C.YDB_ERR_ACOMPTBINC

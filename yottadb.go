@@ -113,4 +113,4 @@ var ydbInitialized uint32    // Atomic: Set to 1 when YDB has been initialized w
 var ydbSigPanicCalled uint32 // Atomic: True when our exit is panic driven due to a signal
 var inInit uint32            // Atomic: We are in initializeYottaDB() so don't force re-init in ValE()
 
-//go:generate ./scripts/gen_error_codes.sh
+//go:generate ./scripts/gen_error_codes.sh error_codes

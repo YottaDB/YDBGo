@@ -24,10 +24,12 @@ import (
 	"sync/atomic"
 	"syscall"
 	"time"
+
+	"lang.yottadb.com/go/yottadb/v2/ydberr"
 )
 
 // #include "libyottadb.h"
-// extern void *ydb_get_gowrapper_panic_callback_funcvp(void);
+// extern void *ydb_get_gowrapper_panic_callback(void);
 import "C"
 
 type ydbHndlrWhen int
@@ -255,7 +257,7 @@ func shutdownSignalGoroutines() {
 		if dbgSigHandling {
 			fmt.Fprintln(os.Stderr, "YDB: shutdownSignalGoroutines: Timeout! Some signal threads did not shutdown")
 		}
-		errstr := getWrapperErrorMsg(YDB_ERR_SIGGORTNTIMEOUT)
+		errstr := getWrapperErrorMsg(ydberr.SIGGORTNTIMEOUT)
 		syslogEntry(errstr)
 	}
 	shutdownSigGortns = true
@@ -307,7 +309,7 @@ func initializeYottaDB() {
 		return
 	}
 	// Drive initialization of the YottaDB engine/runtime
-	rc := C.ydb_main_lang_init(C.YDB_MAIN_LANG_GO, C.ydb_get_gowrapper_panic_callback_funcvp())
+	rc := C.ydb_main_lang_init(C.YDB_MAIN_LANG_GO, C.ydb_get_gowrapper_panic_callback())
 	if YDB_OK != rc {
 		panic(fmt.Sprintf("YDB: YottaDB initialization failed with return code %d", rc))
 	}
@@ -421,7 +423,7 @@ func waitForSignalAckWTimeout(ackChan chan bool, whatAck string) {
 	select { // Wait for an acknowledgement but put a timer on it
 	case <-ackChan:
 	case <-time.After(time.Duration(MaximumSigAckWait) * time.Second):
-		syslogEntry(strings.Replace(getWrapperErrorMsg(YDB_ERR_SIGACKTIMEOUT), "!AD", whatAck, 1))
+		syslogEntry(strings.Replace(getWrapperErrorMsg(ydberr.SIGACKTIMEOUT), "!AD", whatAck, 1))
 	}
 }
 
@@ -513,7 +515,7 @@ func waitForAndProcessSignal(shutdownChannelIndx int) {
 				case YDB_OK: // Signal handling complete
 				case YDB_DEFER_HANDLER: // Signal was deferred for some reason
 					// If CALLINAFTERXIT (positive or negative version) we're done - exit goroutine
-				case YDB_ERR_CALLINAFTERXIT, -YDB_ERR_CALLINAFTERXIT:
+				case ydberr.CALLINAFTERXIT, -ydberr.CALLINAFTERXIT:
 					allDone = true
 				default: // Some sort of error occurred during signal handling
 					if rc != YDB_OK {
@@ -655,8 +657,8 @@ func Exit(handle DbHandle) error {
 		if dbgSigHandling {
 			fmt.Fprintln(os.Stderr, "YDB: Exit(): Wait for ydb_exit() expired")
 		}
-		errstr = getWrapperErrorMsg(YDB_ERR_DBRNDWNBYPASS)
-		errNum = YDB_ERR_DBRNDWNBYPASS
+		errstr = getWrapperErrorMsg(ydberr.DBRNDWNBYPASS)
+		errNum = ydberr.DBRNDWNBYPASS
 		if !ydbSigPanicCalled.Load() {
 			// If we panic'd due to a signal, we definitely have run the exit handler as it runs before the panic is
 			// driven so we can bypass this message in that case.

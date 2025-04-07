@@ -23,6 +23,7 @@ import (
 func main() {
 	iterations, _ := strconv.Atoi(os.Args[1])
 
+	defer yottadb.Exit(yottadb.Init())
 	db := yottadb.NewConn()
 	n := db.Node("x") // or: db.New("varname", "sub1", "sub2")
 
