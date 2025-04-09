@@ -27,7 +27,7 @@ import (
 
 // ---- Utility functions for tests
 
-var randstrArray = make([]string, 0, 10000) // Array of random strings for use in testing
+var randstrArray = make([]string, 0, 1000000) // Array of random strings for use in testing
 var randstrIndex = 0
 
 // initRandstr prepares a list of many random strings.
@@ -163,6 +163,12 @@ func _testMain(m *testing.M) int {
 	defer Exit(Init())
 	initRandstr()
 	ret := m.Run()
+
+	// Print result of BenchmarkDiff, if it was run
+	if pathA.Load() != 0 {
+		fmt.Printf("BenchmarkDiff: PathA is %.1f%% of the speed of Path B ", 100*float32(pathA.Load())/float32(pathB.Load()))
+		fmt.Printf("(PathA=%d PathB=%d)\n", pathA.Load(), pathB.Load())
+	}
 
 	// Cleanup the temp directory, but leave it if we are in verbose mode or the test failed
 	if !is_ydbtest_invocation && !verbose && ret == 0 {

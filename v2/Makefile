@@ -12,6 +12,11 @@
 #
 ##################################################################
 
+tests=.
+benchtime?=1s
+short=-short
+BENCH=
+
 perflock?=$(shell command -v perflock >/dev/null && echo perflock)
 PERFFLAGS?=-governor 90%
 
@@ -27,10 +32,18 @@ test:
 bench: benchmark
 benchmarks: benchmark
 benchmark:
-	$(perflock) go test -bench . $(BENCH)
+	$(perflock) go test -bench $(tests) $(short) -benchtime $(benchtime) $(BENCH)
+
+diff: benchtime=5s
+diff: short=
+diff: tests=BenchmarkDiff
+diff: benchmark
 
 # Check whether test results increase with each test by shown 5 of each test.
 # Perflock fixes this problem but perflock doesn't work on all systems.
 # So check your system with `make check`
-check: BENCH=-count=6 -benchtime 0.1s
+check: BENCH=-count=6
+check: benchtime=0.1s
 check: benchmark
+
+.PHONY: test bench benchmarks benchmark check

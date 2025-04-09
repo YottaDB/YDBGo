@@ -37,7 +37,7 @@ typedef struct node {
 	int len;		// number of buffers[] allocated to store subscripts/strings
 	int datasize;		// length of string `data` field (all strings and subscripts concatenated)
 	int mutable;		// whether the node is mutable (these are only emitted by node iterators)
-	ydb_buffer_t buffers[1];	// first of an array of buffers (typically varname)
+	ydb_buffer_t buffers;	// first of an array of buffers (typically varname)
 	ydb_buffer_t buffersn[];	// rest of array
 	// char *data;		// stored after `buffers` (however large they are), which point into this data
 } node;
@@ -52,6 +52,12 @@ int fill_buffer(ydb_buffer_t *buf, _GoString_ val) {
 }
 */
 import "C"
+
+// indexBuf finds the address of index i within a ydb_buffer_t array.
+// This function is necessary because CGo discards buffersn[] since it has no size.
+func bufferIndex(buf *C.ydb_buffer_t, i int) *C.ydb_buffer_t {
+	return (*C.ydb_buffer_t)(unsafe.Add(unsafe.Pointer(buf), C.sizeof_ydb_buffer_t*i))
+}
 
 // ---- Conn connection object
 
@@ -204,18 +210,32 @@ type Node struct {
 	conn *Conn // Node.conn points to the Go conn; Node.n.conn will point directly to the C.conn
 }
 
-// Creates a `Node` type instance that represents a database node with class methods for fast calls to YottaDB.
+// Creates a `Node` type instance that represents a database node with methods that access YottaDB.
 // The strings and array are stored in C-allocated space to give Node methods fast access to YottaDB API functions.
-func (conn *Conn) Node(varname string, subscripts ...string) (n *Node) {
+// varname may be a string or, if it is another node, that node's path strings will be prepended to `subscripts`.
+func (conn *Conn) _Node(varname interface{}, subscripts ...string) (n *Node) {
+	// Note: benchmarking shows that the use of interface{} slows down node creation almost immeasurably (< 0.1%)
 	// Concatenate strings the fastest Go way.
 	// This involves creating an extra copy of subscripts but is probably faster than one C.memcpy call per subscript
 	var joiner bytes.Buffer
-	joiner.WriteString(varname)
+	var first string // first string stored in joiner
+	var firstLen int // number of subscripts in first string
+	var node1 *Node  // if varname is a node, store it in here
+	switch val := varname.(type) {
+	case *Node:
+		node1 = val
+		first = C.GoStringN(node1.n.buffers.buf_addr, node1.n.datasize)
+		firstLen = int(node1.n.len)
+	default:
+		first = val.(string)
+		firstLen = 1
+	}
+	joiner.WriteString(first)
 	for _, s := range subscripts {
 		joiner.WriteString(s)
 	}
 
-	size := C.sizeof_node + C.sizeof_ydb_buffer_t*len(subscripts) + joiner.Len()
+	size := C.sizeof_node + C.sizeof_ydb_buffer_t*(firstLen-1+len(subscripts)) + joiner.Len()
 	var goNode Node
 	n = &goNode
 	// This initial call must be to calloc() to get initialized (cleared) storage: due to a documented cgo bug
@@ -232,21 +252,28 @@ func (conn *Conn) Node(varname string, subscripts ...string) (n *Node) {
 
 	n.conn = conn // point to the Go conn
 	cnode := n.n
-	cnode.conn = (*C.conn)(unsafe.Pointer(conn.cconn)) // point to the C version of the conn
-	cnode.len = C.int(len(subscripts) + 1)
+	cnode.conn = conn.cconn // point to the C version of the conn
+	cnode.len = C.int(len(subscripts) + firstLen)
 	cnode.mutable = 0 // i.e. false
 
-	dataptr := unsafe.Add(unsafe.Pointer(&cnode.buffers[0]), C.sizeof_ydb_buffer_t*(len(subscripts)+1))
+	dataptr := unsafe.Pointer(bufferIndex(&cnode.buffers, len(subscripts)+firstLen))
+	// Note: have tried to replace the following with copy() to avoid a CGo invocation, but it's slower
 	C.memcpy(dataptr, unsafe.Pointer(&joiner.Bytes()[0]), C.size_t(joiner.Len()))
 
 	// Now fill in ydb_buffer_t pointers
-	s := varname
-	buf := (*C.ydb_buffer_t)(unsafe.Pointer(&cnode.buffers[0]))
-	buf.buf_addr = (*C.char)(dataptr)
-	buf.len_used, buf.len_alloc = C.uint(len(s)), C.uint(len(s))
-	dataptr = unsafe.Add(dataptr, len(s))
+	if node1 != nil {
+		// Copy node1.buffers to node.buffers
+		C.memcpy(unsafe.Pointer(&cnode.buffers), unsafe.Pointer(&node1.n.buffers), C.size_t(node1.n.len)*C.sizeof_ydb_buffer_t)
+		dataptr = unsafe.Add(dataptr, len(first))
+	} else {
+		s := first
+		buf := bufferIndex(&cnode.buffers, 0)
+		buf.buf_addr = (*C.char)(dataptr)
+		buf.len_used, buf.len_alloc = C.uint(len(s)), C.uint(len(s))
+		dataptr = unsafe.Add(dataptr, len(s))
+	}
 	for i, s := range subscripts {
-		buf := (*C.ydb_buffer_t)(unsafe.Add(unsafe.Pointer(&cnode.buffers[0]), C.sizeof_ydb_buffer_t*(i+1)))
+		buf := bufferIndex(&cnode.buffers, i+firstLen)
 		buf.buf_addr = (*C.char)(dataptr)
 		buf.len_used, buf.len_alloc = C.uint(len(s)), C.uint(len(s))
 		dataptr = unsafe.Add(dataptr, len(s))
@@ -254,12 +281,35 @@ func (conn *Conn) Node(varname string, subscripts ...string) (n *Node) {
 	return n
 }
 
+// Creates a `Node` type instance that represents a database node with methods that access YottaDB.
+// The strings and array are stored in C-allocated space to give Node methods fast access to YottaDB API functions.
+func (conn *Conn) Node(varname string, subscripts ...string) (n *Node) {
+	return conn._Node(varname, subscripts...)
+}
+
+// Creates a child node of parent that represents parent with subscripts appended.
+func (parent *Node) Child(subscripts ...string) (n *Node) {
+	return parent.conn._Node(parent, subscripts...)
+}
+
+// Creates a clone of node, n, optionally for use with a different connection, conn[0], in a different goroutine.
+// Nodes may be passed to another goroutine but not used to access the database unless first cloned to another connection.
+func (parent *Node) Clone(conn ...(*Conn)) (clone *Node) {
+	clone = parent.conn._Node(parent)
+	if len(conn) > 0 {
+		clone.conn = conn[0]
+		cnode := clone.n
+		cnode.conn = clone.conn.cconn
+	}
+	return clone
+}
+
 // Return string representation of this database node in typical YottaDB format: `varname("sub1")("sub2")`.
 func (n *Node) String() string {
 	var bld strings.Builder
 	cnode := n.n // access C.node from Go node
 	for i := range cnode.len {
-		buf := (*C.ydb_buffer_t)(unsafe.Add(unsafe.Pointer(&cnode.buffers[0]), C.sizeof_ydb_buffer_t*i))
+		buf := bufferIndex(&cnode.buffers, int(i))
 		s := C.GoStringN(buf.buf_addr, C.int(buf.len_used))
 		if i > 0 {
 			bld.WriteString("(\"")
@@ -277,7 +327,7 @@ func (n *Node) Set(val string) error {
 	cnode := n.n // access C.node from Go node
 	cconn := cnode.conn
 	n.conn.setValue(val)
-	ret := C.ydb_set_st(cconn.tptoken, &cconn.errstr, &cnode.buffers[0], cnode.len-1, (*C.ydb_buffer_t)(unsafe.Add(unsafe.Pointer(&cnode.buffers[0]), C.sizeof_ydb_buffer_t)), &cconn.value)
+	ret := C.ydb_set_st(cconn.tptoken, &cconn.errstr, &cnode.buffers, cnode.len-1, bufferIndex(&cnode.buffers, 1), &cconn.value)
 
 	return n.conn.GetError(ret)
 }
@@ -288,11 +338,11 @@ func (n *Node) Set(val string) error {
 func (n *Node) Get(deflt ...string) (string, error) {
 	cnode := n.n // access C.node from Go node
 	cconn := cnode.conn
-	err := C.ydb_get_st(cconn.tptoken, &cconn.errstr, &cnode.buffers[0], cnode.len-1, (*C.ydb_buffer_t)(unsafe.Add(unsafe.Pointer(&cnode.buffers[0]), C.sizeof_ydb_buffer_t)), &cconn.value)
+	err := C.ydb_get_st(cconn.tptoken, &cconn.errstr, &cnode.buffers, cnode.len-1, bufferIndex(&cnode.buffers, 1), &cconn.value)
 	if err == ydberr.INVSTRLEN {
 		// Allocate more space and retry the call
 		n.conn.ensureValueSize(int(cconn.value.len_used))
-		err = C.ydb_get_st(cconn.tptoken, &cconn.errstr, &cnode.buffers[0], cnode.len-1, (*C.ydb_buffer_t)(unsafe.Add(unsafe.Pointer(&cnode.buffers[0]), C.sizeof_ydb_buffer_t)), &cconn.value)
+		err = C.ydb_get_st(cconn.tptoken, &cconn.errstr, &cnode.buffers, cnode.len-1, bufferIndex(&cnode.buffers, 1), &cconn.value)
 	}
 	if len(deflt) > 0 && (err == ydberr.GVUNDEF || err == ydberr.LVUNDEF) {
 		return deflt[0], nil
@@ -310,45 +360,39 @@ func (n *Node) Get(deflt ...string) (string, error) {
 //   - 1: node has a value, but no subtree
 //   - 10: node has no value, but does have a subtree
 //   - 11: node has both value and subtree
-func (n *Node) Data() (int, error) {
+func (n *Node) Data() int {
 	cnode := n.n // access C.node from Go node
 	cconn := cnode.conn
 	var val C.uint
-	err := C.ydb_data_st(cconn.tptoken, &cconn.errstr, &cnode.buffers[0], cnode.len-1, (*C.ydb_buffer_t)(unsafe.Add(unsafe.Pointer(&cnode.buffers[0]), C.sizeof_ydb_buffer_t)), &val)
-	if err == ydberr.INVSTRLEN {
-		// Allocate more space and retry the call
-		n.conn.ensureValueSize(int(cconn.value.len_used))
-		err = C.ydb_get_st(cconn.tptoken, &cconn.errstr, &cnode.buffers[0], cnode.len-1, (*C.ydb_buffer_t)(unsafe.Add(unsafe.Pointer(&cnode.buffers[0]), C.sizeof_ydb_buffer_t)), &cconn.value)
+	err := C.ydb_data_st(cconn.tptoken, &cconn.errstr, &cnode.buffers, cnode.len-1, bufferIndex(&cnode.buffers, 1), &val)
+	if err != YDB_OK {
+		panic(n.conn.GetError(err))
 	}
-	return int(val), n.conn.GetError(err)
+	return int(val)
 }
 
 // Returns whether the database node has a value.
 // Use this in preference to node.Data()
-func (n *Node) HasValue() (bool, error) {
-	ret, err := n.Data()
-	return (ret & 1) == 1, err
+func (n *Node) HasValue() bool {
+	return (n.Data() & 1) == 1
 }
 
 // Returns whether the database node has a tree of subscripts containing data.
 // Use this in preference to node.Data()
-func (n *Node) HasTree() (bool, error) {
-	ret, err := n.Data()
-	return (ret & 10) == 10, err
+func (n *Node) HasTree() bool {
+	return (n.Data() & 10) == 10
 }
 
 // Returns whether the database node has both tree and value.
 // Use this in preference to node.Data()
-func (n *Node) HasTreeAndValue() (bool, error) {
-	ret, err := n.Data()
-	return (ret & 11) == 11, err
+func (n *Node) HasTreeAndValue() bool {
+	return (n.Data() & 11) == 11
 }
 
 // Returns whether the database node has neither tree nor value.
 // Use this in preference to node.Data()
-func (n *Node) Empty() (bool, error) {
-	ret, err := n.Data()
-	return (ret & 11) == 0, err
+func (n *Node) HasNone() bool {
+	return (n.Data() & 11) == 0
 }
 
 // Kill deletes a database node including its value and any subtree.
@@ -356,7 +400,7 @@ func (n *Node) Empty() (bool, error) {
 func (n *Node) Kill() error {
 	cnode := n.n // access C.node from Go node
 	cconn := cnode.conn
-	ret := C.ydb_delete_st(cconn.tptoken, &cconn.errstr, &cnode.buffers[0], cnode.len-1, (*C.ydb_buffer_t)(unsafe.Add(unsafe.Pointer(&cnode.buffers[0]), C.sizeof_ydb_buffer_t)), C.YDB_DEL_TREE)
+	ret := C.ydb_delete_st(cconn.tptoken, &cconn.errstr, &cnode.buffers, cnode.len-1, bufferIndex(&cnode.buffers, 1), C.YDB_DEL_TREE)
 	return n.conn.GetError(ret)
 }
 
@@ -365,6 +409,6 @@ func (n *Node) Kill() error {
 func (n *Node) Clear() error {
 	cnode := n.n // access C.node from Go node
 	cconn := cnode.conn
-	ret := C.ydb_delete_st(cconn.tptoken, &cconn.errstr, &cnode.buffers[0], cnode.len-1, (*C.ydb_buffer_t)(unsafe.Add(unsafe.Pointer(&cnode.buffers[0]), C.sizeof_ydb_buffer_t)), C.YDB_DEL_NODE)
+	ret := C.ydb_delete_st(cconn.tptoken, &cconn.errstr, &cnode.buffers, cnode.len-1, bufferIndex(&cnode.buffers, 1), C.YDB_DEL_NODE)
 	return n.conn.GetError(ret)
 }

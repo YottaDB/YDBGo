@@ -14,6 +14,9 @@ package yottadb
 
 import (
 	"fmt"
+	"os"
+	"runtime"
+	"sync/atomic"
 	"testing"
 
 	assert "github.com/stretchr/testify/require"
@@ -56,14 +59,10 @@ func ExampleNode_String() {
 // Test Node creation.
 func TestNode(t *testing.T) {
 	tconn := NewConn()
-	t.Run("String", func(t *testing.T) {
-		n := tconn.Node("var", "sub1", "sub2")
-		ans := fmt.Sprintf("%v", n)
-		expect := "var(\"sub1\")(\"sub2\")"
-		if ans != expect {
-			t.Errorf("got %s, want %s", ans, expect)
-		}
-	})
+	n := tconn.Node("var", "sub1", "sub2")
+	assert.Equal(t, `var("sub1")("sub2")`, fmt.Sprintf("%v", n))
+	n2 := n.Child("sub3", "sub4")
+	assert.Equal(t, `var("sub1")("sub2")("sub3")("sub4")`, fmt.Sprintf("%v", n2))
 }
 
 func TestSetGet(t *testing.T) {
@@ -73,7 +72,78 @@ func TestSetGet(t *testing.T) {
 	assert.Equal(t, multi("value", nil), multi(n.Get()))
 }
 
+func SkipTestData(t *testing.T) {
+	tconn := NewConn()
+	n := tconn.Node("var")
+	assert.Equal(t, 0, n.Data())
+	assert.Equal(t, true, n.HasNone())
+	assert.Equal(t, false, n.HasValue())
+	assert.Equal(t, false, n.HasTree())
+	assert.Equal(t, false, n.HasTreeAndValue())
+
+	assert.Nil(t, n.Set("value"))
+	assert.Equal(t, 1, n.Data())
+	assert.Equal(t, false, n.HasNone())
+	assert.Equal(t, true, n.HasValue())
+	assert.Equal(t, false, n.HasTree())
+	assert.Equal(t, false, n.HasTreeAndValue())
+
+	assert.Equal(t, multi("value", nil), multi(n.Get()))
+}
+
 // ---- Benchmarks
+
+// Retain results of BenchmarkDiff for printing by _testMain()
+var pathA, pathB atomic.Int64
+var cpuIndex atomic.Int64
+
+// Benchmark difference between two separate functions running in parallel.
+// This was envisaged to diminish the effects of CPU warm-up, but it's not accurate enough.
+// For best results run it with perflock and use test flag: -benchtime=5s
+// Then it will typically have about 1% variance
+func BenchmarkDiff(b *testing.B) {
+	if testing.Short() {
+		b.Skip()
+	}
+
+	var cpus int = -1
+	pathA.Store(0)
+	pathB.Store(0)
+	cpuIndex.Store(0)
+	for _, arg := range os.Args {
+		fmt.Sscanf(arg, "-test.cpu=%d", &cpus)
+	}
+	if cpus == -1 {
+		cpus = int(runtime.NumCPU()) // Go sets -cpu to this by default, so we should, too
+	}
+	if cpus == -1 || cpus%2 != 0 {
+		panic("You must set test flag: -cpu=<even number>, preferably large like 100")
+	}
+
+	b.RunParallel(func(pb *testing.PB) {
+		i := cpuIndex.Add(1)
+		for int(cpuIndex.Load()) < cpus {
+		}
+		tconn := NewConn()
+		for pb.Next() {
+			if i%2 == 0 {
+				tconn.Node(Randstr())
+				pathA.Add(1)
+			} else {
+				tconn.Node(Randstr())
+				pathB.Add(1)
+			}
+		}
+	})
+}
+
+// Benchmark setting a node repeatedly to new values each time.
+func BenchmarkNode(b *testing.B) {
+	tconn := NewConn()
+	for b.Loop() {
+		tconn.Node(Randstr())
+	}
+}
 
 // Benchmark setting a node repeatedly to new values each time.
 func BenchmarkSet(b *testing.B) {
