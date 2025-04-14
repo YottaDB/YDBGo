@@ -157,14 +157,14 @@ func (conn *Conn) GetError(code C.int) error {
 func (conn *Conn) Zwr2Str(zstr string) (string, error) {
 	cconn := conn.cconn
 	cbuf := conn.setValue(zstr)
-	err := C.ydb_zwr2str_st(cconn.tptoken, &cconn.errstr, cbuf, cbuf)
-	if err == ydberr.INVSTRLEN {
+	status := C.ydb_zwr2str_st(cconn.tptoken, &cconn.errstr, cbuf, cbuf)
+	if status == ydberr.INVSTRLEN {
 		// Allocate more space and retry the call
 		conn.ensureValueSize(int(cconn.value.len_used))
-		err = C.ydb_zwr2str_st(cconn.tptoken, &cconn.errstr, cbuf, cbuf)
+		status = C.ydb_zwr2str_st(cconn.tptoken, &cconn.errstr, cbuf, cbuf)
 	}
-	if err != YDB_OK {
-		return "", conn.GetError(err)
+	if status != YDB_OK {
+		return "", conn.GetError(status)
 	}
 	val := conn.getValue()
 	if val == "" && zstr != "" {
@@ -196,17 +196,17 @@ func (conn *Conn) Str2Zwr(str string) (string, error) {
 // Kill all YottaDB 'locals' except for the ones listed by name in exclusions.
 // To kill a specific variable use node.Kill()
 func (conn *Conn) KillLocalsExcept(exclusions ...string) {
-	var err C.int
+	var status C.int
 	cconn := conn.cconn
 	if len(exclusions) == 0 {
-		err = C.ydb_delete_excl_st(cconn.tptoken, &cconn.errstr, 0, nil)
+		status = C.ydb_delete_excl_st(cconn.tptoken, &cconn.errstr, 0, nil)
 	} else {
 		// use a Node type just as a handy way to store exclusions strings as a ydb_buffer_t array
 		namelist := conn.Node(exclusions[0], exclusions[1:]...)
-		err = C.ydb_delete_excl_st(cconn.tptoken, &cconn.errstr, C.int(len(exclusions)), &namelist.cnode.buffers)
+		status = C.ydb_delete_excl_st(cconn.tptoken, &cconn.errstr, C.int(len(exclusions)), &namelist.cnode.buffers)
 	}
-	if err != YDB_OK {
-		panic(conn.GetError(err))
+	if status != YDB_OK {
+		panic(conn.GetError(status))
 	}
 }
 
@@ -487,4 +487,49 @@ func (n *Node) Incr(amount ...interface{}) float64 {
 		panic(err)
 	}
 	return value
+}
+
+// Grab attempts to acquire or increment the count a lock matching this node, waiting up to timeout for availability.
+// Equivalent to the M `LOCK +` command.
+// The timeout is supplied in timeout[0] in seconds. If no timeout is supplied, wait forever. A timeout of zero means try only once.
+// Return true if lock was acquired; otherwise false.
+// Panics with TIME2LONG if the timeout exceeds YDB_MAX_TIME_NSEC or on other panic-worthy errors (e.g. invalid variable names).
+func (n *Node) Grab(timeout ...float64) bool {
+	cnode := n.cnode // access C equivalents of Go types
+	cconn := cnode.conn
+
+	forever := len(timeout) == 0
+	var timeoutNsec C.ulonglong
+	if forever {
+		timeoutNsec = YDB_MAX_TIME_NSEC
+	} else {
+		// Prevent overflow in timeout conversion to ulonglong and ensure the proper error is created
+		timeoutNsec = C.ulonglong(timeout[0] * 1000000000)
+		if timeout[0] > YDB_MAX_TIME_NSEC {
+			timeoutNsec = YDB_MAX_TIME_NSEC + 1
+		}
+	}
+
+	for {
+		status := C.ydb_lock_incr_st(cconn.tptoken, &cconn.errstr, timeoutNsec, &cnode.buffers, cnode.len-1, bufferIndex(&cnode.buffers, 1))
+		if status == C.YDB_LOCK_TIMEOUT && !forever {
+			return false
+		} else if status != YDB_OK {
+			panic(n.conn.GetError(status))
+		}
+	}
+}
+
+// Release decrements the count of a lock matching this node, releasing it if zero.
+// Equivalent to the M `LOCK -` command.
+// Returns nothing since releasing a lock cannot fail.
+// Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
+func (n *Node) Release() {
+	cnode := n.cnode // access C equivalents of Go types
+	cconn := cnode.conn
+
+	status := C.ydb_lock_decr_st(cconn.tptoken, &cconn.errstr, &cnode.buffers, cnode.len-1, bufferIndex(&cnode.buffers, 1))
+	if status != YDB_OK {
+		panic(n.conn.GetError(status))
+	}
 }
