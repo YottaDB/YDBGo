@@ -51,7 +51,7 @@ func ExampleNode_String() {
 	conn := NewConn()
 	n := conn.Node("var", "sub1", "sub2")
 	fmt.Println(n)
-	// Output: var("sub1")("sub2")
+	// Output: var("sub1","sub2")
 }
 
 // ---- Tests
@@ -60,9 +60,9 @@ func ExampleNode_String() {
 func TestNode(t *testing.T) {
 	tconn := SetupTest(t)
 	n := tconn.Node("var", "sub1", "sub2")
-	assert.Equal(t, `var("sub1")("sub2")`, fmt.Sprintf("%v", n))
+	assert.Equal(t, `var("sub1","sub2")`, fmt.Sprintf("%v", n))
 	n2 := n.Child("sub3", "sub4")
-	assert.Equal(t, `var("sub1")("sub2")("sub3")("sub4")`, fmt.Sprintf("%v", n2))
+	assert.Equal(t, `var("sub1","sub2","sub3","sub4")`, fmt.Sprintf("%v", n2))
 }
 
 func TestKillLocalsExcept(t *testing.T) {
@@ -178,6 +178,45 @@ func TestIncr(t *testing.T) {
 	assert.Equal(t, 0.0, n.Incr("-4.5"))
 	assert.Equal(t, -4.5, n.Incr("-4.5"))
 	assert.Equal(t, -3.5, n.Incr("1abcdefg"))
+}
+
+func TestLock(t *testing.T) {
+	tconn := SetupTest(t)
+	n := tconn.Node("^var", "Don't", "Panic!")
+	// Increment lock 3 times
+	assert.Equal(t, true, n.Grab(0.1))
+	assert.Equal(t, true, n.Grab(0.1))
+	assert.Equal(t, true, n.Grab(0.1))
+
+	// Check that lock now exists
+	lockpath := fmt.Sprint(n)
+	assert.Equal(t, true, lockExists(lockpath))
+
+	// Decrement 3 times and each time check whether lock exists
+	n.Release()
+	assert.Equal(t, true, lockExists(lockpath))
+	n.Release()
+	assert.Equal(t, true, lockExists(lockpath))
+	n.Release()
+	assert.Equal(t, false, lockExists(lockpath))
+
+	// Now lock two paths and check that Lock(0) releases them
+	n2 := tconn.Node("^var2")
+	n.Grab()
+	n2.Grab()
+	assert.Equal(t, true, lockExists(fmt.Sprint(n)))
+	assert.Equal(t, true, lockExists(fmt.Sprint(n2)))
+	assert.Equal(t, true, tconn.Lock(0)) // Release all locks
+	assert.Equal(t, false, lockExists(fmt.Sprint(n)))
+	assert.Equal(t, false, lockExists(fmt.Sprint(n2)))
+
+	// Now lock both using Lock() and make sure they get locked and unlocked
+	assert.Equal(t, true, tconn.Lock(0.1, n, n2)) // Release all locks
+	assert.Equal(t, true, lockExists(fmt.Sprint(n)))
+	assert.Equal(t, true, lockExists(fmt.Sprint(n2)))
+	assert.Equal(t, true, tconn.Lock(0)) // Release all locks
+	assert.Equal(t, false, lockExists(fmt.Sprint(n)))
+	assert.Equal(t, false, lockExists(fmt.Sprint(n2)))
 }
 
 // ---- Benchmarks

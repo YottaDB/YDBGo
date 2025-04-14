@@ -13,6 +13,7 @@
 package yottadb
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"log"
@@ -32,7 +33,7 @@ var randstrIndex = 0
 
 // initRandstr prepares a list of many random strings.
 // Note that tests that use this may not currently run in parallel.
-// This would be fixed if randstrIndex were thread-local, but Go frowns upon thread-local state.
+// This would be fixed if randstrIndex were goroutine-local, but Go frowns upon goroutine-local state.
 func initRandstr() {
 	if len(randstrArray) > 0 {
 		return // early return if already filled randstrArray
@@ -58,6 +59,26 @@ func RandstrReset() {
 // Useful, for example, in asserting test validity of functions that return both a value and an error.
 func multi(v ...interface{}) []interface{} {
 	return v
+}
+
+// Return whether a lock exists using YottaDB's LKE utility.
+func lockExists(lockpath string) bool {
+	const debug = false // set true to print output of LKE command
+	var outbuff bytes.Buffer
+
+	// Run LKE and scan result
+	cmd := exec.Command(os.Getenv("ydb_dist")+"/lke", "show", "-all", "-wait")
+	cmd.Stdout = &outbuff
+	cmd.Stderr = &outbuff
+	err := cmd.Run()
+	if err != nil {
+		panic(err)
+	}
+	output := outbuff.Bytes()
+	if debug {
+		fmt.Printf("finding '%s' in:\n%s\n", lockpath+" Owned", string(output))
+	}
+	return bytes.Contains(output, []byte(lockpath+" Owned"))
 }
 
 // ---- Initialize test system

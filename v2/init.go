@@ -437,7 +437,7 @@ func waitForAndProcessSignal(shutdownChannelIndx int) {
 	sig = ydbSignalList[shutdownChannelIndx]
 	shutdownChannel = &ydbShutdownChannel[shutdownChannelIndx]
 
-	conn := NewConn() // an easy way to get an error buffer for this thread
+	conn := NewConn() // an easy way to get an error buffer for the current goroutine
 	// We only need one of each type of signal so buffer depth is 1, but let it queue one additional
 	sigchan := make(chan os.Signal, 2)
 	// Only one message need be passed on shutdown channel so no buffering
@@ -588,13 +588,13 @@ func Init() DbHandle {
 //
 // Recommended behaviour is for your main routine to defer yottadb.Exit(yottadb.Init()) early in the main routine's initialization, and then
 // for the main routine to confirm that all goroutines have stopped or have completely finished accessing the database before returning.
-//   - If Go routines that access the database are spawned, it is the main routine's responsibility to ensure that all such threads have
+//   - If goroutines that access the database are spawned, it is the main routine's responsibility to ensure that all such goroutines have
 //     finished using the database before it calls yottadb.Exit().
 //   - The application must not call Go's os.Exit() function which is a very low-level function that bypasses any defers.
 //   - Care must be taken with any signal notifications (see [Go Using Signals]) to prevent them from causing premature exit.
 //   - Note that Go *will* run defers on panic, but not on fatal signals such as SIGSEGV.
 //
-// Exit() may be called multiple times by different threads during an application shutdown, without any problems.
+// Exit() may be called multiple times by different goroutines during an application shutdown, without any problems.
 //
 // [Database Integrity]: https://docs.yottadb.com/MultiLangProgGuide/goprogram.html#database-integrity
 // [relevant LKE documentation]: https://docs.yottadb.com/AdminOpsGuide/mlocks.html#introduction
@@ -608,7 +608,7 @@ func Exit(handle DbHandle) error {
 	if !ydbInitialized.Load() {
 		return nil // If never initialized, nothing to do
 	}
-	mtxInExit.Lock()         // One thread at a time through here else we can get DATA-RACE warnings accessing wgexit wait group
+	mtxInExit.Lock()         // One goroutine at a time through here else we can get DATA-RACE warnings accessing wgexit wait group
 	defer mtxInExit.Unlock() // Release lock when we leave this routine
 	if exitRun {
 		return nil // If exit has already run, no use in running it again

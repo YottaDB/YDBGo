@@ -45,8 +45,8 @@ func bufferIndex(buf *C.ydb_buffer_t, i int) *C.ydb_buffer_t {
 // will change each loop. If you need to take a snapshot of a mutable node this may be done with node.Clone().
 //
 // Thread Safety: Do not run database actions on node objects created in another thread. If you want to
-// act on a node object passed in from another thread, first call node.Clone(conn) to make a copy of the
-// other thread's node object using the current thread's connection `conn`. Then perform methods on that.
+// act on a node object passed in from another goroutine, first call node.Clone(conn) to make a copy of the
+// other goroutine's node object using the current thread's connection `conn`. Then perform methods on that.
 
 // This struct wraps a C.node struct in a Go struct so Go can add methods to it.
 type Node struct {
@@ -155,12 +155,16 @@ func (n *Node) String() string {
 	for i := range cnode.len {
 		buf := bufferIndex(&cnode.buffers, int(i))
 		s := C.GoStringN(buf.buf_addr, C.int(buf.len_used))
-		if i > 0 {
+		if i == 1 {
 			bld.WriteString("(\"")
 		}
 		bld.WriteString(s)
 		if i > 0 {
-			bld.WriteString("\")")
+			if i == cnode.len-1 {
+				bld.WriteString("\")")
+			} else {
+				bld.WriteString("\",\"")
+			}
 		}
 	}
 	return bld.String()
@@ -338,9 +342,13 @@ func (n *Node) Grab(timeout ...float64) bool {
 
 	for {
 		status := C.ydb_lock_incr_st(cconn.tptoken, &cconn.errstr, timeoutNsec, &cnode.buffers, cnode.len-1, bufferIndex(&cnode.buffers, 1))
+		if status == YDB_OK {
+			return true
+		}
 		if status == C.YDB_LOCK_TIMEOUT && !forever {
 			return false
-		} else if status != YDB_OK {
+		}
+		if status != YDB_OK {
 			panic(n.conn.GetError(status))
 		}
 	}

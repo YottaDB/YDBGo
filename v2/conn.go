@@ -32,6 +32,11 @@ int fill_buffer(ydb_buffer_t *buf, _GoString_ val) {
 	memcpy(buf->buf_addr, _GoStringPtr(val), buf->len_used);
 	return len <= buf->len_alloc;
 }
+
+// C routine to get around the cgo issue and its lack of support for variadic plist routines
+void *get_ydb_lock_st_ptr(void) {
+        return (void *)&ydb_lock_st;
+}
 */
 import "C"
 
@@ -41,8 +46,8 @@ import "C"
 // This could be set to C.YDB_MAX_STR to avoid any reallocation, but that would make all new connections large.
 const overalloc = 1024
 
-// Conn creates a thread-specific 'connection' object for calling the YottaDB API.
-// You must use a different connection for each thread.
+// Conn creates a goroutine-specific 'connection' object for calling the YottaDB API.
+// You must use a different connection for each goroutine.
 //
 // This struct wraps C.conn in a Go struct so Go can add methods to it.
 type Conn struct {
@@ -76,6 +81,7 @@ func NewConn() *Conn {
 	runtime.AddCleanup(&conn, func(cn *C.conn) {
 		C.free(unsafe.Pointer(cn.value.buf_addr))
 		C.free(unsafe.Pointer(cn.errstr.buf_addr))
+		C.free(unsafe.Pointer(cn.vplist))
 		C.free(unsafe.Pointer(cn))
 	}, conn.cconn)
 	return &conn
@@ -182,4 +188,40 @@ func (conn *Conn) KillLocalsExcept(exclusions ...string) {
 	if status != YDB_OK {
 		panic(conn.GetError(status))
 	}
+}
+
+// Releases all existing locks and attempt to acquire locks matching all supplied nodes, waiting up to timeout for availability.
+// Equivalent to the M `LOCK` command. See Node.Grab() and Node.Release() methods for single-lock usage.
+// The timeout is in seconds. A timeout of zero means try only once.
+// Return true if lock was acquired; otherwise false.
+// Panics with TIME2LONG if the timeout exceeds YDB_MAX_TIME_NSEC or on other panic-worthy errors (e.g. invalid variable names).
+func (conn *Conn) Lock(timeout float64, nodes ...(*Node)) bool {
+	// Prevent overflow in timeout conversion to ulonglong and ensure the proper error is created
+	timeoutNsec := C.ulonglong(timeout * 1000000000)
+	if timeout > YDB_MAX_TIME_NSEC {
+		timeoutNsec = YDB_MAX_TIME_NSEC + 1
+	}
+
+	cconn := conn.cconn
+
+	// Add each parameter to the vararg list
+	conn.vpaddParam64(uint64(cconn.tptoken))
+	conn.vpaddParam(uintptr(unsafe.Pointer(&cconn.errstr)))
+	conn.vpaddParam64(uint64(timeoutNsec))
+	conn.vpaddParam(uintptr(len(nodes)))
+	for _, node := range nodes {
+		cnode := node.cnode
+		conn.vpaddParam(uintptr(unsafe.Pointer(&cnode.buffers)))
+		conn.vpaddParam(uintptr(cnode.len - 1))
+		conn.vpaddParam(uintptr(unsafe.Pointer(bufferIndex(&cnode.buffers, 1))))
+	}
+
+	// vplist now contains the parameter list we want to send to ydb_lock_st(). But CGo doesn't permit us
+	// to call or even create a function pointer to ydb_lock_st(). So instead of calling vplist.CallVariadicPlistFuncST()
+	// directly, we have to call it via C function get_ydb_lock_st_ptr().
+	status := conn.vpcall(C.get_ydb_lock_st_ptr()) // call ydb_lock_st()
+	if status != YDB_OK && status != C.YDB_LOCK_TIMEOUT {
+		panic(conn.GetError(status))
+	}
+	return status == YDB_OK
 }
