@@ -58,22 +58,45 @@ func ExampleNode_String() {
 
 // Test Node creation.
 func TestNode(t *testing.T) {
-	tconn := NewConn()
+	tconn := SetupTest(t)
 	n := tconn.Node("var", "sub1", "sub2")
 	assert.Equal(t, `var("sub1")("sub2")`, fmt.Sprintf("%v", n))
 	n2 := n.Child("sub3", "sub4")
 	assert.Equal(t, `var("sub1")("sub2")("sub3")("sub4")`, fmt.Sprintf("%v", n2))
 }
 
-func TestSetGet(t *testing.T) {
-	tconn := NewConn()
-	n := tconn.Node("var")
-	assert.Nil(t, n.Set("value"))
-	assert.Equal(t, multi("value", nil), multi(n.Get()))
+func TestKillLocalsExcept(t *testing.T) {
+	tconn := SetupTest(t)
+	n1 := tconn.Node("var1")
+	n2 := tconn.Node("var2")
+	n3 := tconn.Node("var3")
+	n1.Set("v1")
+	n2.Set("v2")
+	n3.Set("v3")
+	n3.Child("sub1").Set("subval")
+	assert.Equal(t, multi(1, 1, 11), multi(n1.Data(), n2.Data(), n3.Data()))
+	tconn.KillLocalsExcept("var1", "var3")
+	assert.Equal(t, multi(1, 0, 11), multi(n1.Data(), n2.Data(), n3.Data()))
+	tconn.KillLocalsExcept()
+	assert.Equal(t, multi(0, 0, 0), multi(n1.Data(), n2.Data(), n3.Data()))
 }
 
-func SkipTestData(t *testing.T) {
-	tconn := NewConn()
+func TestSetGet(t *testing.T) {
+	tconn := SetupTest(t)
+	n := tconn.Node("var")
+	val, err := n.GetIf()
+	assert.Equal(t, "", val)
+	assert.NotNil(t, err)
+	assert.Equal(t, "", n.Get())
+	assert.Equal(t, "default", n.Get("default"))
+
+	assert.Equal(t, "value", n.Set("value"))
+	assert.Equal(t, "value", n.Get())
+	assert.Equal(t, "value", n.Get("default"))
+}
+
+func TestData(t *testing.T) {
+	tconn := SetupTest(t)
 	n := tconn.Node("var")
 	assert.Equal(t, 0, n.Data())
 	assert.Equal(t, true, n.HasNone())
@@ -81,14 +104,80 @@ func SkipTestData(t *testing.T) {
 	assert.Equal(t, false, n.HasTree())
 	assert.Equal(t, false, n.HasTreeAndValue())
 
-	assert.Nil(t, n.Set("value"))
+	n.Set("value")
 	assert.Equal(t, 1, n.Data())
 	assert.Equal(t, false, n.HasNone())
 	assert.Equal(t, true, n.HasValue())
 	assert.Equal(t, false, n.HasTree())
 	assert.Equal(t, false, n.HasTreeAndValue())
 
-	assert.Equal(t, multi("value", nil), multi(n.Get()))
+	n.Child("sub1", "sub2").Set("valsub2")
+	assert.Equal(t, 11, n.Data())
+	assert.Equal(t, false, n.HasNone())
+	assert.Equal(t, true, n.HasValue())
+	assert.Equal(t, true, n.HasTree())
+	assert.Equal(t, true, n.HasTreeAndValue())
+
+	n2 := n.Child("sub1")
+	assert.Equal(t, 10, n2.Data())
+	assert.Equal(t, false, n2.HasNone())
+	assert.Equal(t, false, n2.HasValue())
+	assert.Equal(t, true, n2.HasTree())
+	assert.Equal(t, false, n2.HasTreeAndValue())
+}
+
+func TestKill(t *testing.T) {
+	tconn := SetupTest(t)
+	n1 := tconn.Node("var1")
+	n2 := tconn.Node("var2")
+	n3 := tconn.Node("var3")
+	n1.Set("v1")
+	n2.Set("v2")
+	n3.Set("v3")
+	n3.Child("sub1").Set("subval")
+	assert.Equal(t, multi(1, 1, 11), multi(n1.Data(), n2.Data(), n3.Data()))
+	n2.Kill()
+	assert.Equal(t, multi(1, 0, 11), multi(n1.Data(), n2.Data(), n3.Data()))
+	n3.Kill()
+	assert.Equal(t, multi(1, 0, 0), multi(n1.Data(), n2.Data(), n3.Data()))
+}
+
+func TestClear(t *testing.T) {
+	tconn := SetupTest(t)
+	n1 := tconn.Node("var1")
+	n2 := tconn.Node("var2")
+	n3 := tconn.Node("var3")
+	n1.Set("v1")
+	n2.Set("v2")
+	n3.Set("v3")
+	n3.Child("sub1").Set("subval")
+	assert.Equal(t, multi(1, 1, 11), multi(n1.Data(), n2.Data(), n3.Data()))
+	n2.Clear()
+	assert.Equal(t, multi(1, 0, 11), multi(n1.Data(), n2.Data(), n3.Data()))
+	n3.Clear()
+	assert.Equal(t, multi(1, 0, 10), multi(n1.Data(), n2.Data(), n3.Data()))
+	n3.Child("sub1").Clear()
+	assert.Equal(t, multi(1, 0, 0), multi(n1.Data(), n2.Data(), n3.Data()))
+}
+
+func TestIncr(t *testing.T) {
+	tconn := SetupTest(t)
+	n := tconn.Node("var")
+	assert.Equal(t, 1.0, n.Incr())
+	assert.Equal(t, "1", n.Get())
+	assert.Equal(t, 3.0, n.Incr(2))
+	assert.Equal(t, 4.5, n.Incr(1.5))
+	assert.Equal(t, 0.0, n.Incr(-4.5))
+	assert.Equal(t, -4.5, n.Incr(-4.5))
+
+	n.Set("0")
+	assert.Equal(t, 1.0, n.Incr(""))
+	assert.Equal(t, "1", n.Get())
+	assert.Equal(t, 3.0, n.Incr("2"))
+	assert.Equal(t, 4.5, n.Incr("1.5"))
+	assert.Equal(t, 0.0, n.Incr("-4.5"))
+	assert.Equal(t, -4.5, n.Incr("-4.5"))
+	assert.Equal(t, -3.5, n.Incr("1abcdefg"))
 }
 
 // ---- Benchmarks
@@ -124,7 +213,7 @@ func BenchmarkDiff(b *testing.B) {
 		i := cpuIndex.Add(1)
 		for int(cpuIndex.Load()) < cpus {
 		}
-		tconn := NewConn()
+		tconn := SetupTest(b)
 		for pb.Next() {
 			if i%2 == 0 {
 				tconn.Node(Randstr())
@@ -139,7 +228,7 @@ func BenchmarkDiff(b *testing.B) {
 
 // Benchmark setting a node repeatedly to new values each time.
 func BenchmarkNode(b *testing.B) {
-	tconn := NewConn()
+	tconn := SetupTest(b)
 	for b.Loop() {
 		tconn.Node(Randstr())
 	}
@@ -147,26 +236,25 @@ func BenchmarkNode(b *testing.B) {
 
 // Benchmark setting a node repeatedly to new values each time.
 func BenchmarkSet(b *testing.B) {
-	tconn := NewConn()
+	tconn := SetupTest(b)
 	n := tconn.Node("var")
 	for b.Loop() {
-		assert.Nil(b, n.Set(Randstr()))
+		n.Set(Randstr())
 	}
 }
 
 // Benchmark getting a node repeatedly.
 func BenchmarkGet(b *testing.B) {
-	tconn := NewConn()
+	tconn := SetupTest(b)
 	n := tconn.Node("var")
 	for b.Loop() {
-		_, err := n.Get()
-		assert.Nil(b, err)
+		n.Get()
 	}
 }
 
 // Benchmark setting a node with randomly located node, where each node has 5 random subscripts.
 func BenchmarkSetVariantSubscripts(b *testing.B) {
-	tconn := NewConn()
+	tconn := SetupTest(b)
 	subs := make([]string, 5)
 	RandstrReset() // access the same nodes to be subsequently fetched by matching Get() benchmark
 	for b.Loop() {
@@ -174,13 +262,13 @@ func BenchmarkSetVariantSubscripts(b *testing.B) {
 			subs[j] = Randstr()
 		}
 		n := tconn.Node("var", subs...)
-		assert.Nil(b, n.Set(Randstr()))
+		n.Set(Randstr())
 	}
 }
 
 // Benchmark getting a node with randomly located node, where each node has 5 random subscripts.
 func BenchmarkGetVariantSubscripts(b *testing.B) {
-	tconn := NewConn()
+	tconn := SetupTest(b)
 	subs := make([]string, 5)
 	RandstrReset() // access the same nodes previously stored by matching Set() benchmark
 	for b.Loop() {
@@ -189,7 +277,7 @@ func BenchmarkGetVariantSubscripts(b *testing.B) {
 		}
 		n := tconn.Node("var", subs...)
 		Randstr() // increment random string index to match strings with Set() benchmark
-		_, err := n.Get()
+		_, err := n.GetIf()
 		if err != nil {
 			assert.Nil(b, err, "Make sure to run the Set benchmark first to init values to read")
 		}
@@ -197,7 +285,7 @@ func BenchmarkGetVariantSubscripts(b *testing.B) {
 }
 
 func BenchmarkZwr2Str(b *testing.B) {
-	tconn := NewConn()
+	tconn := SetupTest(b)
 	str := `"X"_$C(0)_"ABC"`
 	for b.Loop() {
 		_, err := tconn.Zwr2Str(str)

@@ -82,28 +82,9 @@ func setupLogger(test_dir string, verbose bool) (*log.Logger, *os.File) {
 	return logger, f
 }
 
-func createDatabase() (string, bool, *log.Logger, *os.File) {
-	// "tst_working_dir" env var is not defined. This means an outside the test system invocation.
-	// So create temporary database. We do this to avoid "go test" invocation from polluting any existing
-	// database of user.
-	//
-	// Get a temporary directory to put the database in
-	test_dir, err := os.MkdirTemp("", "ydbgotest-")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// Setup the log file, print to stdout if needed
-	verbose := false
-	for _, b := range os.Args {
-		if b == "-test.v=true" || b == "-test.v" {
-			verbose = true
-		}
-	}
-	log, f := setupLogger(test_dir, verbose)
-
+func createDatabase(test_dir string, logger *log.Logger) string {
 	// Setup environment variables
-	log.Printf("Test directory is %s", test_dir)
+	logger.Printf("Test directory is %s", test_dir)
 	ydb_gbldir := filepath.Join(test_dir, "mumps.gld")
 	ydb_datfile := filepath.Join(test_dir, "mumps.dat")
 	os.Setenv("ydb_gbldir", ydb_gbldir)
@@ -118,34 +99,44 @@ func createDatabase() (string, bool, *log.Logger, *os.File) {
 	cmd := exec.Command(mumps_exe, "-run", "^GDE",
 		"change -seg DEFAULT -file="+ydb_datfile)
 	output, err := cmd.CombinedOutput()
-	log.Printf("%s\n", output)
+	logger.Printf("%s\n", output)
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal(err)
 	}
 
 	// Create database itself
 	cmd = exec.Command(mupip_exe, "create")
 	output, err = cmd.CombinedOutput()
-	log.Printf("%s\n", output)
+	logger.Printf("%s\n", output)
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal(err)
 	}
-	return test_dir, verbose, log, f
+	return test_dir
 }
 
-func cleanupDatabase(log *log.Logger, f *os.File, test_dir string) {
-	log.Printf("Cleaning up test directory")
-	f.Close()
+func cleanupDatabase(logger *log.Logger, test_dir string) {
+	logger.Printf("Cleaning up test directory")
 	os.RemoveAll(test_dir)
 }
 
 // _testMain is factored out of TestMain to let us defer Init() properly
 // since os.Exit() must not be run in the same function as defer.
 func _testMain(m *testing.M) int {
-	var verbose bool
-	var test_dir string
-	var f *os.File
-	var log *log.Logger
+	// Get a temporary directory to put the database and logfile in
+	test_dir, err := os.MkdirTemp("", "ydbgotest-")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Setup the log file, print to stdout if needed
+	verbose := false
+	for _, b := range os.Args {
+		if b == "-test.v=true" || b == "-test.v" {
+			verbose = true
+		}
+	}
+	logger, logfile := setupLogger(test_dir, verbose)
+	defer logfile.Close()
 
 	// Create test database if necessary.
 	// Determine if this is an invocation of "go test" from the YDBTest repo (YottaDB test system).
@@ -153,7 +144,7 @@ func _testMain(m *testing.M) int {
 	// (qdbrundown, replication etc.) and will get more coverage using that database than this on-the-fly database.
 	_, is_ydbtest_invocation := os.LookupEnv("tst_working_dir")
 	if !is_ydbtest_invocation {
-		test_dir, verbose, log, f = createDatabase()
+		test_dir = createDatabase(test_dir, logger)
 	}
 
 	// run init/exit for both v1 and v2 code so we can compare them
@@ -172,7 +163,7 @@ func _testMain(m *testing.M) int {
 
 	// Cleanup the temp directory, but leave it if we are in verbose mode or the test failed
 	if !is_ydbtest_invocation && !verbose && ret == 0 {
-		cleanupDatabase(log, f, test_dir)
+		cleanupDatabase(logger, test_dir)
 	}
 	return ret
 }
@@ -181,4 +172,12 @@ func _testMain(m *testing.M) int {
 func TestMain(m *testing.M) {
 	code := _testMain(m)
 	os.Exit(code) // os.Exit is the official way to exit a test suite
+}
+
+// Called by each test to set up the database prior to the test.
+// Returns a database connection that may be used by that test.
+func SetupTest(t testing.TB) *Conn {
+	tconn := NewConn()
+	tconn.KillLocalsExcept()
+	return tconn
 }

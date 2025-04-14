@@ -32,7 +32,7 @@ test:
 bench: benchmark
 benchmarks: benchmark
 benchmark:
-	$(perflock) go test -bench $(tests) $(short) -benchtime $(benchtime) $(BENCH)
+	$(perflock) go test -bench $(tests) $(short) -timeout 5s -benchtime $(benchtime) $(BENCH)
 
 diff: benchtime=5s
 diff: short=

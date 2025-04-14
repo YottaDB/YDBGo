@@ -16,7 +16,9 @@ package yottadb
 
 import (
 	"bytes"
+	"fmt"
 	"runtime"
+	"strconv"
 	"strings"
 	"unsafe"
 
@@ -178,17 +180,34 @@ func (conn *Conn) Zwr2Str(zstr string) (string, error) {
 func (conn *Conn) Str2Zwr(str string) (string, error) {
 	cconn := conn.cconn
 	cbuf := conn.setValue(str)
-	ret := C.ydb_str2zwr_st(cconn.tptoken, &cconn.errstr, cbuf, cbuf)
-	if ret == ydberr.INVSTRLEN {
+	status := C.ydb_str2zwr_st(cconn.tptoken, &cconn.errstr, cbuf, cbuf)
+	if status == ydberr.INVSTRLEN {
 		// Allocate more space and retry the call
 		conn.ensureValueSize(int(cconn.value.len_used))
 		cbuf := conn.setValue(str)
-		ret = C.ydb_str2zwr_st(cconn.tptoken, &cconn.errstr, cbuf, cbuf)
+		status = C.ydb_str2zwr_st(cconn.tptoken, &cconn.errstr, cbuf, cbuf)
 	}
-	if ret != YDB_OK {
-		return "", conn.GetError(ret)
+	if status != YDB_OK {
+		return "", conn.GetError(status)
 	}
 	return conn.getValue(), nil
+}
+
+// Kill all YottaDB 'locals' except for the ones listed by name in exclusions.
+// To kill a specific variable use node.Kill()
+func (conn *Conn) KillLocalsExcept(exclusions ...string) {
+	var err C.int
+	cconn := conn.cconn
+	if len(exclusions) == 0 {
+		err = C.ydb_delete_excl_st(cconn.tptoken, &cconn.errstr, 0, nil)
+	} else {
+		// use a Node type just as a handy way to store exclusions strings as a ydb_buffer_t array
+		namelist := conn.Node(exclusions[0], exclusions[1:]...)
+		err = C.ydb_delete_excl_st(cconn.tptoken, &cconn.errstr, C.int(len(exclusions)), &namelist.cnode.buffers)
+	}
+	if err != YDB_OK {
+		panic(conn.GetError(err))
+	}
 }
 
 // ---- Node object
@@ -206,8 +225,8 @@ func (conn *Conn) Str2Zwr(str string) (string, error) {
 // This struct wraps a C.node struct in a Go struct so Go can add methods to it.
 type Node struct {
 	// Pointer to C.node rather than the item itself so we can point to it from C without Go moving it.
-	n    *C.node
-	conn *Conn // Node.conn points to the Go conn; Node.n.conn will point directly to the C.conn
+	cnode *C.node
+	conn  *Conn // Node.conn points to the Go conn; Node.cnode.conn will point directly to the C.conn
 }
 
 // Creates a `Node` type instance that represents a database node with methods that access YottaDB.
@@ -224,8 +243,8 @@ func (conn *Conn) _Node(varname interface{}, subscripts ...string) (n *Node) {
 	switch val := varname.(type) {
 	case *Node:
 		node1 = val
-		first = C.GoStringN(node1.n.buffers.buf_addr, node1.n.datasize)
-		firstLen = int(node1.n.len)
+		first = C.GoStringN(node1.cnode.buffers.buf_addr, node1.cnode.datasize)
+		firstLen = int(node1.cnode.len)
 	default:
 		first = val.(string)
 		firstLen = 1
@@ -241,17 +260,17 @@ func (conn *Conn) _Node(varname interface{}, subscripts ...string) (n *Node) {
 	// This initial call must be to calloc() to get initialized (cleared) storage: due to a documented cgo bug
 	// we must not let Go store pointer values in uninitialized C-allocated memory or errors may result.
 	// See the cgo bug mentioned at https://golang.org/cmd/cgo/#hdr-Passing_pointers.
-	n.n = (*C.node)(C.calloc(1, C.size_t(size)))
-	if n.n == nil {
+	n.cnode = (*C.node)(C.calloc(1, C.size_t(size)))
+	if n.cnode == nil {
 		panic("YDB: out of memory when allocating new reference to database node")
 	}
 	// Queue the cleanup function to free it
 	runtime.AddCleanup(n, func(cnode *C.node) {
 		C.free(unsafe.Pointer(cnode))
-	}, n.n)
+	}, n.cnode)
 
-	n.conn = conn // point to the Go conn
-	cnode := n.n
+	n.conn = conn
+	cnode := n.cnode
 	cnode.conn = conn.cconn // point to the C version of the conn
 	cnode.len = C.int(len(subscripts) + firstLen)
 	cnode.mutable = 0 // i.e. false
@@ -263,7 +282,7 @@ func (conn *Conn) _Node(varname interface{}, subscripts ...string) (n *Node) {
 	// Now fill in ydb_buffer_t pointers
 	if node1 != nil {
 		// Copy node1.buffers to node.buffers
-		C.memcpy(unsafe.Pointer(&cnode.buffers), unsafe.Pointer(&node1.n.buffers), C.size_t(node1.n.len)*C.sizeof_ydb_buffer_t)
+		C.memcpy(unsafe.Pointer(&cnode.buffers), unsafe.Pointer(&node1.cnode.buffers), C.size_t(node1.cnode.len)*C.sizeof_ydb_buffer_t)
 		dataptr = unsafe.Add(dataptr, len(first))
 	} else {
 		s := first
@@ -298,8 +317,7 @@ func (parent *Node) Clone(conn ...(*Conn)) (clone *Node) {
 	clone = parent.conn._Node(parent)
 	if len(conn) > 0 {
 		clone.conn = conn[0]
-		cnode := clone.n
-		cnode.conn = clone.conn.cconn
+		clone.cnode.conn = clone.conn.cconn
 	}
 	return clone
 }
@@ -307,7 +325,7 @@ func (parent *Node) Clone(conn ...(*Conn)) (clone *Node) {
 // Return string representation of this database node in typical YottaDB format: `varname("sub1")("sub2")`.
 func (n *Node) String() string {
 	var bld strings.Builder
-	cnode := n.n // access C.node from Go node
+	cnode := n.cnode // access C.node from Go node
 	for i := range cnode.len {
 		buf := bufferIndex(&cnode.buffers, int(i))
 		s := C.GoStringN(buf.buf_addr, C.int(buf.len_used))
@@ -322,33 +340,51 @@ func (n *Node) String() string {
 	return bld.String()
 }
 
-// Set the value of a database node to val.
-func (n *Node) Set(val string) error {
-	cnode := n.n // access C.node from Go node
+// Set the value of a database node to val and return val.
+// The val may be a string, integer, or float because it is converted to a string using fmt.Sprint().
+// Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
+func (n *Node) Set(val string) string {
+	cnode := n.cnode // access C equivalents of Go types
 	cconn := cnode.conn
-	n.conn.setValue(val)
-	ret := C.ydb_set_st(cconn.tptoken, &cconn.errstr, &cnode.buffers, cnode.len-1, bufferIndex(&cnode.buffers, 1), &cconn.value)
-
-	return n.conn.GetError(ret)
+	n.conn.setValue(fmt.Sprint(val))
+	status := C.ydb_set_st(cconn.tptoken, &cconn.errstr, &cnode.buffers, cnode.len-1, bufferIndex(&cnode.buffers, 1), &cconn.value)
+	if status != YDB_OK {
+		panic(n.conn.GetError(status))
+	}
+	return val
 }
 
-// Get the value of a database node.
-// On error return the empty string and the error.
-// If deflt is supplied return string deflt[0] instead of GVUNDEF or LVUNDEF errors.
-func (n *Node) Get(deflt ...string) (string, error) {
-	cnode := n.n // access C.node from Go node
+// Get and return the value of a database node or deflt if it does not exist.
+// Since a default is supplied, the only possible errors are panic-worthy, so this calls panic on them.
+func (n *Node) Get(deflt ...string) string {
+	val, err := n.GetIf()
+	if err == nil {
+		return val
+	}
+	status := err.(*YDBError).Code
+	if status == ydberr.GVUNDEF || status == ydberr.LVUNDEF || status == ydberr.INVSVN {
+		if len(deflt) == 0 {
+			return ""
+		}
+		return deflt[0]
+	}
+	panic(err)
+}
+
+// Return the value of a database node if possible, otherwise return an error.
+// The errors returned are GVUNDEF, LVUNDEF, INVSVN, and also other panic-worthy errors (e.g. invalid variable names),
+// so you may safely use Get() instead.
+func (n *Node) GetIf() (string, error) {
+	cnode := n.cnode // access C equivalents of Go types
 	cconn := cnode.conn
-	err := C.ydb_get_st(cconn.tptoken, &cconn.errstr, &cnode.buffers, cnode.len-1, bufferIndex(&cnode.buffers, 1), &cconn.value)
-	if err == ydberr.INVSTRLEN {
+	status := C.ydb_get_st(cconn.tptoken, &cconn.errstr, &cnode.buffers, cnode.len-1, bufferIndex(&cnode.buffers, 1), &cconn.value)
+	if status == ydberr.INVSTRLEN {
 		// Allocate more space and retry the call
 		n.conn.ensureValueSize(int(cconn.value.len_used))
-		err = C.ydb_get_st(cconn.tptoken, &cconn.errstr, &cnode.buffers, cnode.len-1, bufferIndex(&cnode.buffers, 1), &cconn.value)
+		status = C.ydb_get_st(cconn.tptoken, &cconn.errstr, &cnode.buffers, cnode.len-1, bufferIndex(&cnode.buffers, 1), &cconn.value)
 	}
-	if len(deflt) > 0 && (err == ydberr.GVUNDEF || err == ydberr.LVUNDEF) {
-		return deflt[0], nil
-	}
-	if err != C.YDB_OK {
-		return "", n.conn.GetError(err)
+	if status != YDB_OK {
+		return "", n.conn.GetError(status)
 	}
 	// take a copy of the string so that we can release `space`
 	value := C.GoStringN(cconn.value.buf_addr, C.int(cconn.value.len_used))
@@ -360,55 +396,95 @@ func (n *Node) Get(deflt ...string) (string, error) {
 //   - 1: node has a value, but no subtree
 //   - 10: node has no value, but does have a subtree
 //   - 11: node has both value and subtree
+//
+// Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
 func (n *Node) Data() int {
-	cnode := n.n // access C.node from Go node
+	cnode := n.cnode // access C equivalents of Go types
 	cconn := cnode.conn
 	var val C.uint
-	err := C.ydb_data_st(cconn.tptoken, &cconn.errstr, &cnode.buffers, cnode.len-1, bufferIndex(&cnode.buffers, 1), &val)
-	if err != YDB_OK {
-		panic(n.conn.GetError(err))
+	status := C.ydb_data_st(cconn.tptoken, &cconn.errstr, &cnode.buffers, cnode.len-1, bufferIndex(&cnode.buffers, 1), &val)
+	if status != YDB_OK {
+		panic(n.conn.GetError(status))
 	}
 	return int(val)
 }
 
 // Returns whether the database node has a value.
 // Use this in preference to node.Data()
+// Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
 func (n *Node) HasValue() bool {
 	return (n.Data() & 1) == 1
 }
 
 // Returns whether the database node has a tree of subscripts containing data.
 // Use this in preference to node.Data()
+// Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
 func (n *Node) HasTree() bool {
 	return (n.Data() & 10) == 10
 }
 
 // Returns whether the database node has both tree and value.
 // Use this in preference to node.Data()
+// Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
 func (n *Node) HasTreeAndValue() bool {
 	return (n.Data() & 11) == 11
 }
 
 // Returns whether the database node has neither tree nor value.
 // Use this in preference to node.Data()
+// Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
 func (n *Node) HasNone() bool {
 	return (n.Data() & 11) == 0
 }
 
 // Kill deletes a database node including its value and any subtree.
 // To delete only the value of a node use node.Clear()
-func (n *Node) Kill() error {
-	cnode := n.n // access C.node from Go node
+// Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
+func (n *Node) Kill() {
+	cnode := n.cnode // access C equivalents of Go types
 	cconn := cnode.conn
-	ret := C.ydb_delete_st(cconn.tptoken, &cconn.errstr, &cnode.buffers, cnode.len-1, bufferIndex(&cnode.buffers, 1), C.YDB_DEL_TREE)
-	return n.conn.GetError(ret)
+	status := C.ydb_delete_st(cconn.tptoken, &cconn.errstr, &cnode.buffers, cnode.len-1, bufferIndex(&cnode.buffers, 1), C.YDB_DEL_TREE)
+	if status != YDB_OK {
+		panic(n.conn.GetError(status))
+	}
 }
 
 // Delete the node value, not its child subscripts.
 // Equivalent to YottaDB M command ZKILL
+// Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
 func (n *Node) Clear() error {
-	cnode := n.n // access C.node from Go node
+	cnode := n.cnode // access C equivalents of Go types
 	cconn := cnode.conn
-	ret := C.ydb_delete_st(cconn.tptoken, &cconn.errstr, &cnode.buffers, cnode.len-1, bufferIndex(&cnode.buffers, 1), C.YDB_DEL_NODE)
-	return n.conn.GetError(ret)
+	status := C.ydb_delete_st(cconn.tptoken, &cconn.errstr, &cnode.buffers, cnode.len-1, bufferIndex(&cnode.buffers, 1), C.YDB_DEL_NODE)
+	return n.conn.GetError(status)
+}
+
+// Atomically increment the value of database node by amount.
+// The amount may be an integer, float or string representation of the same, and defaults to 1 if not supplied.
+// Convert the value of the node to a number first by discarding any trailing non-digits and returning zero if it is still not a number.
+// Return the new value of the node.
+// Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
+func (n *Node) Incr(amount ...interface{}) float64 {
+	cnode := n.cnode // access C equivalents of Go types
+	cconn := cnode.conn
+
+	var numberString string
+	if len(amount) == 0 {
+		numberString = "1"
+	} else {
+		numberString = fmt.Sprint(amount[0])
+	}
+	n.conn.setValue(numberString)
+
+	status := C.ydb_incr_st(cconn.tptoken, &cconn.errstr, &cnode.buffers, cnode.len-1, bufferIndex(&cnode.buffers, 1), &cconn.value, &cconn.value)
+	if status != YDB_OK {
+		panic(n.conn.GetError(status))
+	}
+
+	valuestring := C.GoStringN(cconn.value.buf_addr, C.int(cconn.value.len_used))
+	value, err := strconv.ParseFloat(valuestring, 64)
+	if err != nil {
+		panic(err)
+	}
+	return value
 }

@@ -314,10 +314,7 @@ func initializeYottaDB() {
 		panic(fmt.Sprintf("YDB: YottaDB initialization failed with return code %d", rc))
 	}
 
-	releaseInfoString, err := NewConn().Node("$ZYRELEASE").Get()
-	if err != nil {
-		panic(fmt.Sprintf("YDB: YottaDB fetch of $ZYRELEASE failed with error: %s", err))
-	}
+	releaseInfoString := NewConn().Node("$ZYRELEASE").Get()
 
 	// The returned output should have the YottaDB version as the 2nd token in the form rX.YY[Y] where:
 	//   - 'r' is a fixed character
@@ -341,7 +338,7 @@ func initializeYottaDB() {
 	// for use in a development environment (no production releases have character suffixes). If we get an error, try
 	// removing a char off the end and retry.
 	// The possibility of major release having a letter suffix prevents the use of fmt.Scanf()
-	_, err = strconv.Atoi(releaseMajorStr)
+	_, err := strconv.Atoi(releaseMajorStr)
 	if err != nil {
 		releaseMajorStr = releaseMajorStr[:len(releaseMajorStr)-1]
 		_, err = strconv.Atoi(releaseMajorStr)
