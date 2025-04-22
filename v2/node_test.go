@@ -16,13 +16,14 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"strings"
 	"sync/atomic"
 	"testing"
 
 	assert "github.com/stretchr/testify/require"
 )
 
-// ---- Examples (testable)
+// ---- Examples (testable) and tests
 
 // Example of converting a ZWRITE-formatted string to a Go string
 func ExampleConn_Zwr2Str() {
@@ -50,11 +51,64 @@ func ExampleConn_Str2Zwr() {
 func ExampleNode_String() {
 	conn := NewConn()
 	n := conn.Node("var", "sub1", "sub2")
+	numsubs := conn.Node("var2", "1", "2")
 	fmt.Println(n)
-	// Output: var("sub1","sub2")
+	fmt.Println(numsubs)
+	// Output:
+	// var("sub1","sub2")
+	// var2(1,2)
 }
 
-// ---- Tests
+// Example of traversing a database tree
+func ExampleNode_TreeNext() {
+	conn := NewConn()
+	n1 := conn.Node("X", "1")
+	n1.Child("2", "3").Set("123")
+	n1.Child("2", "3", "7").Set("1237")
+	n1.Child("2", "4").Set("124")
+	n1.Child("2", "5", "9").Set("1259")
+	n1.Child("6").Set("16")
+	nb := conn.Node("X", "B")
+	nb.Child("1").Set("AB")
+
+	x := conn.Node("X")
+	for {
+		x = x.TreeNext()
+		if x == nil {
+			break
+		}
+		fmt.Printf("%s=%s\n", x, Quote(x.Get("")))
+	}
+	// Output:
+	// X(1,2,3)=123
+	// X(1,2,3,7)=1237
+	// X(1,2,4)=124
+	// X(1,2,5,9)=1259
+	// X(1,6)=16
+	// X("B",1)="AB"
+}
+
+// Test cases that ExampleNode_TreeNext() did not catch
+func TestTreeNext(t *testing.T) {
+	tconn := NewConn()
+
+	// Ensure TreeNext will work even if it has to allocate new subscript memory up to the size of YDB_MAX_STR
+	bigstring := strings.Repeat("A", YDB_MAX_STR)
+	n1 := tconn.Node("X", bigstring)
+	n1.Child("2", "3").Set("Big23")
+	n1.Child("5", bigstring).Set("Big5Big")
+
+	x := tconn.Node("X")
+	output := ""
+	for {
+		x = x.TreeNext()
+		if x == nil {
+			break
+		}
+		output += fmt.Sprintf("%s=%s ", x, Quote(x.Get("")))
+	}
+	assert.Equal(t, `X("`+bigstring+`",2,3)="Big23" X("`+bigstring+`",5,"`+bigstring+`")="Big5Big" `, output)
+}
 
 // Test Node creation.
 func TestNode(t *testing.T) {
@@ -309,17 +363,27 @@ func BenchmarkSetVariantSubscripts(b *testing.B) {
 func BenchmarkGetVariantSubscripts(b *testing.B) {
 	tconn := SetupTest(b)
 	subs := make([]string, 5)
+
+	// set up database locals to Get shortly
+	RandstrReset() // access the same nodes to be subsequently fetched by matching Get() benchmark
+	for range b.N {
+		for j := range subs {
+			subs[j] = Randstr()
+		}
+		n := tconn.Node("var", subs...)
+		n.Set(Randstr())
+	}
+	b.ResetTimer()
+
 	RandstrReset() // access the same nodes previously stored by matching Set() benchmark
-	for b.Loop() {
+	for range b.N {
 		for j := range subs {
 			subs[j] = Randstr()
 		}
 		n := tconn.Node("var", subs...)
 		Randstr() // increment random string index to match strings with Set() benchmark
 		_, err := n.GetIf()
-		if err != nil {
-			assert.Nil(b, err, "Make sure to run the Set benchmark first to init values to read")
-		}
+		assert.Nil(b, err, "Database locals not properly set up for this test")
 	}
 }
 

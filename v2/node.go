@@ -31,7 +31,7 @@ import (
 import "C"
 
 // indexBuf finds the address of index i within a ydb_buffer_t array.
-// This function is necessary because CGo discards buffersn[] since it has no size.
+//   - This function is necessary because CGo discards Node.cnode.buffersn[] since it has no size.
 func bufferIndex(buf *C.ydb_buffer_t, i int) *C.ydb_buffer_t {
 	return (*C.ydb_buffer_t)(unsafe.Add(unsafe.Pointer(buf), C.sizeof_ydb_buffer_t*i))
 }
@@ -39,15 +39,17 @@ func bufferIndex(buf *C.ydb_buffer_t, i int) *C.ydb_buffer_t {
 // ---- Node object
 
 // Node is an object containing strings that represents a YottaDB node.
-// Stores all the supplied strings (varname and subscripts) in the Node object along with array of C.ydb_buffer_t
-// structs that point to each successive string, to provide fast access to YottaDB API functions.
-// Regular Nodes are immutable. There is a mutable version of Node emitted by Node iterators, which
-// will change each loop. If you need to take a snapshot of a mutable node this may be done with node.Clone().
+//   - Stores all the supplied strings (varname and subscripts) in the Node object along with array of C.ydb_buffer_t
 //
-// Thread Safety: Do not run database actions on node objects created in another thread. If you want to
-// act on a node object passed in from another goroutine, first call node.Clone(conn) to make a copy of the
+// structs that point to each successive string, to provide fast access to YottaDB API functions.
+//   - Regular Nodes are immutable. There is a mutable version of Node emitted by Node iterators, which
+//
+// will change each loop. If you need to take an immutable snapshot of a mutable node this may be done with [Node.Clone]().
+//   - Thread Safety: Do not run database actions on node objects created in another thread. If you want to
+//
+// act on a node object passed in from another goroutine, first call [Node.Clone](conn) to make a copy of the
 // other goroutine's node object using the current thread's connection `conn`. Then perform methods on that.
-
+//
 // This struct wraps a C.node struct in a Go struct so Go can add methods to it.
 type Node struct {
 	// Pointer to C.node rather than the item itself so we can point to it from C without Go moving it.
@@ -56,7 +58,8 @@ type Node struct {
 }
 
 // Creates a `Node` type instance that represents a database node with methods that access YottaDB.
-// The strings and array are stored in C-allocated space to give Node methods fast access to YottaDB API functions.
+//   - The strings and array are stored in C-allocated space to give Node methods fast access to YottaDB API functions.
+//
 // varname may be a string or, if it is another node, that node's path strings will be prepended to `subscripts`.
 func (conn *Conn) _Node(varname interface{}, subscripts ...string) (n *Node) {
 	// Note: benchmarking shows that the use of interface{} slows down node creation almost immeasurably (< 0.1%)
@@ -127,18 +130,20 @@ func (conn *Conn) _Node(varname interface{}, subscripts ...string) (n *Node) {
 }
 
 // Creates a `Node` type instance that represents a database node with methods that access YottaDB.
-// The strings and array are stored in C-allocated space to give Node methods fast access to YottaDB API functions.
+//   - The strings and array are stored in C-allocated space to give Node methods fast access to YottaDB API functions.
 func (conn *Conn) Node(varname string, subscripts ...string) (n *Node) {
 	return conn._Node(varname, subscripts...)
 }
 
 // Creates a child node of parent that represents parent with subscripts appended.
+//   - [Node.Clone]() without parameters is equivalent to [Node.Child]() without parameters.
 func (parent *Node) Child(subscripts ...string) (n *Node) {
 	return parent.conn._Node(parent, subscripts...)
 }
 
-// Creates a clone of node, n, optionally for use with a different connection, conn[0], in a different goroutine.
-// Nodes may be passed to another goroutine but not used to access the database unless first cloned to another connection.
+// Creates a clone of node which may be used with a different connection in a different goroutine if the optional conn[0] is supplied.
+//   - Nodes may be passed to another goroutine but not used to access the database unless first cloned to another connection.
+//   - [Node.Clone]() without parameters is equivalent to [Node.Child]() without parameters.
 func (parent *Node) Clone(conn ...(*Conn)) (clone *Node) {
 	clone = parent.conn._Node(parent)
 	if len(conn) > 0 {
@@ -148,31 +153,47 @@ func (parent *Node) Clone(conn ...(*Conn)) (clone *Node) {
 	return clone
 }
 
-// Return string representation of this database node in typical YottaDB format: `varname("sub1")("sub2")`.
+// Add quotes around string for display purposes if it cannot be represented as a number.
+//   - The input value is treated as a string if it cannot be converted, unchanged, to and from float64
+//     using [strconv.ParseFloat](value, 64) and [strconv.FormatFloat](number, 'f', -1, 64)
+//   - This is exported so that the user can validate against the same conversion that is used by the YDBGo.
+func Quote(value string) string {
+	num, err := strconv.ParseFloat(value, 64)
+	// Treat as number only if it can be converted back to the same number -- in which case M would treat it as a number
+	if err == nil && value == strconv.FormatFloat(num, 'f', -1, 64) {
+		return value
+	}
+	return "\"" + value + "\""
+}
+
+// Return a string representation of this database node in typical YottaDB format: `varname("sub1")("sub2")`.
+//   - Output subscripts and values as unquoted numbers if they convert to float64 and back without change.
 func (n *Node) String() string {
 	var bld strings.Builder
 	cnode := n.cnode // access C.node from Go node
 	for i := range cnode.len {
 		buf := bufferIndex(&cnode.buffers, int(i))
 		s := C.GoStringN(buf.buf_addr, C.int(buf.len_used))
-		if i == 1 {
-			bld.WriteString("(\"")
+		if i == 0 {
+			bld.WriteString(s)
+			continue
 		}
-		bld.WriteString(s)
-		if i > 0 {
-			if i == cnode.len-1 {
-				bld.WriteString("\")")
-			} else {
-				bld.WriteString("\",\"")
-			}
+		if i == 1 {
+			bld.WriteString("(")
+		}
+		bld.WriteString(Quote(s))
+		if i == cnode.len-1 {
+			bld.WriteString(")")
+		} else {
+			bld.WriteString(",")
 		}
 	}
 	return bld.String()
 }
 
 // Set the value of a database node to val and return val.
-// The val may be a string, integer, or float because it is converted to a string using fmt.Sprint().
-// Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
+//   - The val may be a string, integer, or float because it is converted to a string using fmt.Sprint().
+//   - Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
 func (n *Node) Set(val string) string {
 	cnode := n.cnode // access C equivalents of Go types
 	cconn := cnode.conn
@@ -185,7 +206,7 @@ func (n *Node) Set(val string) string {
 }
 
 // Get and return the value of a database node or deflt if it does not exist.
-// Since a default is supplied, the only possible errors are panic-worthy, so this calls panic on them.
+//   - Since a default is supplied, the only possible errors are panic-worthy, so this calls panic on them.
 func (n *Node) Get(deflt ...string) string {
 	val, err := n.GetIf()
 	if err == nil {
@@ -202,7 +223,8 @@ func (n *Node) Get(deflt ...string) string {
 }
 
 // Return the value of a database node if possible, otherwise return an error.
-// The errors returned are GVUNDEF, LVUNDEF, INVSVN, and also other panic-worthy errors (e.g. invalid variable names),
+//   - Errors returned are GVUNDEF, LVUNDEF, INVSVN, and also other panic-worthy errors (e.g. invalid variable names),
+//
 // so you may safely use Get() instead.
 func (n *Node) GetIf() (string, error) {
 	cnode := n.cnode // access C equivalents of Go types
@@ -240,36 +262,36 @@ func (n *Node) Data() int {
 }
 
 // Returns whether the database node has a value.
-// Use this in preference to node.Data()
-// Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
+//   - Use this in preference to [Node.Data]()
+//   - Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
 func (n *Node) HasValue() bool {
 	return (n.Data() & 1) == 1
 }
 
 // Returns whether the database node has a tree of subscripts containing data.
-// Use this in preference to node.Data()
-// Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
+//   - Use this in preference to [Node.Data]()
+//   - Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
 func (n *Node) HasTree() bool {
 	return (n.Data() & 10) == 10
 }
 
 // Returns whether the database node has both tree and value.
-// Use this in preference to node.Data()
-// Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
+//   - Use this in preference to [Node.Data]()
+//   - Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
 func (n *Node) HasTreeAndValue() bool {
 	return (n.Data() & 11) == 11
 }
 
 // Returns whether the database node has neither tree nor value.
-// Use this in preference to node.Data()
-// Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
+//   - Use this in preference to [Node.Data]()
+//   - Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
 func (n *Node) HasNone() bool {
 	return (n.Data() & 11) == 0
 }
 
 // Kill deletes a database node including its value and any subtree.
-// To delete only the value of a node use node.Clear()
-// Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
+//   - To delete only the value of a node use [Node.Clear]()
+//   - Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
 func (n *Node) Kill() {
 	cnode := n.cnode // access C equivalents of Go types
 	cconn := cnode.conn
@@ -280,8 +302,8 @@ func (n *Node) Kill() {
 }
 
 // Delete the node value, not its child subscripts.
-// Equivalent to YottaDB M command ZKILL
-// Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
+//   - Equivalent to YottaDB M command ZKILL
+//   - Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
 func (n *Node) Clear() error {
 	cnode := n.cnode // access C equivalents of Go types
 	cconn := cnode.conn
@@ -290,10 +312,10 @@ func (n *Node) Clear() error {
 }
 
 // Atomically increment the value of database node by amount.
-// The amount may be an integer, float or string representation of the same, and defaults to 1 if not supplied.
-// Convert the value of the node to a number first by discarding any trailing non-digits and returning zero if it is still not a number.
-// Return the new value of the node.
-// Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
+//   - The amount may be an integer, float or string representation of the same, and defaults to 1 if not supplied.
+//   - Convert the value of the node to a number first by discarding any trailing non-digits and returning zero if it is still not a number.
+//   - Return the new value of the node.
+//   - Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
 func (n *Node) Incr(amount ...interface{}) float64 {
 	cnode := n.cnode // access C equivalents of Go types
 	cconn := cnode.conn
@@ -320,10 +342,10 @@ func (n *Node) Incr(amount ...interface{}) float64 {
 }
 
 // Grab attempts to acquire or increment the count a lock matching this node, waiting up to timeout for availability.
-// Equivalent to the M `LOCK +` command.
-// The timeout is supplied in timeout[0] in seconds. If no timeout is supplied, wait forever. A timeout of zero means try only once.
-// Return true if lock was acquired; otherwise false.
-// Panics with TIME2LONG if the timeout exceeds YDB_MAX_TIME_NSEC or on other panic-worthy errors (e.g. invalid variable names).
+// Equivalent to the M `LOCK +lockpath` command.
+//   - The timeout is supplied in timeout[0] in seconds. If no timeout is supplied, wait forever. A timeout of zero means try only once.
+//   - Return true if lock was acquired; otherwise false.
+//   - Panics with TIME2LONG if the timeout exceeds YDB_MAX_TIME_NSEC or on other panic-worthy errors (e.g. invalid variable names).
 func (n *Node) Grab(timeout ...float64) bool {
 	cnode := n.cnode // access C equivalents of Go types
 	cconn := cnode.conn
@@ -355,9 +377,9 @@ func (n *Node) Grab(timeout ...float64) bool {
 }
 
 // Release decrements the count of a lock matching this node, releasing it if zero.
-// Equivalent to the M `LOCK -` command.
-// Returns nothing since releasing a lock cannot fail.
-// Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
+// Equivalent to the M `LOCK -lockpath` command.
+//   - Returns nothing since releasing a lock cannot fail.
+//   - Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
 func (n *Node) Release() {
 	cnode := n.cnode // access C equivalents of Go types
 	cconn := cnode.conn
@@ -366,4 +388,96 @@ func (n *Node) Release() {
 	if status != YDB_OK {
 		panic(n.conn.GetError(status))
 	}
+}
+
+// Return the next node in the traversal of a database tree of a database variable.
+// Equivalent to the M function [$QUERY()].
+//   - The next node is chosen in depth-first order (i.e by descending deeper into the subscript tree before moving to the next node at the same level).
+//   - If the optional parameter reverse[0] is supplied and equals true, fetch the next node in reverse order.
+//   - Returns nil when called on the final branch of the tree for the given database variable (GLVN).
+//   - Nodes that have 'null subscripts' (i.e. empty string) are all returned in their place except for the top-level GLVN(""), which is never returned.
+//   - Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
+//
+// See [Node.LevelNext]() for traversal of nodes at the same level or to move from one database variable (GLVN) to another.
+//
+// [$QUERY()]: https://docs.yottadb.com/ProgrammersGuide/functions.html#query
+func (n *Node) TreeNext(reverse ...bool) *Node {
+	cnode := n.cnode // access C equivalents of Go types
+	cconn := cnode.conn
+	do_reverse := len(reverse) > 0 && reverse[0]
+	debug := false // Print when buffers need to be reallocated and ydb_node_next() called again
+
+	// Preallocate child subscripts of this size as a reasonable guess of space to fit most subscripts
+	prealloc := "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+	retNode := n.Child(prealloc) // Create new node to store result with a single preallocated child
+	var retSubs C.int
+	var malloced bool // whether we had to malloc() and hence defer free()
+	var status C.int
+	for {
+		retSubs = retNode.cnode.len - 1 // -1 because cnode counts the varname as a subscript and ydb_node_next_st() does not
+		if do_reverse {
+			status = C.ydb_node_previous_st(cconn.tptoken, &cconn.errstr, &cnode.buffers, cnode.len-1, bufferIndex(&cnode.buffers, 1), &retSubs, bufferIndex(&retNode.cnode.buffers, 1))
+		} else {
+			status = C.ydb_node_next_st(cconn.tptoken, &cconn.errstr, &cnode.buffers, cnode.len-1, bufferIndex(&cnode.buffers, 1), &retSubs, bufferIndex(&retNode.cnode.buffers, 1))
+		}
+		if status == ydberr.INSUFFSUBS {
+			if debug {
+				fmt.Printf("INSUFFSUBS: %d (need %d)\n", retNode.cnode.len-1, retSubs)
+			}
+			extraStrings := make([]string, retSubs-(retNode.cnode.len-1))
+			// Pre-fill node subscripts
+			for i := range extraStrings {
+				extraStrings[i] = prealloc
+			}
+			retNode = retNode.Child(extraStrings...)
+			continue
+		}
+		if status == ydberr.INVSTRLEN {
+			if debug {
+				fmt.Printf("INVSTRLEN subscript %d\n", retSubs)
+			}
+			buf := bufferIndex(&retNode.cnode.buffers, int(retSubs+1)) // +1 because cnode counts the varname as a subscript and ydb_node_next_st() does not
+			len := buf.len_used
+			newbuf := C.malloc(C.size_t(len))
+			malloced = true // flag that we have to clone this node before freeing newbuf
+			defer C.free(newbuf)
+			buf.buf_addr = (*C.char)(newbuf)
+			buf.len_alloc = len
+			continue
+		}
+		break
+	}
+	if status == ydberr.NODEEND {
+		return nil
+	}
+	if status != YDB_OK {
+		panic(n.conn.GetError(status))
+	}
+	retNode.cnode.len = C.int(retSubs + 1) // +1 because cnode counts the varname as a subscript and ydb_node_next_st() does not
+	// if we malloced anything, make sure we take a copy of it before defer runs to free the mallocs on return
+	if malloced {
+		cnode := retNode.cnode // access C.node from Go node
+		strings := make([]string, cnode.len)
+		for i := range cnode.len {
+			buf := bufferIndex(&cnode.buffers, int(i))
+			s := C.GoStringN(buf.buf_addr, C.int(buf.len_used))
+			strings[i] = s
+		}
+		retNode = n.conn.Node(strings[0], strings[1:]...)
+	}
+	return retNode
+}
+
+// Return the name of the next subscript after the given at the same depth level.
+// Equivalent to the M function [$ORDER()] and has the same treatment of 'null subscripts' (i.e. empty strings).
+//   - The order of returned nodes matches the collation order of the M database.
+//   - If the optional parameter reverse[0] is supplied and equals true, fetch the next node in reverse order.
+//   - Returns the empty string when called on the last node.
+//   - Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
+//
+// See [Node.TreeNext]() for traversal of nodes in a way that descends into the entire tree.
+//
+// [$ORDER()]: https://docs.yottadb.com/ProgrammersGuide/functions.html#order
+func (n *Node) Next(reverse ...bool) string {
+	return ""
 }

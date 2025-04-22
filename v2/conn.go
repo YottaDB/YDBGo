@@ -174,7 +174,7 @@ func (conn *Conn) Str2Zwr(str string) (string, error) {
 }
 
 // Kill all YottaDB 'locals' except for the ones listed by name in exclusions.
-// To kill a specific variable use node.Kill()
+// To kill a specific variable use [Node.Kill]()
 func (conn *Conn) KillLocalsExcept(exclusions ...string) {
 	var status C.int
 	cconn := conn.cconn
@@ -191,7 +191,7 @@ func (conn *Conn) KillLocalsExcept(exclusions ...string) {
 }
 
 // Releases all existing locks and attempt to acquire locks matching all supplied nodes, waiting up to timeout for availability.
-// Equivalent to the M `LOCK` command. See Node.Grab() and Node.Release() methods for single-lock usage.
+// Equivalent to the M `LOCK` command. See [Node.Grab]() and [Node.Release]() methods for single-lock usage.
 // The timeout is in seconds. A timeout of zero means try only once.
 // Return true if lock was acquired; otherwise false.
 // Panics with TIME2LONG if the timeout exceeds YDB_MAX_TIME_NSEC or on other panic-worthy errors (e.g. invalid variable names).

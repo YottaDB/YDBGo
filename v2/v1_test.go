@@ -121,10 +121,36 @@ func smplBenchmarkGetVariantSubscripts(b *testing.B) {
 	var value yottadb.BufferT
 	value.Alloc(100) // allow a value of up to this many chars
 	defer value.Free()
+	const nSubs = 5
 
 	v2.RandstrReset() // access the same nodes previously stored by matching Set() benchmark
-	const nSubs = 5
-	for b.Loop() {
+	// set up database locals to Get shortly
+	for range b.N {
+		var k yottadb.KeyT
+		k.Alloc(100, nSubs, 100)
+		// Store varname
+		err := k.Varnm.SetValStr(yottadb.NOTTP, nil, "var")
+		assert.Nil(b, err)
+		// Store each subscript
+		subs := k.Subary
+		for j := range nSubs {
+			sub := v2.Randstr()
+			err := subs.SetValStr(yottadb.NOTTP, nil, uint32(j), sub)
+			assert.Nil(b, err)
+		}
+		subs.SetElemUsed(yottadb.NOTTP, nil, nSubs)
+
+		err = value.SetValStr(yottadb.NOTTP, nil, v2.Randstr())
+		assert.Nil(b, err)
+		err = k.SetValST(yottadb.NOTTP, nil, &value)
+		assert.Nil(b, err)
+
+		k.Free()
+	}
+	b.ResetTimer()
+
+	v2.RandstrReset() // access the same nodes previously stored by matching Set() benchmark
+	for range b.N {
 		var k yottadb.KeyT
 		// In this case we could re-use the allocation each loop, but the purpose of this
 		// benchmark is to simulate allocation of new arbitrary nodes like in a real application
@@ -143,9 +169,7 @@ func smplBenchmarkGetVariantSubscripts(b *testing.B) {
 
 		v2.Randstr() // increment random string index to match strings with Set() benchmark
 		err = k.ValST(yottadb.NOTTP, nil, &value)
-		if err != nil {
-			assert.Nil(b, err, "Make sure to run the Set benchmark first to init values to read")
-		}
+		assert.Nil(b, err, "Database locals not properly set up for this test")
 		_, err = value.ValStr(yottadb.NOTTP, nil)
 		assert.Nil(b, err)
 
