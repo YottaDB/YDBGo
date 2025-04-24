@@ -28,10 +28,10 @@ typedef struct conn {
 // Create a representation of a database node, including a cache of its subscript strings for fast calls to the YottaDB API.
 typedef struct node {
 	conn *conn;
-	int len;		// number of buffers[] allocated to store subscripts/strings
-	int datasize;		// length of string `data` field (all strings and subscripts concatenated)
-	int mutable;		// whether the node is mutable (these are only emitted by node iterators)
-	ydb_buffer_t buffers;	// first of an array of buffers (typically varname)
+	int len;			// number of buffers[] allocated to store subscripts/strings
+	int datasize;			// length of string `data` field (all strings and subscripts concatenated)
+					// note: datasize can shrink in mutable nodes to alter the final subscript
+	ydb_buffer_t buffers;		// first of an array of buffers (typically varname)
 	ydb_buffer_t buffersn[];	// rest of array
-	// char *data;		// stored after `buffers` (however large they are), which point into this data
+	// char *data;			// stored after `buffers` (however large they are), which point into this data
 } node;

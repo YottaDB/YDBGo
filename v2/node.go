@@ -17,6 +17,7 @@ package yottadb
 import (
 	"bytes"
 	"fmt"
+	"iter"
 	"runtime"
 	"strconv"
 	"strings"
@@ -31,7 +32,7 @@ import (
 import "C"
 
 // indexBuf finds the address of index i within a ydb_buffer_t array.
-//   - This function is necessary because CGo discards Node.cnode.buffersn[] since it has no size.
+// - This function is necessary because CGo discards Node.cnode.buffersn[] since it has no size.
 func bufferIndex(buf *C.ydb_buffer_t, i int) *C.ydb_buffer_t {
 	return (*C.ydb_buffer_t)(unsafe.Add(unsafe.Pointer(buf), C.sizeof_ydb_buffer_t*i))
 }
@@ -40,27 +41,24 @@ func bufferIndex(buf *C.ydb_buffer_t, i int) *C.ydb_buffer_t {
 
 // Node is an object containing strings that represents a YottaDB node.
 //   - Stores all the supplied strings (varname and subscripts) in the Node object along with array of C.ydb_buffer_t
-//
-// structs that point to each successive string, to provide fast access to YottaDB API functions.
-//   - Regular Nodes are immutable. There is a mutable version of Node emitted by Node iterators, which
-//
-// will change each loop. If you need to take an immutable snapshot of a mutable node this may be done with [Node.Clone]().
+//     structs that point to each successive string, to provide fast access to YottaDB API functions.
+//   - Regular Nodes are immutable. There is a mutable version of Node emitted by [Node.Next]() and Node iterators, which
+//     will change each loop. If you need to take an immutable snapshot of a mutable node this may be done with [Node.Clone]().
 //   - Thread Safety: Do not run database actions on node objects created in another thread. If you want to
-//
-// act on a node object passed in from another goroutine, first call [Node.Clone](conn) to make a copy of the
-// other goroutine's node object using the current thread's connection `conn`. Then perform methods on that.
+//     act on a node object passed in from another goroutine, first call [Node.Clone](conn) to make a copy of the
+//     other goroutine's node object using the current thread's connection `conn`. Then perform methods on that.
 //
 // This struct wraps a C.node struct in a Go struct so Go can add methods to it.
 type Node struct {
 	// Pointer to C.node rather than the item itself so we can point to it from C without Go moving it.
-	cnode *C.node
-	conn  *Conn // Node.conn points to the Go conn; Node.cnode.conn will point directly to the C.conn
+	cnode   *C.node
+	conn    *Conn // Node.conn points to the Go conn; Node.cnode.conn will point directly to the C.conn
+	mutable bool  // Whether the node may be altered for fast iteration
 }
 
 // Creates a `Node` type instance that represents a database node with methods that access YottaDB.
 //   - The strings and array are stored in C-allocated space to give Node methods fast access to YottaDB API functions.
-//
-// varname may be a string or, if it is another node, that node's path strings will be prepended to `subscripts`.
+//     varname may be a string or, if it is another node, that node's path strings will be prepended to `subscripts`.
 func (conn *Conn) _Node(varname interface{}, subscripts ...string) (n *Node) {
 	// Note: benchmarking shows that the use of interface{} slows down node creation almost immeasurably (< 0.1%)
 	// Concatenate strings the fastest Go way.
@@ -102,11 +100,12 @@ func (conn *Conn) _Node(varname interface{}, subscripts ...string) (n *Node) {
 	cnode := n.cnode
 	cnode.conn = conn.cconn // point to the C version of the conn
 	cnode.len = C.int(len(subscripts) + firstLen)
-	cnode.mutable = 0 // i.e. false
 
 	dataptr := unsafe.Pointer(bufferIndex(&cnode.buffers, len(subscripts)+firstLen))
-	// Note: have tried to replace the following with copy() to avoid a CGo invocation, but it's slower
-	C.memcpy(dataptr, unsafe.Pointer(&joiner.Bytes()[0]), C.size_t(joiner.Len()))
+	if joiner.Len() > 0 {
+		// Note: have tried to replace the following with copy() to avoid a CGo invocation, but it's slower
+		C.memcpy(dataptr, unsafe.Pointer(&joiner.Bytes()[0]), C.size_t(joiner.Len()))
+	}
 
 	// Now fill in ydb_buffer_t pointers
 	if node1 != nil {
@@ -166,14 +165,24 @@ func Quote(value string) string {
 	return "\"" + value + "\""
 }
 
+// Return slice of strings that represent the varname and subscript names of the given node.
+func (n *Node) Subscripts() []string {
+	cnode := n.cnode // access C.node from Go node
+	strings := make([]string, cnode.len)
+	for i := range cnode.len {
+		buf := bufferIndex(&cnode.buffers, int(i))
+		s := C.GoStringN(buf.buf_addr, C.int(buf.len_used))
+		strings[i] = s
+	}
+	return strings
+}
+
 // Return a string representation of this database node in typical YottaDB format: `varname("sub1")("sub2")`.
 //   - Output subscripts and values as unquoted numbers if they convert to float64 and back without change.
 func (n *Node) String() string {
 	var bld strings.Builder
-	cnode := n.cnode // access C.node from Go node
-	for i := range cnode.len {
-		buf := bufferIndex(&cnode.buffers, int(i))
-		s := C.GoStringN(buf.buf_addr, C.int(buf.len_used))
+	subs := n.Subscripts()
+	for i, s := range subs {
 		if i == 0 {
 			bld.WriteString(s)
 			continue
@@ -182,7 +191,7 @@ func (n *Node) String() string {
 			bld.WriteString("(")
 		}
 		bld.WriteString(Quote(s))
-		if i == cnode.len-1 {
+		if i == len(subs)-1 {
 			bld.WriteString(")")
 		} else {
 			bld.WriteString(",")
@@ -224,8 +233,7 @@ func (n *Node) Get(deflt ...string) string {
 
 // Return the value of a database node if possible, otherwise return an error.
 //   - Errors returned are GVUNDEF, LVUNDEF, INVSVN, and also other panic-worthy errors (e.g. invalid variable names),
-//
-// so you may safely use Get() instead.
+//     so you may safely use Get() instead.
 func (n *Node) GetIf() (string, error) {
 	cnode := n.cnode // access C equivalents of Go types
 	cconn := cnode.conn
@@ -304,11 +312,13 @@ func (n *Node) Kill() {
 // Delete the node value, not its child subscripts.
 //   - Equivalent to YottaDB M command ZKILL
 //   - Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
-func (n *Node) Clear() error {
+func (n *Node) Clear() {
 	cnode := n.cnode // access C equivalents of Go types
 	cconn := cnode.conn
 	status := C.ydb_delete_st(cconn.tptoken, &cconn.errstr, &cnode.buffers, cnode.len-1, bufferIndex(&cnode.buffers, 1), C.YDB_DEL_NODE)
-	return n.conn.GetError(status)
+	if status != YDB_OK {
+		panic(n.conn.GetError(status))
+	}
 }
 
 // Atomically increment the value of database node by amount.
@@ -390,32 +400,152 @@ func (n *Node) Release() {
 	}
 }
 
+// Return a mutable version of node n with the final subscript changed to the given value.
+//   - Only creates a clone of node if the supplied node is not already mutable or doesn't have enough space for the changed subscript.
+func (n *Node) mutate(value string) *Node {
+	cnode := n.cnode // access C equivalents of Go types
+	retNode := n
+	lastbuf := bufferIndex(&cnode.buffers, int(cnode.len-1))
+	if !n.IsMutable() || int(lastbuf.len_alloc) < len(value) {
+		strs := n.Subscripts()
+		// Overallocate by appending preallocSubscript to value
+		strs[len(strs)-1] = value + preallocSubscript
+		retNode = n.conn.Node(strs[0], strs[1:]...)
+		retNode.mutable = true
+		// Shrink last buffer down to size of value leaving preallocSubscript space above it for future mutations
+		retNode.cnode.datasize -= C.int(len(preallocSubscript))
+		lastbuf := bufferIndex(&retNode.cnode.buffers, len(strs)-1)
+		lastbuf.len_used = C.uint(len(value))
+	} else {
+		retNode.cnode.datasize -= C.int(lastbuf.len_used) - C.int(len(value))
+		C.memcpy(unsafe.Pointer(lastbuf.buf_addr), unsafe.Pointer(unsafe.StringData(value)), C.size_t(len(value)))
+		lastbuf.len_used = C.uint(len(value))
+	}
+	return retNode
+}
+
+// Return whether given node is mutable.
+//   - Mutable nodes are returned only by [Node.Next]() and generated by [Node.Iterate](). Mutable nodes will change their final
+//     subscript each iteration or each call to Node.Next().
+//   - If you need to take an immutable snapshot of a mutable node this may be done with [Node.Clone]().
+func (n *Node) IsMutable() bool {
+	return n.mutable
+}
+
+// This subscript name is used to preallocate subscript space in mutable nodes that may have their final subscript name changed.
+// When it is exceeded by subsequent Node.Next() iterations, the entire node must be cloned to achieve reallocation
+var preallocSubscript string = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+
+// Get the next subscript at the same depth level.
+// Return a mutable node pointing to the database node with the next subscript after the given node, at the same depth level.
+// Unless you want to start half way through a sequence of subscripts, it's usually tidier to use Node.Iterate() instead.
+//   - Equivalent to the M function [$ORDER()] and has the same treatment of 'null subscripts' (i.e. empty strings).
+//   - The order of returned nodes matches the collation order of the M database.
+//   - The node path supplied does not need to exist in the database to find the next match.
+//   - If the supplied node n contains only a variable name without subscripts, the next variable (GLVN) name is returned instead of the next subscript.
+//   - If the optional parameter reverse[0] is supplied and equals "reverse", fetch the next node in reverse order.
+//   - Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
+//
+// Returns nil when there are no more subscripts at the level of the supplied node path, or a mutable node as follows:
+//   - if the supplied node is immutable, a mutable clone of n with its final subscript changed to the next node.
+//   - if the supplied node is mutable, the same node n with its final subscript changed to the next node.
+//
+// If you need to take an immutable snapshot of the returned mutable node this may be done with [Node.Clone]()
+//
+// See [Node.TreeNext]() for traversal of nodes in a way that descends into the entire tree.
+//
+// [$ORDER()]: https://docs.yottadb.com/ProgrammersGuide/functions.html#order
+func (n *Node) Next(reverse ...string) *Node {
+	cnode := n.cnode // access C equivalents of Go types
+	cconn := cnode.conn
+	doReverse := len(reverse) > 0 && reverse[0] == "reverse"
+
+	var status C.int
+	for range 2 {
+		if doReverse {
+			status = C.ydb_subscript_previous_st(cconn.tptoken, &cconn.errstr, &cnode.buffers, cnode.len-1, bufferIndex(&cnode.buffers, 1), &cconn.value)
+		} else {
+			status = C.ydb_subscript_next_st(cconn.tptoken, &cconn.errstr, &cnode.buffers, cnode.len-1, bufferIndex(&cnode.buffers, 1), &cconn.value)
+		}
+		if status == ydberr.INVSTRLEN {
+			// Allocate more space and retry the call
+			n.conn.ensureValueSize(int(cconn.value.len_used))
+			continue
+		}
+		break
+	}
+
+	if status == ydberr.NODEEND {
+		return nil
+	}
+	if status != YDB_OK {
+		panic(n.conn.GetError(status))
+	}
+
+	// take a copy of the string so that we can release `space`
+	value := C.GoStringN(cconn.value.buf_addr, C.int(cconn.value.len_used))
+
+	return n.mutate(value)
+}
+
+// Return an interator that can FOR-loop through all a node's single-depth child subscripts.
+// This iterator is a wrapper for [Node.Next](). It yields a mutable with successive final subscripts.
+//   - Treats 'null subscripts' (i.e. empty strings) in the same way as M function [$ORDER()].
+//   - The order of returned nodes matches the collation order of the M database.
+//   - If the optional parameter reverse[0] is supplied and equals "reverse", fetch the next node in reverse order.
+//   - This function never adjusts the supplied node even if it is mutable.
+//   - If you need to take an immutable snapshot of the returned mutable node, use [Node.Clone]().
+//
+// Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
+//
+// See [Node.TreeNext]() for traversal of nodes in a way that descends into the entire tree.
+//
+// [$ORDER()]: https://docs.yottadb.com/ProgrammersGuide/functions.html#order
+func (n *Node) Iterate(reverse ...string) iter.Seq[*Node] {
+	// The next 3 lines are functionally n := n.Child("") but result in faster subsequent code because they create a mutable
+	// node with enough spare subscript space to avoid Node.Next() having to immediately create a mutable node.
+	n = n.Child(preallocSubscript)
+	n.mutable = true
+	n = n.mutate("")
+
+	return func(yield func(*Node) bool) {
+		for {
+			n = n.Next(reverse...)
+			if n == nil {
+				return
+			}
+			if !yield(n) {
+				return
+			}
+		}
+	}
+}
+
 // Return the next node in the traversal of a database tree of a database variable.
 // Equivalent to the M function [$QUERY()].
 //   - The next node is chosen in depth-first order (i.e by descending deeper into the subscript tree before moving to the next node at the same level).
-//   - If the optional parameter reverse[0] is supplied and equals true, fetch the next node in reverse order.
-//   - Returns nil when called on the final branch of the tree for the given database variable (GLVN).
+//   - The node path supplied does not need to exist in the database to find the next match.
+//   - If the optional parameter reverse[0] is supplied and equals "reverse", fetch the next node in reverse order.
+//   - Returns nil when there are no more nodes after the given node path within the given database variable (GLVN).
 //   - Nodes that have 'null subscripts' (i.e. empty string) are all returned in their place except for the top-level GLVN(""), which is never returned.
 //   - Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
 //
 // See [Node.LevelNext]() for traversal of nodes at the same level or to move from one database variable (GLVN) to another.
 //
 // [$QUERY()]: https://docs.yottadb.com/ProgrammersGuide/functions.html#query
-func (n *Node) TreeNext(reverse ...bool) *Node {
+func (n *Node) TreeNext(reverse ...string) *Node {
 	cnode := n.cnode // access C equivalents of Go types
 	cconn := cnode.conn
-	do_reverse := len(reverse) > 0 && reverse[0]
-	debug := false // Print when buffers need to be reallocated and ydb_node_next() called again
+	doReverse := len(reverse) > 0 && reverse[0] == "reverse"
 
 	// Preallocate child subscripts of this size as a reasonable guess of space to fit most subscripts
-	prealloc := "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-	retNode := n.Child(prealloc) // Create new node to store result with a single preallocated child
+	retNode := n.Child(preallocSubscript) // Create new node to store result with a single preallocated child
 	var retSubs C.int
 	var malloced bool // whether we had to malloc() and hence defer free()
 	var status C.int
 	for {
 		retSubs = retNode.cnode.len - 1 // -1 because cnode counts the varname as a subscript and ydb_node_next_st() does not
-		if do_reverse {
+		if doReverse {
 			status = C.ydb_node_previous_st(cconn.tptoken, &cconn.errstr, &cnode.buffers, cnode.len-1, bufferIndex(&cnode.buffers, 1), &retSubs, bufferIndex(&retNode.cnode.buffers, 1))
 		} else {
 			status = C.ydb_node_next_st(cconn.tptoken, &cconn.errstr, &cnode.buffers, cnode.len-1, bufferIndex(&cnode.buffers, 1), &retSubs, bufferIndex(&retNode.cnode.buffers, 1))
@@ -427,7 +557,7 @@ func (n *Node) TreeNext(reverse ...bool) *Node {
 			extraStrings := make([]string, retSubs-(retNode.cnode.len-1))
 			// Pre-fill node subscripts
 			for i := range extraStrings {
-				extraStrings[i] = prealloc
+				extraStrings[i] = preallocSubscript
 			}
 			retNode = retNode.Child(extraStrings...)
 			continue
@@ -456,28 +586,8 @@ func (n *Node) TreeNext(reverse ...bool) *Node {
 	retNode.cnode.len = C.int(retSubs + 1) // +1 because cnode counts the varname as a subscript and ydb_node_next_st() does not
 	// if we malloced anything, make sure we take a copy of it before defer runs to free the mallocs on return
 	if malloced {
-		cnode := retNode.cnode // access C.node from Go node
-		strings := make([]string, cnode.len)
-		for i := range cnode.len {
-			buf := bufferIndex(&cnode.buffers, int(i))
-			s := C.GoStringN(buf.buf_addr, C.int(buf.len_used))
-			strings[i] = s
-		}
+		strings := retNode.Subscripts()
 		retNode = n.conn.Node(strings[0], strings[1:]...)
 	}
 	return retNode
-}
-
-// Return the name of the next subscript after the given at the same depth level.
-// Equivalent to the M function [$ORDER()] and has the same treatment of 'null subscripts' (i.e. empty strings).
-//   - The order of returned nodes matches the collation order of the M database.
-//   - If the optional parameter reverse[0] is supplied and equals true, fetch the next node in reverse order.
-//   - Returns the empty string when called on the last node.
-//   - Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
-//
-// See [Node.TreeNext]() for traversal of nodes in a way that descends into the entire tree.
-//
-// [$ORDER()]: https://docs.yottadb.com/ProgrammersGuide/functions.html#order
-func (n *Node) Next(reverse ...bool) string {
-	return ""
 }

@@ -132,8 +132,8 @@ func (conn *Conn) GetError(code C.int) error {
 }
 
 // Zwr2Str takes the given ZWRITE-formatted string and converts it to return as a normal ASCII string.
-// If zstr is not in valid zwrite format, return the empty string. Otherwise, return the unencoded string.
-// Note that the length of a string in zwrite format is always greater than or equal to the string in its original, unencoded format.
+//   - If zstr is not in valid zwrite format, return the empty string. Otherwise, return the unencoded string.
+//   - Note that the length of a string in zwrite format is always greater than or equal to the string in its original, unencoded format.
 func (conn *Conn) Zwr2Str(zstr string) (string, error) {
 	cconn := conn.cconn
 	cbuf := conn.setValue(zstr)
@@ -154,9 +154,9 @@ func (conn *Conn) Zwr2Str(zstr string) (string, error) {
 }
 
 // Str2Zwr takes the given Go string and converts it to return a ZWRITE-formatted string
-// If the returned zwrite-formatted string does not fit within the maximum YottaDB string size, return error code ydberr.INVSTRLEN.
-// Otherwise, return the ZWRITE-formatted string.
-// Note that the length of a string in zwrite format is always greater than or equal to the string in its original, unencoded format.
+//   - If the returned zwrite-formatted string does not fit within the maximum YottaDB string size, return error code ydberr.INVSTRLEN.
+//     Otherwise, return the ZWRITE-formatted string.
+//   - Note that the length of a string in zwrite format is always greater than or equal to the string in its original, unencoded format.
 func (conn *Conn) Str2Zwr(str string) (string, error) {
 	cconn := conn.cconn
 	cbuf := conn.setValue(str)
@@ -174,7 +174,7 @@ func (conn *Conn) Str2Zwr(str string) (string, error) {
 }
 
 // Kill all YottaDB 'locals' except for the ones listed by name in exclusions.
-// To kill a specific variable use [Node.Kill]()
+//   - To kill a specific variable use [Node.Kill]()
 func (conn *Conn) KillLocalsExcept(exclusions ...string) {
 	var status C.int
 	cconn := conn.cconn
@@ -191,10 +191,10 @@ func (conn *Conn) KillLocalsExcept(exclusions ...string) {
 }
 
 // Releases all existing locks and attempt to acquire locks matching all supplied nodes, waiting up to timeout for availability.
-// Equivalent to the M `LOCK` command. See [Node.Grab]() and [Node.Release]() methods for single-lock usage.
-// The timeout is in seconds. A timeout of zero means try only once.
-// Return true if lock was acquired; otherwise false.
-// Panics with TIME2LONG if the timeout exceeds YDB_MAX_TIME_NSEC or on other panic-worthy errors (e.g. invalid variable names).
+//   - Equivalent to the M `LOCK` command. See [Node.Grab]() and [Node.Release]() methods for single-lock usage.
+//   - The timeout is in seconds. A timeout of zero means try only once.
+//   - Return true if lock was acquired; otherwise false.
+//   - Panics with TIME2LONG if the timeout exceeds YDB_MAX_TIME_NSEC or on other panic-worthy errors (e.g. invalid variable names).
 func (conn *Conn) Lock(timeout float64, nodes ...(*Node)) bool {
 	// Prevent overflow in timeout conversion to ulonglong and ensure the proper error is created
 	timeoutNsec := C.ulonglong(timeout * 1000000000)

@@ -102,6 +102,7 @@ var ydbSigPanicCalled atomic.Bool // True when our exit is panic driven due to a
 
 // ---- Debug settings
 
+var debug bool                    // false by default -- can be enabled by test/debugging code to turn things on
 const dbgPrintEPHdrs bool = false // Print entry point headers when routine is entered
 
 //go:generate ../scripts/gen_error_codes.sh ydberr/error_codes ydbconst ydberr

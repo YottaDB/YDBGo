@@ -14,16 +14,34 @@ package yottadb
 
 import (
 	"fmt"
-	"os"
-	"runtime"
 	"strings"
-	"sync/atomic"
 	"testing"
 
 	assert "github.com/stretchr/testify/require"
 )
 
-// ---- Examples (testable) and tests
+// ---- Tests and Examples
+
+func ExampleConn_Node() {
+	conn := NewConn()
+	n := conn.Node("var", "sub1", "sub2")
+	n2 := n.Child("sub3", "sub4")
+	fmt.Printf("%v\n", n)
+	fmt.Printf("%v\n", n2)
+	// Output:
+	// var("sub1","sub2")
+	// var("sub1","sub2","sub3","sub4")
+}
+
+func ExampleNode_Subscripts() {
+	conn := NewConn()
+	n := conn.Node("var", "sub1", "sub2")
+	fmt.Println(n)
+	fmt.Println(n.Subscripts())
+	// Output:
+	// var("sub1","sub2")
+	// [var sub1 sub2]
+}
 
 // Example of converting a ZWRITE-formatted string to a Go string
 func ExampleConn_Zwr2Str() {
@@ -57,66 +75,6 @@ func ExampleNode_String() {
 	// Output:
 	// var("sub1","sub2")
 	// var2(1,2)
-}
-
-// Example of traversing a database tree
-func ExampleNode_TreeNext() {
-	conn := NewConn()
-	n1 := conn.Node("X", "1")
-	n1.Child("2", "3").Set("123")
-	n1.Child("2", "3", "7").Set("1237")
-	n1.Child("2", "4").Set("124")
-	n1.Child("2", "5", "9").Set("1259")
-	n1.Child("6").Set("16")
-	nb := conn.Node("X", "B")
-	nb.Child("1").Set("AB")
-
-	x := conn.Node("X")
-	for {
-		x = x.TreeNext()
-		if x == nil {
-			break
-		}
-		fmt.Printf("%s=%s\n", x, Quote(x.Get("")))
-	}
-	// Output:
-	// X(1,2,3)=123
-	// X(1,2,3,7)=1237
-	// X(1,2,4)=124
-	// X(1,2,5,9)=1259
-	// X(1,6)=16
-	// X("B",1)="AB"
-}
-
-// Test cases that ExampleNode_TreeNext() did not catch
-func TestTreeNext(t *testing.T) {
-	tconn := NewConn()
-
-	// Ensure TreeNext will work even if it has to allocate new subscript memory up to the size of YDB_MAX_STR
-	bigstring := strings.Repeat("A", YDB_MAX_STR)
-	n1 := tconn.Node("X", bigstring)
-	n1.Child("2", "3").Set("Big23")
-	n1.Child("5", bigstring).Set("Big5Big")
-
-	x := tconn.Node("X")
-	output := ""
-	for {
-		x = x.TreeNext()
-		if x == nil {
-			break
-		}
-		output += fmt.Sprintf("%s=%s ", x, Quote(x.Get("")))
-	}
-	assert.Equal(t, `X("`+bigstring+`",2,3)="Big23" X("`+bigstring+`",5,"`+bigstring+`")="Big5Big" `, output)
-}
-
-// Test Node creation.
-func TestNode(t *testing.T) {
-	tconn := SetupTest(t)
-	n := tconn.Node("var", "sub1", "sub2")
-	assert.Equal(t, `var("sub1","sub2")`, fmt.Sprintf("%v", n))
-	n2 := n.Child("sub3", "sub4")
-	assert.Equal(t, `var("sub1","sub2","sub3","sub4")`, fmt.Sprintf("%v", n2))
 }
 
 func TestKillLocalsExcept(t *testing.T) {
@@ -273,125 +231,141 @@ func TestLock(t *testing.T) {
 	assert.Equal(t, false, lockExists(fmt.Sprint(n2)))
 }
 
-// ---- Benchmarks
+// Example of getting next subscript
+func ExampleNode_Next() {
+	conn := NewConn()
+	n := conn.Node("X", "1")
+	n.Child("2", "3").Set("123")
+	n.Child("2", "3", "7").Set("1237")
+	n.Child("2", "4").Set("124")
 
-// Retain results of BenchmarkDiff for printing by _testMain()
-var pathA, pathB atomic.Int64
-var cpuIndex atomic.Int64
+	x := conn.Node("X", "1", "2", "")
+	x = x.Next()
+	for x != nil {
+		fmt.Printf("%s=%s\n", x, Quote(x.Get()))
+		x = x.Next()
+	}
+	// Output:
+	// X(1,2,3)=123
+	// X(1,2,4)=124
+}
 
-// Benchmark difference between two separate functions running in parallel.
-// This was envisaged to diminish the effects of CPU warm-up, but it's not accurate enough.
-// For best results run it with perflock and use test flag: -benchtime=5s
-// Then it will typically have about 1% variance
-func BenchmarkDiff(b *testing.B) {
-	if testing.Short() {
-		b.Skip()
+// Example of listing all local database variable names
+func ExampleNode_Next_varnames() {
+	conn := NewConn()
+	conn.Node("X", "1").Set("X1")
+	conn.Node("X", "1", "2").Set("X12")
+	conn.Node("Y", "2").Set("Y2")
+
+	fmt.Println("Display all top-level database variable names, starting after '%' (which is the first possible name in sort order)")
+	x := conn.Node("%")
+	x = x.Next()
+	for x != nil {
+		fmt.Printf("%s\n", x)
+		x = x.Next()
+	}
+	// Output:
+	// Display all top-level database variable names, starting after '%' (which is the first possible name in sort order)
+	// X
+	// Y
+}
+
+// Example of getting next subscript
+func ExampleNode_Iterate() {
+	conn := NewConn()
+	n := conn.Node("X", "1")
+	n.Child("2", "3").Set("123")
+	n.Child("2", "3", "7").Set("1237")
+	n.Child("2", "4").Set("124")
+
+	n = conn.Node("X", "1", "2")
+	for x := range n.Iterate() {
+		fmt.Printf("%s=%s\n", x, Quote(x.Get()))
 	}
 
-	var cpus int = -1
-	pathA.Store(0)
-	pathB.Store(0)
-	cpuIndex.Store(0)
-	for _, arg := range os.Args {
-		fmt.Sscanf(arg, "-test.cpu=%d", &cpus)
+	fmt.Println("Do the same in reverse:")
+	for x := range n.Iterate("reverse") {
+		fmt.Printf("%s=%s\n", x, Quote(x.Get()))
 	}
-	if cpus == -1 {
-		cpus = int(runtime.NumCPU()) // Go sets -cpu to this by default, so we should, too
-	}
-	if cpus == -1 || cpus%2 != 0 {
-		panic("You must set test flag: -cpu=<even number>, preferably large like 100")
+	// Output:
+	// X(1,2,3)=123
+	// X(1,2,4)=124
+	// Do the same in reverse:
+	// X(1,2,4)=124
+	// X(1,2,3)=123
+}
+
+// Example of getting a mutable version of node
+func ExampleNode_mutate() {
+	conn := NewConn()
+	n := conn.Node("X", "1", "2", "3")
+	mutation1 := n.mutate("4")
+	mutation2 := n.mutate("text")
+	fmt.Println(n)
+	fmt.Println(mutation1)
+	fmt.Println(mutation2)
+	// Output:
+	// X(1,2,3)
+	// X(1,2,4)
+	// X(1,2,"text")
+}
+
+// Example of traversing a database tree
+func ExampleNode_TreeNext() {
+	conn := NewConn()
+	n1 := conn.Node("tree", "1")
+	n1.Child("2", "3").Set("123")
+	n1.Child("2", "3", "7").Set("1237")
+	n1.Child("2", "4").Set("124")
+	n1.Child("2", "5", "9").Set("1259")
+	n1.Child("6").Set("16")
+	nb := conn.Node("tree", "B")
+	nb.Child("1").Set("AB")
+
+	x := conn.Node("tree").TreeNext()
+	for x != nil {
+		fmt.Printf("%s=%s\n", x, Quote(x.Get()))
+		x = x.TreeNext()
 	}
 
-	b.RunParallel(func(pb *testing.PB) {
-		i := cpuIndex.Add(1)
-		for int(cpuIndex.Load()) < cpus {
+	fmt.Println("Re-start half way through and go in reverse order:")
+	x = conn.Node("tree", "1", "2", "4")
+	for x != nil {
+		fmt.Printf("%s=%s\n", x, Quote(x.Get()))
+		x = x.TreeNext("reverse")
+	}
+
+	// Output:
+	// tree(1,2,3)=123
+	// tree(1,2,3,7)=1237
+	// tree(1,2,4)=124
+	// tree(1,2,5,9)=1259
+	// tree(1,6)=16
+	// tree("B",1)="AB"
+	// Re-start half way through and go in reverse order:
+	// tree(1,2,4)=124
+	// tree(1,2,3,7)=1237
+	// tree(1,2,3)=123
+}
+
+// Test cases that ExampleNode_TreeNext() did not catch
+func TestTreeNext(t *testing.T) {
+	tconn := NewConn()
+
+	// Ensure TreeNext will work even if it has to allocate new subscript memory up to the size of YDB_MAX_STR
+	bigstring := strings.Repeat("A", YDB_MAX_STR)
+	n1 := tconn.Node("X", bigstring)
+	n1.Child("2", "3").Set("Big23")
+	n1.Child("5", bigstring).Set("Big5Big")
+
+	x := tconn.Node("X")
+	output := ""
+	for {
+		x = x.TreeNext()
+		if x == nil {
+			break
 		}
-		tconn := SetupTest(b)
-		for pb.Next() {
-			if i%2 == 0 {
-				tconn.Node(Randstr())
-				pathA.Add(1)
-			} else {
-				tconn.Node(Randstr())
-				pathB.Add(1)
-			}
-		}
-	})
-}
-
-// Benchmark setting a node repeatedly to new values each time.
-func BenchmarkNode(b *testing.B) {
-	tconn := SetupTest(b)
-	for b.Loop() {
-		tconn.Node(Randstr())
+		output += fmt.Sprintf("%s=%s ", x, Quote(x.Get()))
 	}
-}
-
-// Benchmark setting a node repeatedly to new values each time.
-func BenchmarkSet(b *testing.B) {
-	tconn := SetupTest(b)
-	n := tconn.Node("var")
-	for b.Loop() {
-		n.Set(Randstr())
-	}
-}
-
-// Benchmark getting a node repeatedly.
-func BenchmarkGet(b *testing.B) {
-	tconn := SetupTest(b)
-	n := tconn.Node("var")
-	for b.Loop() {
-		n.Get()
-	}
-}
-
-// Benchmark setting a node with randomly located node, where each node has 5 random subscripts.
-func BenchmarkSetVariantSubscripts(b *testing.B) {
-	tconn := SetupTest(b)
-	subs := make([]string, 5)
-	RandstrReset() // access the same nodes to be subsequently fetched by matching Get() benchmark
-	for b.Loop() {
-		for j := range subs {
-			subs[j] = Randstr()
-		}
-		n := tconn.Node("var", subs...)
-		n.Set(Randstr())
-	}
-}
-
-// Benchmark getting a node with randomly located node, where each node has 5 random subscripts.
-func BenchmarkGetVariantSubscripts(b *testing.B) {
-	tconn := SetupTest(b)
-	subs := make([]string, 5)
-
-	// set up database locals to Get shortly
-	RandstrReset() // access the same nodes to be subsequently fetched by matching Get() benchmark
-	for range b.N {
-		for j := range subs {
-			subs[j] = Randstr()
-		}
-		n := tconn.Node("var", subs...)
-		n.Set(Randstr())
-	}
-	b.ResetTimer()
-
-	RandstrReset() // access the same nodes previously stored by matching Set() benchmark
-	for range b.N {
-		for j := range subs {
-			subs[j] = Randstr()
-		}
-		n := tconn.Node("var", subs...)
-		Randstr() // increment random string index to match strings with Set() benchmark
-		_, err := n.GetIf()
-		assert.Nil(b, err, "Database locals not properly set up for this test")
-	}
-}
-
-func BenchmarkZwr2Str(b *testing.B) {
-	tconn := SetupTest(b)
-	str := `"X"_$C(0)_"ABC"`
-	for b.Loop() {
-		_, err := tconn.Zwr2Str(str)
-		assert.Nil(b, err)
-	}
+	assert.Equal(t, `X("`+bigstring+`",2,3)="Big23" X("`+bigstring+`",5,"`+bigstring+`")="Big5Big" `, output)
 }

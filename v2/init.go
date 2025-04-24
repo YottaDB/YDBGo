@@ -168,10 +168,9 @@ func validateNotifySignal(sig syscall.Signal, entryPoint ydbEntryPoint) error {
 	return nil
 }
 
-// RegisterSignalNotify is a function to request notification of a signal occurring on a supplied channel. Additionally,
-// the user should respond to the same channel when they are done. To make sure this happens, the first step in the
-// routine listening for the signal should be a defer statement that sends an acknowledgement back that handling is
-// complete.
+// RegisterSignalNotify is a function to request notification of a signal occurring on a supplied channel.
+// After the user handles the signal notified on notifyChan, they must send to ackChan to acknowledge
+// that they have finished handling the signal.
 func RegisterSignalNotify(sig syscall.Signal, notifyChan, ackChan chan bool, notifyWhen YDBHandlerFlag) error {
 	// Although this routine itself does not interact with the YottaDB runtime, use of this routine has an expectation that
 	// the runtime is going to handle signals so make sure it is initialized.
@@ -289,9 +288,9 @@ var inInit atomic.Bool // We are in initializeYottaDB() so don't recurse when ca
 // initializeYottaDB initializes the YottaDB engine if necessary.
 // This is an atypical method of doing simple API initialization compared to
 // other language APIs, where you can just make any API call, and initialization is automatic.
-// But the Go wrapper needs to do its initialization differently to setup signal handling differently. Usually,
-// YottaDB sets up its signal handling, but to work well with Go, Go itself needs to do the signal handling and
-// forward it as needed to the YottaDB engine.
+// But the Go wrapper needs to do its initialization differently to setup signal handling differently.
+// Usually, YottaDB sets up its signal handling, but to work well with Go, Go itself needs to do the
+// signal handling and forward it as needed to the YottaDB engine.
 func initializeYottaDB() {
 	var releaseMajorStr, releaseMinorStr string
 
@@ -568,10 +567,11 @@ func initCheck() {
 type DbHandle interface{}
 
 // Init YottaDB access and return an exit function that should be deferred.
-// Users should `defer yottadb.Exit(yottadb.Init())` from their main routine before using any other database function.
+//   - Users should `defer yottadb.Exit(yottadb.Init())` from their main routine before using any other database function.
+//   - Init returns a value of type DbHandle that must be passed to the Exit function.
+//
 // Although Init could be made to be called automatically, this more explicit approach clarifies that Exit() MUST be
-// called before process exit. See Exit for more detail.
-// Init returns a value of type DbHandle that must be passed to the Exit function.
+// called before process exit. See [Exit] for more detail.
 func Init() DbHandle {
 	initializeYottaDB()
 	var ret DbHandle
