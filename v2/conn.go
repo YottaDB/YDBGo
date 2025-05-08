@@ -16,6 +16,7 @@ package yottadb
 
 import (
 	"runtime"
+	"runtime/cgo"
 	"unsafe"
 
 	"lang.yottadb.com/go/yottadb/v2/ydberr"
@@ -23,6 +24,10 @@ import (
 
 /* #include "libyottadb.h"
 #include "yottadb.h"
+
+// Work around Go compiler issue to be fixed in Go 1.25: https://go-review.googlesource.com/c/go/+/642235
+extern size_t _GoStringLen(_GoString_ s);
+extern const char *_GoStringPtr(_GoString_ s);
 
 // Fill ydb_buffer_t with a Go string.
 // Returns 1 on success or 0 if the string had to be truncated
@@ -36,6 +41,11 @@ int fill_buffer(ydb_buffer_t *buf, _GoString_ val) {
 // C routine to get around the cgo issue and its lack of support for variadic plist routines
 void *get_ydb_lock_st_ptr(void) {
         return (void *)&ydb_lock_st;
+}
+
+extern int tpCallbackWrapper(uint64_t tptoken, ydb_buffer_t *errstr, void *callback);
+int tp_callback_wrapper(uint64_t tptoken, ydb_buffer_t *errstr, void *callback) {
+  return tpCallbackWrapper(tptoken, errstr, callback);
 }
 */
 import "C"
@@ -224,4 +234,67 @@ func (conn *Conn) Lock(timeout float64, nodes ...(*Node)) bool {
 		panic(conn.GetError(status))
 	}
 	return status == YDB_OK
+}
+
+// tpInfo stores callback function and connection used by Transaction() to run transaction logic.
+type tpInfo struct {
+	conn     *Conn
+	callback func() int
+}
+
+// Transaction processes database logic inside a database transaction.
+//   - `callback` must be a function that implements the required database logic.
+//   - `transId` has its first 8 bytes recorded in the commit record of journal files for database regions participating in the transaction.
+//     Note that a transId of case-insensitive "BATCH" or "BA" are special: see [Conn.TransactionFast]()
+//   - `varnames` are names of local M variables to be restored to their original values when a transaction is restarted.
+//     If varnames[0] equals "*" then all local M database variables are restored on restart. Note that since Go has its own local
+//     variables it is unlikely that you will need this feature in Go.
+//   - Returns true to indicate that the transaction logic was successful and has been committed to the database, or false if a rollback was necessary.
+//   - Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
+//
+// The callback function should:
+//   - Implement the required database logic taking into account key considerations for [Transaction Processing] code.
+//   - If there are database collisions, `callback` will be called repeatedly, rolling back the database before each call. On the
+//     fourth try, YottaDB will resort to calling it with other processes locked out to ensure its success.
+//   - Return YDB_OK on success
+//   - Return YDB_TP_RESTART to force a rollback plus restart
+//   - Return YDB_TP_ROLLBACK to roll back the database and return false to the caller of Transaction().
+//
+// Transaction nesting level may be determined within the callback function by reading the special variable [$tlevel], and the number of restart
+// repetitions by [$trestart]. These things are documented in more detail in [Transaction Processing].
+//
+// [Transaction Processing]: https://docs.yottadb.com/ProgrammersGuide/langfeat.html#transaction-processing
+// [$trestart]: https://docs.yottadb.com/ProgrammersGuide/isv.html#trestart
+// [$tlevel]: https://docs.yottadb.com/ProgrammersGuide/isv.html#tlevel
+func (conn *Conn) Transaction(callback func() int, transId string, varnames ...string) bool {
+	cconn := conn.cconn
+	info := tpInfo{conn, callback}
+	handle := C.uintptr_t(cgo.NewHandle(info))
+	var status C.int
+	if len(varnames) == 0 {
+		status = C.ydb_tp_st(cconn.tptoken, &cconn.errstr, C.ydb_tpfnptr_t(C.tp_callback_wrapper), unsafe.Pointer(&handle),
+			(*C.char)(unsafe.Pointer(unsafe.StringData(transId))), 0, nil)
+	} else {
+		// use a Node type just as a handy way to store exclusions strings as a ydb_buffer_t array
+		namelist := conn.Node(varnames[0], varnames[1:]...)
+		status = C.ydb_tp_st(cconn.tptoken, &cconn.errstr, C.ydb_tpfnptr_t(C.tp_callback_wrapper), unsafe.Pointer(&handle),
+			(*C.char)(unsafe.Pointer(unsafe.StringData(transId))), C.int(len(varnames)), &namelist.cnode.buffers)
+	}
+	if status == YDB_TP_ROLLBACK {
+		return false
+	}
+	if status != YDB_OK {
+		panic(conn.GetError(status))
+	}
+	return true
+}
+
+// TransactionFast is a faster version of Transaction that does not ensure durability,
+// for applications that do not require durability or have alternate durability mechanisms (such as checkpoints).
+// It is implemented by setting the transId to the special name "BATCH" as discussed in [Transaction Processing].
+//   - Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
+//
+// [Transaction Processing]: https://docs.yottadb.com/ProgrammersGuide/langfeat.html#transaction-processing
+func (conn *Conn) TransactionFast(callback func() int, varnames ...string) bool {
+	return conn.Transaction(callback, "BATCH", varnames...)
 }

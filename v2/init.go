@@ -267,13 +267,13 @@ func shutdownSignalGoroutines() {
 	}
 }
 
-// YDBWrapperPanicCallback is a function called from C code.
+// ydbWrapperPanicCallback is a function called from C code.
 // The C code routine address is passed to YottaDB via the ydb_main_lang_init()
 // call in initializeYottaDB() below and is called by YottaDB when it has completed processing a deferred fatal signal
 // and needs to exit in a "Go-ish" manner. The parameter determines the type of panic that gets raised.
 //
-//export YDBWrapperPanicCallback
-func YDBWrapperPanicCallback(sigNum C.int) {
+//export ydbWrapperPanicCallback
+func ydbWrapperPanicCallback(sigNum C.int) {
 	var sig syscall.Signal
 
 	printEntry("YDBWrapperPanic()")
