@@ -31,7 +31,7 @@ const maxARM32RegParms uint32 = 4 // Max number of parms passed in registers in 
 
 // ---- Variadic parameter (vp) support for C (despite CGo not supporting it directly).
 
-// call method calls a variadic function with the parameters previously added.
+// vpcall method calls a variadic function with the parameters previously added.
 // The function pointer `vpfunc` must point to the C variadic function to call.
 // The instance vplist must have been previously initialized with any parameters using call(s) to vpaddParam*().
 func (conn *Conn) vpcall(vpfunc unsafe.Pointer) C.int {
@@ -41,7 +41,7 @@ func (conn *Conn) vpcall(vpfunc unsafe.Pointer) C.int {
 	return retval
 }
 
-// Allocate and return vplist if it hasn't already been allocated.
+// vpalloc allocates and returns vplist if it hasn't already been allocated.
 func (conn *Conn) vpalloc() *C.gparam_list {
 	cconn := conn.cconn
 	// Lazily allocate vplist only if needed
@@ -53,20 +53,20 @@ func (conn *Conn) vpalloc() *C.gparam_list {
 	// See the cgo bug mentioned at https://golang.org/cmd/cgo/#hdr-Passing_pointers.
 	cconn.vplist = (*C.gparam_list)(C.calloc(1, C.size_t(C.sizeof_gparam_list)))
 	if cconn.vplist == nil {
-		panic("YDB: out of memory when allocating storage for variadac parameter list")
+		panic("YDBGo: out of memory when allocating storage for variadac parameter list")
 	}
 	// Note this gets freed by conn cleanup
 	cconn.vplist.n = 0 // initialize to 0 now and at the end of every vpcall()
 	return cconn.vplist
 }
 
-// Adds another parameter to the variadic parameter list that will be used at the next invocation of conn.vpcall().
+// vpaddParam adds another parameter to the variadic parameter list that will be used at the next invocation of conn.vpcall().
 // Note that any supplied addresses must point to C allocated memory, not Go allocated memory, or CGo will panic.
 func (conn *Conn) vpaddParam(value uintptr) {
 	vplist := conn.vpalloc() // Lazily allocate vplist only if needed
 	n := vplist.n
 	if n >= C.MAX_GPARAM_LIST_ARGS {
-		panic(fmt.Sprintf("YDB: variadic parameter item count %d exceeds maximum count of %d", n+1, C.MAX_GPARAM_LIST_ARGS))
+		panic(fmt.Sprintf("YDBGo: variadic parameter item count %d exceeds maximum count of %d", n+1, C.MAX_GPARAM_LIST_ARGS))
 	}
 	// Compute address of indexed element
 	elemptr := (*uintptr)(unsafe.Pointer(&vplist.arg[n]))
@@ -74,7 +74,7 @@ func (conn *Conn) vpaddParam(value uintptr) {
 	vplist.n++
 }
 
-// Adds a specifically 64-bit parameter to the variadic parameter list that will be used at the next invocation of conn.vpcall().
+// vpaddParam64 adds a specifically 64-bit parameter to the variadic parameter list that will be used at the next invocation of conn.vpcall().
 // On 32-bit platforms this will push the 64-bit value in two 32-bit slots in the correct endian order.
 // Note that any supplied addresses must point to C allocated memory, not Go allocated memory, or CGo will panic.
 func (conn *Conn) vpaddParam64(value uint64) {
@@ -103,11 +103,11 @@ func (conn *Conn) vpaddParam64(value uint64) {
 	}
 }
 
-// Dump a variadic parameter list for debugging/test purposes.
+// vpdump dumps a variadic parameter list for debugging/test purposes.
 func (conn *Conn) vpdump(w io.Writer) {
 	vplist := conn.cconn.vplist
 	if vplist == nil {
-		panic("YDB: could not dump nil vararg list")
+		panic("YDBGo: could not dump nil vararg list")
 	}
 	n := int(vplist.n)
 	argbase := unsafe.Add(unsafe.Pointer(vplist), unsafe.Sizeof(vplist))

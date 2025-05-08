@@ -16,65 +16,39 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	assert "github.com/stretchr/testify/require"
 )
 
-// ---- Tests and Examples
+// ---- Tests
 
-func ExampleConn_Node() {
-	conn := NewConn()
-	n := conn.Node("var", "sub1", "sub2")
-	n2 := n.Child("sub3", "sub4")
-	fmt.Printf("%v\n", n)
-	fmt.Printf("%v\n", n2)
-	// Output:
-	// var("sub1","sub2")
-	// var("sub1","sub2","sub3","sub4")
-}
+func TestCloneNode(t *testing.T) {
+	conn1 := SetupTest(t)
+	conn2 := NewConn()
+	n1 := conn1.Node("var1")
+	n2 := conn2.Node("var2")
 
-func ExampleNode_Subscripts() {
-	conn := NewConn()
-	n := conn.Node("var", "sub1", "sub2")
-	fmt.Println(n)
-	fmt.Println(n.Subscripts())
-	// Output:
-	// var("sub1","sub2")
-	// [var sub1 sub2]
-}
+	// Make sure the LVUNDEF error ends with "var1"
+	n1.Get()
+	status := n1.conn.lastCode()
+	err := n1.conn.lastError(status)
+	assert.Contains(t, err.Error(), ": var1")
 
-// Example of converting a ZWRITE-formatted string to a Go string
-func ExampleConn_Zwr2Str() {
-	conn := NewConn()
-	str, err := conn.Zwr2Str(`"X"_$C(0)_"ABC"`)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Printf("%#v", str)
-	// Output: "X\x00ABC"
-}
+	// Make sure conn2 LVUNDEF error returns "var2"
+	n2.Get()
+	status = n1.conn.lastCode()
+	err = n2.conn.lastError(status)
+	assert.Contains(t, err.Error(), ": var2")
+	// Alter tptoken in n2's conn
+	n2.conn.cconn.tptoken++
 
-// Example of converting a Go string to a ZWRITE-formatted string
-func ExampleConn_Str2Zwr() {
-	conn := NewConn()
-	str, err := conn.Str2Zwr("X\x00ABC")
-	if err != nil {
-		panic(err)
-	}
-	fmt.Printf("%v", str)
-	// Output: "X"_$C(0)_"ABC"
-}
-
-// Example of viewing a Node instance as a string.
-func ExampleNode_String() {
-	conn := NewConn()
-	n := conn.Node("var", "sub1", "sub2")
-	numsubs := conn.Node("var2", "1", "2")
-	fmt.Println(n)
-	fmt.Println(numsubs)
-	// Output:
-	// var("sub1","sub2")
-	// var2(1,2)
+	// Above should not have changed the last message that's still stored in conn1
+	status = n1.conn.lastCode()
+	err = n1.conn.lastError(status)
+	assert.Contains(t, err.Error(), ": var1")
+	// Check that a changed tptoken in n2's conn doesn't affect n1's conn
+	assert.NotEqual(t, n1.conn.cconn.tptoken, n2.conn.cconn.tptoken)
 }
 
 func TestKillLocalsExcept(t *testing.T) {
@@ -86,56 +60,64 @@ func TestKillLocalsExcept(t *testing.T) {
 	n2.Set("v2")
 	n3.Set("v3")
 	n3.Child("sub1").Set("subval")
-	assert.Equal(t, multi(1, 1, 11), multi(n1.Data(), n2.Data(), n3.Data()))
+	assert.Equal(t, multi(true, true, true), multi(n1.HasValueOnly(), n2.HasValueOnly(), n3.HasBoth()))
 	tconn.KillLocalsExcept("var1", "var3")
-	assert.Equal(t, multi(1, 0, 11), multi(n1.Data(), n2.Data(), n3.Data()))
+	assert.Equal(t, multi(true, true, true), multi(n1.HasValueOnly(), n2.HasNone(), n3.HasBoth()))
 	tconn.KillLocalsExcept()
-	assert.Equal(t, multi(0, 0, 0), multi(n1.Data(), n2.Data(), n3.Data()))
+	assert.Equal(t, multi(true, true, true), multi(n1.HasNone(), n2.HasNone(), n3.HasNone()))
+
+	n1.Set("v1")
+	n2.Set("v2")
+	n3.Set("v3")
+	tconn.KillAllLocals()
+	assert.Equal(t, multi(true, true, true), multi(n1.HasNone(), n2.HasNone(), n3.HasNone()))
 }
 
 func TestSetGet(t *testing.T) {
 	tconn := SetupTest(t)
 	n := tconn.Node("var")
-	val, err := n.GetIf()
+	val, ok := n.Lookup()
 	assert.Equal(t, "", val)
-	assert.NotNil(t, err)
+	assert.False(t, ok)
 	assert.Equal(t, "", n.Get())
 	assert.Equal(t, "default", n.Get("default"))
 
-	assert.Equal(t, "value", n.Set("value"))
+	n.Set("value")
 	assert.Equal(t, "value", n.Get())
 	assert.Equal(t, "value", n.Get("default"))
+
+	// Test Set to a number
+	n.Set(5)
+	assert.Equal(t, "5", n.Get())
+	n.Set(5.6)
+	assert.Equal(t, "5.6", n.Get())
 }
 
 func TestData(t *testing.T) {
 	tconn := SetupTest(t)
 	n := tconn.Node("var")
-	assert.Equal(t, 0, n.Data())
 	assert.Equal(t, true, n.HasNone())
 	assert.Equal(t, false, n.HasValue())
 	assert.Equal(t, false, n.HasTree())
-	assert.Equal(t, false, n.HasTreeAndValue())
+	assert.Equal(t, false, n.HasBoth())
 
 	n.Set("value")
-	assert.Equal(t, 1, n.Data())
 	assert.Equal(t, false, n.HasNone())
 	assert.Equal(t, true, n.HasValue())
 	assert.Equal(t, false, n.HasTree())
-	assert.Equal(t, false, n.HasTreeAndValue())
+	assert.Equal(t, false, n.HasBoth())
 
 	n.Child("sub1", "sub2").Set("valsub2")
-	assert.Equal(t, 11, n.Data())
 	assert.Equal(t, false, n.HasNone())
 	assert.Equal(t, true, n.HasValue())
 	assert.Equal(t, true, n.HasTree())
-	assert.Equal(t, true, n.HasTreeAndValue())
+	assert.Equal(t, true, n.HasBoth())
 
 	n2 := n.Child("sub1")
-	assert.Equal(t, 10, n2.Data())
 	assert.Equal(t, false, n2.HasNone())
 	assert.Equal(t, false, n2.HasValue())
 	assert.Equal(t, true, n2.HasTree())
-	assert.Equal(t, false, n2.HasTreeAndValue())
+	assert.Equal(t, false, n2.HasBoth())
 }
 
 func TestKill(t *testing.T) {
@@ -147,11 +129,11 @@ func TestKill(t *testing.T) {
 	n2.Set("v2")
 	n3.Set("v3")
 	n3.Child("sub1").Set("subval")
-	assert.Equal(t, multi(1, 1, 11), multi(n1.Data(), n2.Data(), n3.Data()))
+	assert.Equal(t, multi(true, true, true), multi(n1.HasValueOnly(), n2.HasValueOnly(), n3.HasBoth()))
 	n2.Kill()
-	assert.Equal(t, multi(1, 0, 11), multi(n1.Data(), n2.Data(), n3.Data()))
+	assert.Equal(t, multi(true, true, true), multi(n1.HasValueOnly(), n2.HasNone(), n3.HasBoth()))
 	n3.Kill()
-	assert.Equal(t, multi(1, 0, 0), multi(n1.Data(), n2.Data(), n3.Data()))
+	assert.Equal(t, multi(true, true, true), multi(n1.HasValueOnly(), n2.HasNone(), n3.HasNone()))
 }
 
 func TestClear(t *testing.T) {
@@ -163,13 +145,13 @@ func TestClear(t *testing.T) {
 	n2.Set("v2")
 	n3.Set("v3")
 	n3.Child("sub1").Set("subval")
-	assert.Equal(t, multi(1, 1, 11), multi(n1.Data(), n2.Data(), n3.Data()))
+	assert.Equal(t, multi(true, true, true), multi(n1.HasValueOnly(), n2.HasValueOnly(), n3.HasBoth()))
 	n2.Clear()
-	assert.Equal(t, multi(1, 0, 11), multi(n1.Data(), n2.Data(), n3.Data()))
+	assert.Equal(t, multi(true, true, true), multi(n1.HasValueOnly(), n2.HasNone(), n3.HasBoth()))
 	n3.Clear()
-	assert.Equal(t, multi(1, 0, 10), multi(n1.Data(), n2.Data(), n3.Data()))
+	assert.Equal(t, multi(true, true, true), multi(n1.HasValueOnly(), n2.HasNone(), n3.HasTreeOnly()))
 	n3.Child("sub1").Clear()
-	assert.Equal(t, multi(1, 0, 0), multi(n1.Data(), n2.Data(), n3.Data()))
+	assert.Equal(t, multi(true, true, true), multi(n1.HasValueOnly(), n2.HasNone(), n3.HasNone()))
 }
 
 func TestIncr(t *testing.T) {
@@ -196,37 +178,37 @@ func TestLock(t *testing.T) {
 	tconn := SetupTest(t)
 	n := tconn.Node("^var", "Don't", "Panic!")
 	// Increment lock 3 times
-	assert.Equal(t, true, n.Grab(0.1))
-	assert.Equal(t, true, n.Grab(0.1))
-	assert.Equal(t, true, n.Grab(0.1))
+	assert.Equal(t, true, n.Lock(0.1))
+	assert.Equal(t, true, n.Lock(0.1))
+	assert.Equal(t, true, n.Lock(0.1))
 
 	// Check that lock now exists
 	lockpath := fmt.Sprint(n)
 	assert.Equal(t, true, lockExists(lockpath))
 
 	// Decrement 3 times and each time check whether lock exists
-	n.Release()
+	n.Unlock()
 	assert.Equal(t, true, lockExists(lockpath))
-	n.Release()
+	n.Unlock()
 	assert.Equal(t, true, lockExists(lockpath))
-	n.Release()
+	n.Unlock()
 	assert.Equal(t, false, lockExists(lockpath))
 
 	// Now lock two paths and check that Lock(0) releases them
 	n2 := tconn.Node("^var2")
-	n.Grab()
-	n2.Grab()
+	n.Lock()
+	n2.Lock()
 	assert.Equal(t, true, lockExists(fmt.Sprint(n)))
 	assert.Equal(t, true, lockExists(fmt.Sprint(n2)))
-	assert.Equal(t, true, tconn.Lock(0)) // Release all locks
+	assert.Equal(t, true, tconn.Lock(time.Duration(0))) // Release all locks
 	assert.Equal(t, false, lockExists(fmt.Sprint(n)))
 	assert.Equal(t, false, lockExists(fmt.Sprint(n2)))
 
 	// Now lock both using Lock() and make sure they get locked and unlocked
-	assert.Equal(t, true, tconn.Lock(0.1, n, n2)) // Release all locks
+	assert.Equal(t, true, tconn.Lock(100*time.Millisecond, n, n2)) // Release all locks
 	assert.Equal(t, true, lockExists(fmt.Sprint(n)))
 	assert.Equal(t, true, lockExists(fmt.Sprint(n2)))
-	assert.Equal(t, true, tconn.Lock(0)) // Release all locks
+	assert.Equal(t, true, tconn.Lock(time.Duration(0))) // Release all locks
 	assert.Equal(t, false, lockExists(fmt.Sprint(n)))
 	assert.Equal(t, false, lockExists(fmt.Sprint(n2)))
 }
@@ -284,7 +266,7 @@ func ExampleNode_Iterate() {
 	}
 
 	fmt.Println("Do the same in reverse:")
-	for x := range n.Iterate("reverse") {
+	for x := range n.IterateBackward() {
 		fmt.Printf("%s=%s\n", x, Quote(x.Get()))
 	}
 	// Output:
@@ -332,7 +314,7 @@ func ExampleNode_TreeNext() {
 	x = conn.Node("tree", "1", "2", "4")
 	for x != nil {
 		fmt.Printf("%s=%s\n", x, Quote(x.Get()))
-		x = x.TreeNext("reverse")
+		x = x.TreePrev()
 	}
 
 	// Output:

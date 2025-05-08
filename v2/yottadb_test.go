@@ -26,6 +26,24 @@ import (
 	v1 "lang.yottadb.com/go/yottadb"
 )
 
+// ---- Tests and Examples
+
+// Tests the example given in the package doc at the top of yottadb.go
+func ExampleNewConn() {
+	defer Shutdown(Init())
+	conn := NewConn()
+	n := conn.Node("person", "name")
+	n.Child("first").Set("Joe")
+	n.Child("last").Set("Bloggs")
+	for x := range n.Iterate() {
+		fmt.Printf("%s = %s\n", x, Quote(x.Get()))
+	}
+	n.Kill()
+	// Output:
+	// person("name","first") = "Joe"
+	// person("name","last") = "Bloggs"
+}
+
 // ---- Utility functions for tests
 
 var randstrArray = make([]string, 0, 1000000) // Array of random strings for use in testing
@@ -45,12 +63,13 @@ func initRandstr() {
 	}
 }
 
-// randstr fetches a random string from our cache of pre-calculated random strings.
+// Randstr fetches a random string from our cache of pre-calculated random strings.
 func Randstr() string {
 	randstrIndex = (randstrIndex + 1) % len(randstrArray)
 	return randstrArray[randstrIndex]
 }
 
+// RandstrReset restarts the sequence of pseudo-random strings from the beginning.
 func RandstrReset() {
 	randstrIndex = 0
 }
@@ -61,7 +80,7 @@ func multi(v ...interface{}) []interface{} {
 	return v
 }
 
-// Return whether a lock exists using YottaDB's LKE utility.
+// lockExists return whether a lock exists using YottaDB's LKE utility.
 func lockExists(lockpath string) bool {
 	const debug = false // set true to print output of LKE command
 	var outbuff bytes.Buffer
@@ -172,7 +191,7 @@ func _testMain(m *testing.M) int {
 	// Run v2 code last so that it sets signals to point to itself
 	v1.Init()
 	defer v1.Exit()
-	defer Exit(Init())
+	defer Shutdown(Init())
 	initRandstr()
 	ret := m.Run()
 
@@ -195,10 +214,10 @@ func TestMain(m *testing.M) {
 	os.Exit(code) // os.Exit is the official way to exit a test suite
 }
 
-// Called by each test to set up the database prior to the test.
+// SetupTest is called by each test to set up the database prior to the test.
 // Returns a database connection that may be used by that test.
 func SetupTest(t testing.TB) *Conn {
 	tconn := NewConn()
-	tconn.KillLocalsExcept()
+	tconn.KillAllLocals()
 	return tconn
 }

@@ -22,7 +22,7 @@ import (
 	"unsafe"
 )
 
-// transactionCallbackWrapper let Transaction() invoke a Go callback closure from C.
+// transactionCallbackWrapper lets Transaction() invoke a Go callback closure from C.
 //
 //export tpCallbackWrapper
 func tpCallbackWrapper(tptoken C.uint64_t, errstr *C.ydb_buffer_t, handle unsafe.Pointer) C.int {
@@ -32,7 +32,7 @@ func tpCallbackWrapper(tptoken C.uint64_t, errstr *C.ydb_buffer_t, handle unsafe
 	saveToken := cconn.tptoken
 	cconn.tptoken = tptoken
 	if errstr != &cconn.errstr {
-		panic("YDB: YDBGo design fault: callback invoked with a different errstr than the one used by the connection")
+		panic("YDBGo: YDBGo design fault: callback invoked with a different errstr than the one used by the connection")
 	}
 	retval := info.callback()
 	cconn.tptoken = saveToken

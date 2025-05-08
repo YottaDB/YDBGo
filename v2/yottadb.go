@@ -10,13 +10,33 @@
 //
 //////////////////////////////////////////////////////////////////
 
-// This package is a Go wrapper for a YottaDB database using the SimplaAPI interface.
-// It requires Go 1.24 to achieve best speed and its use of AddCleanup() instead of SetFinalizer().
+// Package yottadb is a Go wrapper for a YottaDB database.
 //
-// This wrapper uses 'cgo' to interface between this Go wrapper and the YottaDB engine written in C.
-// Its use of the `node` type to pin memory references to database subscript strings gives it optimal speed.
-
+// The package requires Go 1.24. It uses CGo to interface between this Go wrapper and the YottaDB engine written in C.
+// Its use of the `Node` type to pin memory references to database subscript strings gives it optimal speed.
+//
+// Example:
+//
+//	package yottadb
+//	defer yottadb.Shutdown(yottadb.Init())
+//	conn := yottadb.NewConn()
+//	n := conn.Node("person", "name")
+//	n.Child("first").Set("Joe")
+//	n.Child("last").Set("Bloggs")
+//	for x := range n.Iterate() {
+//	  fmt.Printf("%s = %s\n", x, yottadb.Quote(x.Get()))
+//	}
+//
+// Output:
+//
+//	person("name","first") = "Joe"
+//	person("name","last") = "Bloggs"
 package yottadb
+
+// go 1.24 required for the use of AddCleanup() instead of SetFinalizer(), and to run tests: testing.Loop
+// go 1.23 required for iterators, used to iterate database subscripts
+// go 1.22 required for the range clause
+// go 1.19 required for sync/atomic -- safer than previous options
 
 import (
 	"sync/atomic"
@@ -28,15 +48,6 @@ import (
 import "C"
 
 // ---- Release version constants - be sure to change all of them appropriately
-
-// MinimumGoRelease - Minimum version of Go to fully support this wrapper (including tests).
-// Note: this is not checked at runtime. The compile will fail if undefined Go features are used.
-const MinimumGoRelease string = "go1.24"
-
-//	go 1.24 required to run tests: testing.Loop
-//	go 1.23 required for iterators, used to iterate database subscripts
-//	go 1.22 required for the range clause
-//	go 1.19 required for sync/atomic -- safer than
 
 // MinimumYDBRelease - (string) Minimum YottaDB release name required by this wrapper.
 // This is checked on init.
@@ -59,17 +70,17 @@ var (
 	// successful so can afford to wait as long as needed to do the sync but for a signal exit, the rundown is likely
 	// already done (exit handler called by the signal processing itself) but if ydb_exit() is not able to get
 	// the system lock and is likely to hang, 3 seconds is about as much as we can afford to wait.
-	MaximumPanicExitWait time.Duration = 3 // seconds
+	MaximumPanicExitWait time.Duration = 3 * time.Second
 
 	// MaximumNormalExitWait is maximum wait for a normal shutdown when no system lock hang in Exit() is likely.
-	MaximumNormalExitWait time.Duration = 60 // seconds
+	MaximumNormalExitWait time.Duration = 60 * time.Second
 
 	// MaximumSigShutDownWait is maximum wait to close down signal handling goroutines (shouldn't take this long).
-	MaximumSigShutDownWait time.Duration = 5 // seconds
+	MaximumSigShutDownWait time.Duration = 5 * time.Second
 
 	// MaximumSigAckWait is maximum wait for notify via acknowledgement channel that a notified signal handler is
 	// done handling the signal.
-	MaximumSigAckWait time.Duration = 10 // seconds
+	MaximumSigAckWait time.Duration = 10 * time.Second
 )
 
 // ---- Enums for signal functions

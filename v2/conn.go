@@ -15,8 +15,13 @@
 package yottadb
 
 import (
+	"errors"
+	"fmt"
 	"runtime"
 	"runtime/cgo"
+	"strconv"
+	"strings"
+	"time"
 	"unsafe"
 
 	"lang.yottadb.com/go/yottadb/v2/ydberr"
@@ -56,16 +61,16 @@ import "C"
 // This could be set to C.YDB_MAX_STR to avoid any reallocation, but that would make all new connections large.
 const overalloc = 1024
 
-// Conn creates a goroutine-specific 'connection' object for calling the YottaDB API.
+// Conn represents a goroutine-specific 'connection' object for calling the YottaDB API.
 // You must use a different connection for each goroutine.
 //
-// This struct wraps C.conn in a Go struct so Go can add methods to it.
+// Conn type wraps C.conn in a Go struct so Go can add methods to it.
 type Conn struct {
 	// Pointer to C.conn rather than the item itself so we can malloc it and point to it from C without Go moving it.
 	cconn *C.conn
 }
 
-// NewConn creates a new database connection for the current goroutine.
+// NewConn creates a new database connection.
 // Each goroutine must have its own connection.
 func NewConn() *Conn {
 	initCheck()
@@ -76,7 +81,7 @@ func NewConn() *Conn {
 	// See the cgo bug mentioned at https://golang.org/cmd/cgo/#hdr-Passing_pointers.
 	conn.cconn = (*C.conn)(C.calloc(1, C.sizeof_conn))
 	if conn.cconn == nil {
-		panic("YDB: out of memory when allocating new database connection")
+		panic("YDBGo: out of memory when allocating new database connection")
 	}
 	conn.cconn.tptoken = C.YDB_NOTTP
 	// Create space for err
@@ -97,23 +102,30 @@ func NewConn() *Conn {
 	return &conn
 }
 
+// prepAPI initializes anything necessary before C API calls.
+// This sets the error_output string to the empty string in case the API call fails -- at least then we don't get an obsolete string reported.
+func (conn *Conn) prepAPI() {
+	conn.cconn.errstr.len_used = 0 // ensure error string is empty before API call
+}
+
 // ensureValueSize reallocates value.buf_addr if necessary to fit a string of size.
 func (conn *Conn) ensureValueSize(cap int) {
 	if cap > C.YDB_MAX_STR {
-		panic("YDB: tried to set database value to a string longer than the maximum length YDB_MAX_STR")
+		panic("YDBGo: tried to set database value to a string longer than the maximum length YDB_MAX_STR")
 	}
 	value := &conn.cconn.value
 	if cap > int(value.len_alloc) {
 		cap += overalloc // allocate some extra for potential future use
 		addr := (*C.char)(C.realloc(unsafe.Pointer(value.buf_addr), C.size_t(cap)))
 		if addr == nil {
-			panic("YDB: out of memory when allocating more space for string data transfer to YottaDB")
+			panic("YDBGo: out of memory when allocating more space for string data transfer to YottaDB")
 		}
 		value.buf_addr = addr
 		value.len_alloc = C.uint(cap)
 	}
 }
 
+// setValue stores val into the ydb_buffer of Conn.cconn.value.
 func (conn *Conn) setValue(val string) *C.ydb_buffer_t {
 	cconn := conn.cconn
 	conn.ensureValueSize(len(val))
@@ -126,19 +138,76 @@ func (conn *Conn) getValue() string {
 	return C.GoStringN(cconn.value.buf_addr, C.int(cconn.value.len_used))
 }
 
-// GetError returns, given error code, the ydb error message stored by the previous YottaDB call as an error type or nil if there was no error.
-func (conn *Conn) GetError(code C.int) error {
+// getErrorString returns a copy of conn.cconn.errstr as a Go string.
+func (conn *Conn) getErrorString() string {
+	// len_used should never be greater than len_alloc since all errors should fit into errstr, but just in case, take the min
+	errstr := conn.cconn.errstr
+	return C.GoStringN(errstr.buf_addr, C.int(min(errstr.len_used, errstr.len_alloc)))
+}
+
+// lastError returns, given error code, the ydb error message stored by the previous YottaDB call as an error type or nil if there was no error.
+func (conn *Conn) lastError(code C.int) error {
 	if code == C.YDB_OK {
 		return nil
 	}
 	// Take a copy of errstr as a Go String
 	// (len_used should never be greater than len_alloc since all errors should fit into errstr, but just in case, take the min)
-	cconn := conn.cconn
-	msg := C.GoStringN(cconn.errstr.buf_addr, C.int(min(cconn.errstr.len_used, cconn.errstr.len_alloc)))
-	if msg == "" { // this should never happen
-		msg = "(unknown error)"
+	msg := conn.getErrorString()
+	if msg == "" { // See if msg is still empty (we set it to empty before calling the API in conn.prepAPI()
+		// This code gets run, for example, if ydb_exit() is called before a YDB function is invoked.
+		return newError(int(code), conn.recoverMessage(code))
 	}
-	return NewError(int(code), msg)
+
+	pattern := ",(SimpleThreadAPI),"
+	index := strings.Index(msg, pattern)
+	// If msg is improperly formatted, return it verbatim with a -1 code (this should never happen)
+	if index == -1 {
+		// If msg is improperly formatted, return it verbatim (this should never happen)
+		return fmt.Errorf("could not parse error message: %w", newError(-1, msg))
+	}
+	text := msg[index+len(pattern):]
+	return newError(int(code), text)
+}
+
+// lastCode extracts the ydb error status code from the message stored by the previous YottaDB call.
+func (conn *Conn) lastCode() C.int {
+	msg := conn.getErrorString()
+	if msg == "" {
+		// if msg is empty there was no error because we set it to empty before calling the API in conn.prepAPI()
+		return C.int(YDB_OK)
+	}
+
+	// Extract the error code from msg
+	index := strings.Index(msg, ",")
+	if index == -1 {
+		// If msg is improperly formatted, return it verbatim with a -1 code (this should never happen)
+		panic(fmt.Errorf("could not parse error message: %w", newError(-1, msg)))
+	}
+	code, err := strconv.ParseInt(msg[:index], 10, 64)
+	if err != nil {
+		// If msg is improperly formatted, return it verbatim with a -1 code (this should never happen)
+		panic(fmt.Errorf("%w: %w", err, newError(-1, msg)))
+	}
+	return C.int(-code)
+}
+
+// recoverMessage tries to get the error message (albeit without argument substitution) from the supplied status code in cases where the message has been lost.
+func (conn *Conn) recoverMessage(status C.int) string {
+	cconn := conn.cconn
+	// Check for a couple of special cases first.
+	switch status {
+	case ydberr.THREADEDAPINOTALLOWED:
+		// This error will prevent ydb_message_t() from working below, so instead return a hard-coded error message.
+		return "%YDB-E-THREADEDAPINOTALLOWED, Process cannot switch to using threaded Simple API while already using Simple API"
+	case ydberr.CALLINAFTERXIT:
+		// The engine is shut down so calling ydb_message_t will fail if we attempt it so just hard-code this error return value.
+		return "%YDB-E-CALLINAFTERXIT, After a ydb_exit(), a process cannot create a valid YottaDB context"
+	}
+	rc := C.ydb_message_t(cconn.tptoken, nil, -status, &cconn.errstr)
+	if rc != YDB_OK {
+		panic(fmt.Sprintf("YDBGo: error %d when trying to recover error message for error %d using ydb_message_t()", int(rc), int(-status)))
+	}
+	return conn.getErrorString()
 }
 
 // Zwr2Str takes the given ZWRITE-formatted string and converts it to return as a normal ASCII string.
@@ -147,71 +216,79 @@ func (conn *Conn) GetError(code C.int) error {
 func (conn *Conn) Zwr2Str(zstr string) (string, error) {
 	cconn := conn.cconn
 	cbuf := conn.setValue(zstr)
+	conn.prepAPI()
 	status := C.ydb_zwr2str_st(cconn.tptoken, &cconn.errstr, cbuf, cbuf)
 	if status == ydberr.INVSTRLEN {
 		// Allocate more space and retry the call
 		conn.ensureValueSize(int(cconn.value.len_used))
+		conn.prepAPI()
 		status = C.ydb_zwr2str_st(cconn.tptoken, &cconn.errstr, cbuf, cbuf)
 	}
 	if status != YDB_OK {
-		return "", conn.GetError(status)
+		return "", conn.lastError(status)
 	}
 	val := conn.getValue()
 	if val == "" && zstr != "" {
-		return "", NewError(0, "string has invalid ZWRITE-format")
+		return "", errors.New("YDBGo: string has invalid ZWRITE-format")
 	}
 	return val, nil
 }
 
 // Str2Zwr takes the given Go string and converts it to return a ZWRITE-formatted string
-//   - If the returned zwrite-formatted string does not fit within the maximum YottaDB string size, return error code ydberr.INVSTRLEN.
+//   - If the returned zwrite-formatted string does not fit within the maximum YottaDB string size, return a *YDBError with Code=ydberr.INVSTRLEN.
 //     Otherwise, return the ZWRITE-formatted string.
 //   - Note that the length of a string in zwrite format is always greater than or equal to the string in its original, unencoded format.
 func (conn *Conn) Str2Zwr(str string) (string, error) {
 	cconn := conn.cconn
 	cbuf := conn.setValue(str)
+	conn.prepAPI()
 	status := C.ydb_str2zwr_st(cconn.tptoken, &cconn.errstr, cbuf, cbuf)
 	if status == ydberr.INVSTRLEN {
 		// Allocate more space and retry the call
 		conn.ensureValueSize(int(cconn.value.len_used))
 		cbuf := conn.setValue(str)
+		conn.prepAPI()
 		status = C.ydb_str2zwr_st(cconn.tptoken, &cconn.errstr, cbuf, cbuf)
 	}
 	if status != YDB_OK {
-		return "", conn.GetError(status)
+		return "", conn.lastError(status)
 	}
 	return conn.getValue(), nil
 }
 
-// Kill all YottaDB 'locals' except for the ones listed by name in exclusions.
+// KillLocalsExcept kills all M 'locals' except for the ones listed by name in exclusions.
 //   - To kill a specific variable use [Node.Kill]()
 func (conn *Conn) KillLocalsExcept(exclusions ...string) {
 	var status C.int
 	cconn := conn.cconn
 	if len(exclusions) == 0 {
+		conn.prepAPI()
 		status = C.ydb_delete_excl_st(cconn.tptoken, &cconn.errstr, 0, nil)
 	} else {
 		// use a Node type just as a handy way to store exclusions strings as a ydb_buffer_t array
 		namelist := conn.Node(exclusions[0], exclusions[1:]...)
+		conn.prepAPI()
 		status = C.ydb_delete_excl_st(cconn.tptoken, &cconn.errstr, C.int(len(exclusions)), &namelist.cnode.buffers)
 	}
 	if status != YDB_OK {
-		panic(conn.GetError(status))
+		panic(conn.lastError(status))
 	}
 }
 
-// Releases all existing locks and attempt to acquire locks matching all supplied nodes, waiting up to timeout for availability.
-//   - Equivalent to the M `LOCK` command. See [Node.Grab]() and [Node.Release]() methods for single-lock usage.
-//   - The timeout is in seconds. A timeout of zero means try only once.
-//   - Return true if lock was acquired; otherwise false.
-//   - Panics with TIME2LONG if the timeout exceeds YDB_MAX_TIME_NSEC or on other panic-worthy errors (e.g. invalid variable names).
-func (conn *Conn) Lock(timeout float64, nodes ...(*Node)) bool {
-	// Prevent overflow in timeout conversion to ulonglong and ensure the proper error is created
-	timeoutNsec := C.ulonglong(timeout * 1000000000)
-	if timeout > YDB_MAX_TIME_NSEC {
-		timeoutNsec = YDB_MAX_TIME_NSEC + 1
-	}
+// KillAllLocals kills all M 'locals'.
+// It is for clearer source code as it simply calls KillLocalsExcept() without listing any exceptions.
+//   - To kill a specific variable use [Node.Kill]()
+func (conn *Conn) KillAllLocals() {
+	conn.KillLocalsExcept()
+}
 
+// Lock releases all existing locks and attempt to acquire locks matching all supplied nodes, waiting up to timeout for availability.
+//   - Equivalent to the M `LOCK` command. See [Node.Grab]() and [Node.Release]() methods for single-lock usage.
+//   - A timeout of zero means try only once.
+//   - Return true if lock was acquired; otherwise false.
+//   - Panics with error TIME2LONG if the timeout exceeds YDB_MAX_TIME_NSEC or on other panic-worthy errors (e.g. invalid variable names).
+func (conn *Conn) Lock(timeout time.Duration, nodes ...*Node) bool {
+	timeoutNsec := C.ulonglong(timeout.Nanoseconds())
 	cconn := conn.cconn
 
 	// Add each parameter to the vararg list
@@ -229,14 +306,15 @@ func (conn *Conn) Lock(timeout float64, nodes ...(*Node)) bool {
 	// vplist now contains the parameter list we want to send to ydb_lock_st(). But CGo doesn't permit us
 	// to call or even create a function pointer to ydb_lock_st(). So instead of calling vplist.CallVariadicPlistFuncST()
 	// directly, we have to call it via C function get_ydb_lock_st_ptr().
+	conn.prepAPI()
 	status := conn.vpcall(C.get_ydb_lock_st_ptr()) // call ydb_lock_st()
 	if status != YDB_OK && status != C.YDB_LOCK_TIMEOUT {
-		panic(conn.GetError(status))
+		panic(conn.lastError(status))
 	}
 	return status == YDB_OK
 }
 
-// tpInfo stores callback function and connection used by Transaction() to run transaction logic.
+// tpInfo struct stores callback function and connection used by Transaction() to run transaction logic.
 type tpInfo struct {
 	conn     *Conn
 	callback func() int
@@ -272,11 +350,13 @@ func (conn *Conn) Transaction(callback func() int, transId string, varnames ...s
 	handle := C.uintptr_t(cgo.NewHandle(info))
 	var status C.int
 	if len(varnames) == 0 {
+		conn.prepAPI()
 		status = C.ydb_tp_st(cconn.tptoken, &cconn.errstr, C.ydb_tpfnptr_t(C.tp_callback_wrapper), unsafe.Pointer(&handle),
 			(*C.char)(unsafe.Pointer(unsafe.StringData(transId))), 0, nil)
 	} else {
 		// use a Node type just as a handy way to store exclusions strings as a ydb_buffer_t array
 		namelist := conn.Node(varnames[0], varnames[1:]...)
+		conn.prepAPI()
 		status = C.ydb_tp_st(cconn.tptoken, &cconn.errstr, C.ydb_tpfnptr_t(C.tp_callback_wrapper), unsafe.Pointer(&handle),
 			(*C.char)(unsafe.Pointer(unsafe.StringData(transId))), C.int(len(varnames)), &namelist.cnode.buffers)
 	}
@@ -284,7 +364,7 @@ func (conn *Conn) Transaction(callback func() int, transId string, varnames ...s
 		return false
 	}
 	if status != YDB_OK {
-		panic(conn.GetError(status))
+		panic(conn.lastError(status))
 	}
 	return true
 }

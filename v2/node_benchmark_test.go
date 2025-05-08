@@ -131,8 +131,8 @@ func BenchmarkGetVariantSubscripts(b *testing.B) {
 		}
 		n := tconn.Node("var", subs...)
 		Randstr() // increment random string index to match strings with Set() benchmark
-		_, err := n.GetIf()
-		assert.Nil(b, err, "Database locals not properly set up for this test")
+		_, ok := n.Lookup()
+		assert.True(b, ok, "Database locals not properly set up for this test")
 	}
 }
 
