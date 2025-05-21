@@ -18,6 +18,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -29,7 +30,7 @@ import (
 )
 
 // #include "libyottadb.h"
-// extern void *ydb_get_gowrapper_panic_callback(void);
+// extern void *ydb_signal_exit_callback(void);
 import "C"
 
 type ydbHndlrWhen int
@@ -130,37 +131,18 @@ func selectString(boolVal bool, trueString, falseString string) string {
 }
 
 // validateNotifySignal verifies that the specified signal is valid for SignalNotify()/SignalReset()
-func validateNotifySignal(sig os.Signal, entryPoint ydbEntryPoint) {
-	// Verify the supplied signal is one that we support with this function. Note this list contains all of the signals
-	// that the wrapper traps as seen below in the initializeYottaDB() function except those signals that cause
-	// problems if handlers other than YottaDB's handler is driven (e.g. SIGTSTP, SIGTTIN, etc). It is up to the user
-	// to know which signals are duplicates of others so if separate handlers are set for say SIGABRT and SIGIOT, whichever
-	// handler was set last is the one that gets both signals as they are the same signal.
-	switch sig { // Validate the signal chosen
-	case syscall.SIGABRT: // Same as SIGIOT
-	case syscall.SIGALRM:
-	case syscall.SIGBUS:
-	case syscall.SIGCONT:
-	case syscall.SIGFPE:
-	case syscall.SIGHUP:
-	case syscall.SIGILL:
-	case syscall.SIGINT:
-	// case syscall.SIGIO: // Same as SIGPOLL & SIGURG
-	// case syscall.SIGIOT: // Same as SIGABRT (both can't exist as cases in a switch)
-	case syscall.SIGQUIT:
-	case syscall.SIGSEGV:
-	case syscall.SIGTERM:
-	case syscall.SIGTRAP:
-	// case syscall.SIGTSTP: // Trying to handle this signal just hangs
-	// case syscall.SIGTTIN: // Trying to handle this signal just hangs
-	// case syscall.SIGTTOU: // Trying to handle this signal just hangs
-	case syscall.SIGURG: // Same as SIGPOLL and SIGIO - happens almost constantly so be careful if used
-	case syscall.SIGUSR1:
-	default:
-		entryPoint := selectString((ydbEntryRegisterSigNotify == entryPoint), "yottadb.SignalNotify()",
-			"yottadb.SignalReset()")
-		panic(fmt.Sprintf("YDBGo: The specified signal (%v) is not supported for signal notification by %s",
-			sig, entryPoint))
+func validateNotifySignal(sig os.Signal) {
+	// Verify the supplied signal is one that we support with this function. This list contains all of the signals
+	// that the wrapper traps in the initializeYottaDB() except those signals that cause
+	// problems if handlers other than YottaDB's handler is driven (SIGTSTP, SIGTTIN, etc).
+	// It is up to the user to know which signals are duplicates of others so if separate handlers
+	// are set for say SIGABRT and SIGIOT, whichever handler was set last is the one that gets both signals
+	// (because both constants are the the same signal).
+	if !slices.Contains(ydbSignalList, sig) ||
+		sig == syscall.SIGTSTP || // Trying to handle these signals just hangs
+		sig == syscall.SIGTTIN ||
+		sig == syscall.SIGTTOU {
+		panic(fmt.Sprintf("YDBGo: The specified signal (%v) is not supported for signal notification", sig))
 	}
 }
 
@@ -176,7 +158,7 @@ func SignalNotify(sig os.Signal, notifyChan chan os.Signal, ackChan chan struct{
 	// Although this routine itself does not interact with the YottaDB runtime, use of this routine has an expectation that
 	// the runtime is going to handle signals so make sure it is initialized.
 	initCheck()
-	validateNotifySignal(sig, ydbEntryRegisterSigNotify)
+	validateNotifySignal(sig)
 	sigNotificationMapMutex.Lock()
 	if sigNotificationMap == nil {
 		sigNotificationMap = make(map[os.Signal]sigNotificationMapEntry)
@@ -188,7 +170,7 @@ func SignalNotify(sig os.Signal, notifyChan chan os.Signal, ackChan chan struct{
 // SignalReset removes a notification request for the given signal.
 // No error is raised if the signal did not already have a notification request in effect.
 func SignalReset(sig syscall.Signal) {
-	validateNotifySignal(sig, ydbEntryUnRegisterSigNotify)
+	validateNotifySignal(sig)
 	sigNotificationMapMutex.Lock()
 	delete(sigNotificationMap, sig)
 	sigNotificationMapMutex.Unlock()
@@ -258,19 +240,18 @@ func shutdownSignalGoroutines() {
 	}
 }
 
-// ydbWrapperPanicCallback is a function called from C code.
-// The C code routine address is passed to YottaDB via the ydb_main_lang_init()
-// call in initializeYottaDB() below and is called by YottaDB when it has completed processing a deferred fatal signal
-// and needs to exit in a "Go-ish" manner. The parameter determines the type of panic that gets raised.
+// signalExitCallback is called from C by YottaDB to perform an exit when YottaDB gets a fatal signal.
+// Its purpose make sure defers get called before exit, which it does by calling panic.
+// This function is passed to YottaDB during init by ydb_main_lang_init().
+// YDB calls this exit handler after rundown (equivalent to ydb_exit()).
+// The sigNum parameter is reported in the panic message.
 //
-//export ydbWrapperPanicCallback
-func ydbWrapperPanicCallback(sigNum C.int) {
-	var sig syscall.Signal
-
+//export signalExitCallback
+func signalExitCallback(sigNum C.int) {
 	printEntry("YDBWrapperPanic()")
 	ydbSigPanicCalled.Store(true) // Need "atomic" usage to avoid read/write DATA RACE issues
 	shutdownSignalGoroutines()    // Close the goroutines down with their signal notification channels
-	sig = syscall.Signal(sigNum)  // Convert numeric signal number to Signal type for use in panic() message
+	sig := syscall.Signal(sigNum) // Convert numeric signal number to Signal type for use in panic() message
 	panic(fmt.Sprintf("YDBGo: Fatal signal %d (%v) occurred", sig, sig))
 }
 
@@ -291,9 +272,12 @@ func initializeYottaDB() {
 		return // already initialized
 	}
 
-	// Drive initialization of the YottaDB engine/runtime
+	// Init YottaDB engine/runtime
+	// In Go, instead of ydb_init(), use ydb_main_lang_init() which lets us pass an exit handler for YDB to call on fatal signals.
+	// We must make the exit handler panic to ensure defers get called before exit.
+	// YDB calls the exit handler after rundown (equivalent to ydb_exit()).
 	printEntry("initializeYottaDB()")
-	rc := C.ydb_main_lang_init(C.YDB_MAIN_LANG_GO, C.ydb_get_gowrapper_panic_callback())
+	rc := C.ydb_main_lang_init(C.YDB_MAIN_LANG_GO, C.ydb_signal_exit_callback)
 	if YDB_OK != rc {
 		panic(fmt.Sprintf("YDBGo: YottaDB initialization failed with return code %d", rc))
 	}
@@ -407,8 +391,9 @@ func waitForSignalAckWTimeout(ackChan chan struct{}, whatAck string) {
 }
 
 // waitForAndProcessSignal is used as a goroutine to wait for a signal notification and send it to YottaDB's signal dispatcher.
-// This routine will also drive a user handler for the subset of signals we allow to have user handlers if one is defined.
-func waitForAndProcessSignal(shutdownChannelIndx int) {
+// This routine will also call a user handler for the signal if one has been set up using NotifySignal().
+// The `signalIndex` parameter is an index into our various tables that store signal info.
+func waitForAndProcessSignal(signalIndex int) {
 	var cbuft *C.ydb_buffer_t
 	var allDone bool
 	var shutdownChannel *chan int
@@ -416,8 +401,8 @@ func waitForAndProcessSignal(shutdownChannelIndx int) {
 	var sig os.Signal
 	var rc C.int
 
-	sig = ydbSignalList[shutdownChannelIndx]
-	shutdownChannel = &ydbShutdownChannel[shutdownChannelIndx]
+	sig = ydbSignalList[signalIndex]
+	shutdownChannel = &ydbShutdownChannel[signalIndex]
 
 	conn := NewConn() // an easy way to get an error buffer for the current goroutine
 	// We only need one of each type of signal so buffer depth is 1, but let it queue one additional
@@ -452,9 +437,9 @@ func waitForAndProcessSignal(shutdownChannelIndx int) {
 		}
 		func() { // Inline function to provide scope for defer
 			rc = 0 // In case ydb_sig_dispatch() is bypassed by not running a handler
-			atomic.StoreUint32(&ydbSignalActive[shutdownChannelIndx], 1)
+			atomic.StoreUint32(&ydbSignalActive[signalIndex], 1)
 			defer func() {
-				atomic.StoreUint32(&ydbSignalActive[shutdownChannelIndx], 0) // Shut flag back off when we are done
+				atomic.StoreUint32(&ydbSignalActive[signalIndex], 0) // Shut flag back off when we are done
 			}()
 			// See if we have a notification request for this signal
 			sigNotificationMapMutex.Lock()
@@ -530,9 +515,9 @@ func waitForAndProcessSignal(shutdownChannelIndx int) {
 	}
 	signal.Stop(sigchan) // No more signal notification for this signal channel
 	if dbgSigHandling {
-		fmt.Fprintln(os.Stderr, "YDBGo: goroutine-sighandler: Goroutine for signal index", shutdownChannelIndx, "exiting..")
+		fmt.Fprintln(os.Stderr, "YDBGo: goroutine-sighandler: Goroutine for signal index", signalIndex, "exiting..")
 	}
-	atomic.StoreUint32(&ydbShutdownComplete[shutdownChannelIndx], 1) // Indicate this channel is closed
+	atomic.StoreUint32(&ydbShutdownComplete[signalIndex], 1) // Indicate this channel is closed
 
 	ydbShutdownCheck <- 0 // Notify shutdownSignalGoroutines that it needs to check if all channels closed now
 }

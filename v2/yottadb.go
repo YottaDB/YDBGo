@@ -98,14 +98,6 @@ const (
 
 const dbgSigHandling bool = false // Print extra info when running if true
 
-// ydbEntryPoint is passed to validateNotifySignal() to indicate which entry point is calling it. Set it to constants below.
-type ydbEntryPoint uint32
-
-const (
-	ydbEntryRegisterSigNotify ydbEntryPoint = iota + 1
-	ydbEntryUnRegisterSigNotify
-)
-
 // ---- Init locks
 
 var ydbInitialized atomic.Bool    // Set to true when YDB has been initialized with a call to ydb_main_lang_init()
