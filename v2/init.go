@@ -84,13 +84,14 @@ var wgexit sync.WaitGroup
 var wgSigInit sync.WaitGroup           // Used to make sure signals are setup before initializeYottaDB() exits
 var wgSigShutdown sync.WaitGroup       // Used to wait for all signal threads to shutdown
 var inInit sync.Mutex                  // Mutex for access to init and exit
-var ydbShutdownChannel []chan int      // Array of channels used to shutdown signal handling goroutines
 var ydbShutdownCheck chan int          // Channel used to check if all signal routines have been shutdown
 var shutdownSigGortns bool             // We have been through shutdownSignalGoroutines()
 var shutdownSigGortnsMutex sync.Mutex  // Serialize access to shutdownSignalGoroutines()
 var sigNotificationMapMutex sync.Mutex // Mutex for access to user sig handler map
-var ydbSignalActive []uint32           // Array of indicators indicating indexed signal handlers are active
-var ydbShutdownComplete []uint32       // Array of flags that indexed signal goroutine shutdown is complete
+
+var ydbShutdownChannel []chan int // Array of channels used to shutdown signal handling goroutines
+var ydbSignalActive []uint32      // Array of indicators indicating indexed signal handlers are active
+var ydbShutdownComplete []uint32  // Array of flags that indexed signal goroutine shutdown is complete
 
 // printEntry is a function to print the entry point of the function, when entered, if the printEPHdrs flag is enabled.
 func printEntry(funcName string) {
@@ -109,15 +110,15 @@ func printEntry(funcName string) {
 // across goroutines.
 func syslogEntry(logMsg string) {
 	syslogr, err := syslog.New(syslog.LOG_INFO+syslog.LOG_USER, "[YottaDB-Go-Wrapper]")
-	if nil != err {
+	if err != nil {
 		panic(fmt.Sprintf("syslog.New() failed unexpectedly with error: %s", err))
 	}
 	err = syslogr.Info(logMsg)
-	if nil != err {
+	if err != nil {
 		panic(fmt.Sprintf("syslogr.Info() failed unexpectedly with error: %s", err))
 	}
 	err = syslogr.Close()
-	if nil != err {
+	if err != nil {
 		panic(fmt.Sprintf("syslogr.Close() failed unexpectedly with error: %s", err))
 	}
 }
@@ -189,7 +190,7 @@ func shutdownSignalGoroutines() {
 		}
 		return
 	}
-	for i := 0; signalsHandled > i; i++ {
+	for i := range signalsHandled {
 		close(ydbShutdownChannel[i]) // Will wakeup signal goroutine and make it exit
 	}
 	// Wait for the signal goroutines to exit but with a timeout
@@ -200,11 +201,10 @@ func shutdownSignalGoroutines() {
 		// reason, we treat active goroutines the same as successfully shutdown goroutines so we don't delay
 		// shutdown. No need to wait for something that is likely to not occur (The YottaDB handlers for fatal signals
 		// drive a process-ending panic and never return).
-		sigRtnScanStopped := false
-		for !sigRtnScanStopped {
+		for {
 			<-ydbShutdownCheck // A goroutine finished - check if all are shutdown or otherwise busy
 			var i int
-			for i = 0; signalsHandled > i; i++ {
+			for i = 0; i < signalsHandled; i++ { // don't use `range` so that `if i==signalsHandled` below works
 				lclShutdownComplete := (atomic.LoadUint32(&ydbShutdownComplete[i]) == 1)
 				lclSignalActive := (atomic.LoadUint32(&ydbSignalActive[i]) == 1)
 				if !lclShutdownComplete && !lclSignalActive {
@@ -213,9 +213,9 @@ func shutdownSignalGoroutines() {
 					break
 				}
 			}
-			if signalsHandled == i { // We made it all the way through the loop satisfactorily
-				close(done)              // Notify select loop below that this is complete
-				sigRtnScanStopped = true // Escape the sig gortn scan loop
+			if i == signalsHandled { // We made it all the way through the loop satisfactorily
+				close(done) // Notify select loop below that this is complete
+				return
 			}
 		}
 	}()
@@ -278,7 +278,7 @@ func initializeYottaDB() {
 	// YDB calls the exit handler after rundown (equivalent to ydb_exit()).
 	printEntry("initializeYottaDB()")
 	rc := C.ydb_main_lang_init(C.YDB_MAIN_LANG_GO, C.ydb_signal_exit_callback)
-	if YDB_OK != rc {
+	if rc != YDB_OK {
 		panic(fmt.Sprintf("YDBGo: YottaDB initialization failed with return code %d", rc))
 	}
 
@@ -295,7 +295,7 @@ func initializeYottaDB() {
 	}
 	releaseNumberStr = releaseNumberStr[1:]          // Remove starting 'r' in the release number
 	dotIndex := strings.Index(releaseNumberStr, ".") // Look for the decimal point that separates major/minor values
-	if 0 <= dotIndex {                               // Decimal point found
+	if dotIndex >= 0 {                               // Decimal point found
 		releaseMajorStr = string(releaseNumberStr[:dotIndex])
 		releaseMinorStr = string(releaseNumberStr[dotIndex+1:])
 	} else {
@@ -353,7 +353,7 @@ func initializeYottaDB() {
 	wgSigInit.Wait()
 }
 
-// notifyUserSignalChannel drives a user signal routine associated with a given signal
+// notifyUserSignalChannel calls a user signal routine associated with a given signal
 func notifyUserSignalChannel(sig os.Signal, sigHndlrEntry sigNotificationMapEntry, whenCalled ydbHndlrWhen) {
 	// Notify user code via the supplied channel
 	if dbgSigHandling {
@@ -394,17 +394,11 @@ func waitForSignalAckWTimeout(ackChan chan struct{}, whatAck string) {
 // This routine will also call a user handler for the signal if one has been set up using NotifySignal().
 // The `signalIndex` parameter is an index into our various tables that store signal info.
 func waitForAndProcessSignal(signalIndex int) {
-	var cbuft *C.ydb_buffer_t
-	var allDone bool
 	var shutdownChannel *chan int
-	var sigStatus string
-	var sig os.Signal
-	var rc C.int
 
-	sig = ydbSignalList[signalIndex]
+	sig := ydbSignalList[signalIndex]
 	shutdownChannel = &ydbShutdownChannel[signalIndex]
 
-	conn := NewConn() // an easy way to get an error buffer for the current goroutine
 	// We only need one of each type of signal so buffer depth is 1, but let it queue one additional
 	sigchan := make(chan os.Signal, 2)
 	// Only one message need be passed on shutdown channel so no buffering
@@ -414,17 +408,9 @@ func waitForAndProcessSignal(signalIndex int) {
 	if dbgSigHandling {
 		fmt.Fprintf(os.Stderr, "YDBGo: goroutine-sighandler: Signal handler initialized for %v\n", sig)
 	}
-	wgSigInit.Done() // Signal parent goroutine that we have completed initializing signal handling
-	// Although we typically refer to individual signals with their syscall.Signal type, we do need to have them
-	// in their numeric form too to pass to C when we want to dispatch their YottaDB handler. Unfortunately,
-	// switching between designations is a bit silly.
-	csignum := fmt.Sprintf("%d", sig)
-	signum, err := strconv.Atoi(csignum)
-	if nil != err {
-		panic(fmt.Sprintf("YDBGo: Unexpected error translating signal to numeric: %v", csignum))
-	}
-	cbuft = &conn.cconn.errstr // Get pointer to ydb_buffer_t embedded in conn; to pass to C
-	allDone = false
+	wgSigInit.Done()  // Signal parent goroutine that we have completed initializing signal handling
+	conn := NewConn() // an easy way to get an error buffer for the current goroutine
+	allDone := false
 	for !allDone {
 		select {
 		case <-sigchan:
@@ -436,7 +422,8 @@ func waitForAndProcessSignal(signalIndex int) {
 			break // Got a shutdown request - fall out!
 		}
 		func() { // Inline function to provide scope for defer
-			rc = 0 // In case ydb_sig_dispatch() is bypassed by not running a handler
+			var rc C.int
+			rc = YDB_OK // In case ydb_sig_dispatch() is bypassed by not running a handler
 			atomic.StoreUint32(&ydbSignalActive[signalIndex], 1)
 			defer func() {
 				atomic.StoreUint32(&ydbSignalActive[signalIndex], 0) // Shut flag back off when we are done
@@ -464,22 +451,22 @@ func waitForAndProcessSignal(signalIndex int) {
 				}
 			}
 			// Now notify the YDB runtime of this signal unless the handler is not supposed to run
-			if !sigHndlrEntryFound || (NotifyInsteadOfYDBSigHandler != sigHndlrEntry.notifyWhen) {
+			if !sigHndlrEntryFound || (sigHndlrEntry.notifyWhen != NotifyInsteadOfYDBSigHandler) {
 				// Note this call to ydb_sig_dispatch() does not pass a tptoken. The reason for this is that inside
-				// this routine the tptoken at the time the signal actually pops in unknown. The ydb_sig_dispatch()
-				// routine itself does not need the tptoken nor does anything it calls but we do still need the
+				// this routine the tptoken at the time the signal actually occurs is unknown. The ydb_sig_dispatch()
+				// routine itself does not need the tptoken nor does anything it calls but we do still need an
 				// error buffer in case an error occurs that we need to return.
-				if dbgSigHandling && (syscall.SIGURG != sig) {
-					// Note our passage if not SIGURG (happens almost continually so be silent)
-					fmt.Fprintln(os.Stderr, "YDBGo: goroutine-sighandler: Go sighandler - sending notification",
-						"for signal", signum, " to the YottaDB signal dispatcher")
+				if dbgSigHandling && (sig != syscall.SIGURG) {
+					// SIGURG happens almost continually, so don't report it.
+					fmt.Fprintf(os.Stderr, "YDBGo: goroutine-sighandler: notifying YottaDB signal dispatcher of signal %d (%v)", sig, sig)
 				}
-				rc = C.ydb_sig_dispatch(cbuft, C.int(signum))
+				signum := C.int(sig.(syscall.Signal)) // have to type assert before converting to an int
+				rc = C.ydb_sig_dispatch(&conn.cconn.errstr, signum)
 				switch rc {
 				case YDB_OK: // Signal handling complete
 				case YDB_DEFER_HANDLER: // Signal was deferred for some reason
-					// If CALLINAFTERXIT (positive or negative version) we're done - exit goroutine
 				case ydberr.CALLINAFTERXIT, -ydberr.CALLINAFTERXIT:
+					// If CALLINAFTERXIT (positive or negative version) we're done - exit goroutine
 					allDone = true
 				default: // Some sort of error occurred during signal handling
 					if rc != YDB_OK {
@@ -489,11 +476,11 @@ func waitForAndProcessSignal(signalIndex int) {
 				}
 			}
 			// Drive user notification if requested
-			if sigHndlrEntryFound && (NotifyAfterYDBSigHandler == sigHndlrEntry.notifyWhen) {
+			if sigHndlrEntryFound && (sigHndlrEntry.notifyWhen == NotifyAfterYDBSigHandler) {
 				notifyUserSignalChannel(sig, sigHndlrEntry, afterYDBHandler)
 			}
 			if dbgSigHandling {
-				sigStatus = "complete"
+				sigStatus := "complete"
 				switch sig {
 				case syscall.SIGALRM, syscall.SIGCONT, syscall.SIGIO, syscall.SIGIOT, syscall.SIGURG:
 					// No post processing but SIGALRM is most common signal so check for it first
@@ -501,14 +488,13 @@ func waitForAndProcessSignal(signalIndex int) {
 					// No post processing here either
 				case syscall.SIGHUP, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM:
 					// These are the deferrable signals - mark our handling as such if they were deferred
-					if YDB_DEFER_HANDLER == rc {
+					if rc == YDB_DEFER_HANDLER {
 						sigStatus = "deferred"
 					}
 				}
-				if syscall.SIGURG != sig {
-					// Note our passage if not SIGURG (SIGURG happens almost continually so be silent)
-					fmt.Fprintln(os.Stderr, "YDBGo: goroutine-sighandler: Signal handling for signal", signum,
-						sigStatus)
+				if sig != syscall.SIGURG {
+					// SIGURG happens almost continually, so don't report it.
+					fmt.Fprintf(os.Stderr, "YDBGo: goroutine-sighandler: Signal handling for signal %d (%v) %s", sig, sig, sigStatus)
 				}
 			}
 		}()
