@@ -163,7 +163,7 @@ func (conn *Conn) lastError(code C.int) error {
 	// If msg is improperly formatted, return it verbatim with a -1 code (this should never happen)
 	if index == -1 {
 		// If msg is improperly formatted, return it verbatim (this should never happen)
-		return fmt.Errorf("could not parse error message: %w", newError(-1, msg))
+		return fmt.Errorf("YDBGo: could not parse error message: %w", newError(-1, msg))
 	}
 	text := msg[index+len(pattern):]
 	return newError(int(code), text)
@@ -181,7 +181,7 @@ func (conn *Conn) lastCode() C.int {
 	index := strings.Index(msg, ",")
 	if index == -1 {
 		// If msg is improperly formatted, return it verbatim with a -1 code (this should never happen)
-		panic(fmt.Errorf("could not parse error message: %w", newError(-1, msg)))
+		panic(fmt.Errorf("YDBGo: could not parse error message: %w", newError(-1, msg)))
 	}
 	code, err := strconv.ParseInt(msg[:index], 10, 64)
 	if err != nil {
