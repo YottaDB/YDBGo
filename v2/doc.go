@@ -18,7 +18,8 @@ Its use of the `Node` type to pin memory references to database subscript string
 
 # Example
 
-	defer yottadb.Shutdown(yottadb.Init())
+	db := yottadb.Init()
+	defer yottadb.Shutdown(db)
 	conn := yottadb.NewConn()
 	n := conn.Node("person", "name")
 	n.Child("first").Set("Joe")
