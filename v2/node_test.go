@@ -157,7 +157,7 @@ func TestClear(t *testing.T) {
 func TestIncr(t *testing.T) {
 	tconn := SetupTest(t)
 	n := tconn.Node("var")
-	assert.Equal(t, 1.0, n.Incr())
+	assert.Equal(t, 1.0, n.Incr(1))
 	assert.Equal(t, "1", n.Get())
 	assert.Equal(t, 3.0, n.Incr(2))
 	assert.Equal(t, 4.5, n.Incr(1.5))
@@ -165,7 +165,7 @@ func TestIncr(t *testing.T) {
 	assert.Equal(t, -4.5, n.Incr(-4.5))
 
 	n.Set("0")
-	assert.Equal(t, 1.0, n.Incr(""))
+	assert.Equal(t, 1.0, n.Incr("1"))
 	assert.Equal(t, "1", n.Get())
 	assert.Equal(t, 3.0, n.Incr("2"))
 	assert.Equal(t, 4.5, n.Incr("1.5"))
@@ -178,9 +178,9 @@ func TestLock(t *testing.T) {
 	tconn := SetupTest(t)
 	n := tconn.Node("^var", "Don't", "Panic!")
 	// Increment lock 3 times
-	assert.Equal(t, true, n.Lock(0.1))
-	assert.Equal(t, true, n.Lock(0.1))
-	assert.Equal(t, true, n.Lock(0.1))
+	assert.Equal(t, true, n.Lock(100*time.Millisecond))
+	assert.Equal(t, true, n.Lock(100*time.Millisecond))
+	assert.Equal(t, true, n.Lock(100*time.Millisecond))
 
 	// Check that lock now exists
 	lockpath := fmt.Sprint(n)
@@ -200,7 +200,7 @@ func TestLock(t *testing.T) {
 	n2.Lock()
 	assert.Equal(t, true, lockExists(fmt.Sprint(n)))
 	assert.Equal(t, true, lockExists(fmt.Sprint(n2)))
-	assert.Equal(t, true, tconn.Lock(time.Duration(0))) // Release all locks
+	assert.Equal(t, true, tconn.Lock(0)) // Release all locks
 	assert.Equal(t, false, lockExists(fmt.Sprint(n)))
 	assert.Equal(t, false, lockExists(fmt.Sprint(n2)))
 
@@ -253,7 +253,7 @@ func ExampleNode_Next_varnames() {
 }
 
 // Example of getting next subscript
-func ExampleNode_Iterate() {
+func ExampleNode_Children() {
 	conn := NewConn()
 	n := conn.Node("X", "1")
 	n.Child("2", "3").Set("123")
@@ -261,12 +261,12 @@ func ExampleNode_Iterate() {
 	n.Child("2", "4").Set("124")
 
 	n = conn.Node("X", "1", "2")
-	for x := range n.Iterate() {
+	for x := range n.Children() {
 		fmt.Printf("%s=%s\n", x, Quote(x.Get()))
 	}
 
 	fmt.Println("Do the same in reverse:")
-	for x := range n.IterateBackward() {
+	for x := range n.ChildrenBackward() {
 		fmt.Printf("%s=%s\n", x, Quote(x.Get()))
 	}
 	// Output:
@@ -328,6 +328,29 @@ func ExampleNode_TreeNext() {
 	// tree(1,2,4)=124
 	// tree(1,2,3,7)=1237
 	// tree(1,2,3)=123
+}
+
+// Example of traversing a database tree
+func ExampleNode_Tree() {
+	conn := NewConn()
+	n1 := conn.Node("tree", "1")
+	n1.Child("2", "3").Set("123")
+	n1.Child("2", "3", "7").Set("1237")
+	n1.Child("2", "4").Set("124")
+	n1.Child("2", "5", "9").Set("1259")
+	n1.Child("6").Set("16")
+	nb := conn.Node("tree", "B")
+	nb.Child("1").Set("AB")
+
+	for x := range n1.Child("2").Tree() {
+		fmt.Printf("%s=%s\n", x, Quote(x.Get()))
+	}
+
+	// Output:
+	// tree(1,2,3)=123
+	// tree(1,2,3,7)=1237
+	// tree(1,2,4)=124
+	// tree(1,2,5,9)=1259
 }
 
 // Test cases that ExampleNode_TreeNext() did not catch

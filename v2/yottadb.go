@@ -64,23 +64,23 @@ const WrapperRelease string = "v2.0.1"
 
 // Set default exit wait times. The user may change these.
 var (
-	// MaximumPanicExitWait is the maximum wait when a panic caused by a signal has occured (likely unable to run Exit().
+	// MaxPanicExitWait is the maximum wait when a panic caused by a signal has occured (likely unable to run Exit().
 	// It specifies the wait in seconds that yottadb.Exit() will wait for ydb_exit() to run before
 	// giving up and forcing the process to exit. Note the normal exit wait is longer as we expect ydb_exit() to be
 	// successful so can afford to wait as long as needed to do the sync but for a signal exit, the rundown is likely
 	// already done (exit handler called by the signal processing itself) but if ydb_exit() is not able to get
 	// the system lock and is likely to hang, 3 seconds is about as much as we can afford to wait.
-	MaximumPanicExitWait time.Duration = 3 * time.Second
+	MaxPanicExitWait time.Duration = 3 * time.Second
 
-	// MaximumNormalExitWait is maximum wait for a normal shutdown when no system lock hang in Exit() is likely.
-	MaximumNormalExitWait time.Duration = 60 * time.Second
+	// MaxNormalExitWait is maximum wait for a normal shutdown when no system lock hang in Exit() is likely.
+	MaxNormalExitWait time.Duration = 60 * time.Second
 
-	// MaximumSigShutDownWait is maximum wait to close down signal handling goroutines (shouldn't take this long).
-	MaximumSigShutDownWait time.Duration = 5 * time.Second
+	// MaxSigShutdownWait is maximum wait to close down signal handling goroutines (shouldn't take this long).
+	MaxSigShutdownWait time.Duration = 5 * time.Second
 
-	// MaximumSigAckWait is maximum wait for notify via acknowledgement channel that a notified signal handler is
+	// MaxSigAckWait is maximum wait for notify via acknowledgement channel that a notified signal handler is
 	// done handling the signal.
-	MaximumSigAckWait time.Duration = 10 * time.Second
+	MaxSigAckWait time.Duration = 10 * time.Second
 )
 
 // ---- Enums for signal functions

@@ -35,7 +35,7 @@ func ExampleNewConn() {
 	n := conn.Node("person", "name")
 	n.Child("first").Set("Joe")
 	n.Child("last").Set("Bloggs")
-	for x := range n.Iterate() {
+	for x := range n.Children() {
 		fmt.Printf("%s = %s\n", x, Quote(x.Get()))
 	}
 	n.Kill()
@@ -76,7 +76,7 @@ func RandstrReset() {
 
 // multi returns multiple parameters as a single slice of interfaces.
 // Useful, for example, in asserting test validity of functions that return both a value and an error.
-func multi(v ...interface{}) []interface{} {
+func multi(v ...any) []any {
 	return v
 }
 

@@ -21,6 +21,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"time"
 	"unsafe"
 
 	"lang.yottadb.com/go/yottadb/v2/ydberr"
@@ -44,9 +45,9 @@ func bufferIndex(buf *C.ydb_buffer_t, i int) *C.ydb_buffer_t {
 //     structs that point to each successive string, to provide fast access to YottaDB API functions.
 //   - Regular Nodes are immutable. There is a mutable version of Node emitted by [Node.Next]() and Node iterators, which
 //     will change each loop. If you need to take an immutable snapshot of a mutable node this may be done with [Node.Clone]().
-//   - Thread Safety: Do not run database actions on node objects created in another thread. If you want to
+//   - Concurrency: Do not run database actions on node objects created in another goroutine. If you want to
 //     act on a node object passed in from another goroutine, first call [Node.Clone](conn) to make a copy of the
-//     other goroutine's node object using the current thread's connection `conn`. Then perform methods on that.
+//     other goroutine's node object using the current goroutine's connection `conn`. Then perform methods on that.
 type Node struct {
 	// Node type wraps a C.node struct in a Go struct so Go can add methods to it.
 	// Pointer to C.node rather than the item itself so we can point to it from C without Go moving it.
@@ -58,8 +59,8 @@ type Node struct {
 // _Node creates a `Node` type instance that represents a database node with methods that access YottaDB.
 //   - The strings and array are stored in C-allocated space to give Node methods fast access to YottaDB API functions.
 //     varname may be a string or, if it is another node, that node's path strings will be prepended to `subscripts`.
-func (conn *Conn) _Node(varname interface{}, subscripts ...string) (n *Node) {
-	// Note: benchmarking shows that the use of interface{} slows down node creation almost immeasurably (< 0.1%)
+func (conn *Conn) _Node(varname any, subscripts ...string) (n *Node) {
+	// Note: benchmarking shows that the use of any slows down node creation almost immeasurably (< 0.1%)
 	// Concatenate strings the fastest Go way.
 	// This involves creating an extra copy of subscripts but is probably faster than one C.memcpy call per subscript
 	var joiner bytes.Buffer
@@ -135,7 +136,7 @@ func (conn *Conn) Node(varname string, subscripts ...string) (n *Node) {
 
 // CloneNode creates a copy of node associated with conn (in case node was created using a different conn).
 // A node associated with a conn used by another goroutine must not be used by the current goroutine except as
-// a parameter to CloneNode(). If this rule is not obeyed, then the two threads could have their transaction depth
+// a parameter to CloneNode(). If this rule is not obeyed, then the two goroutines could have their transaction depth
 // and error messages mixed up. It is the programmer's responsibility to ensure this does not happen by using CloneNode.
 // This does the same as n.Clone() except that it can switch to new conn.
 // Only immutable nodes are returned.
@@ -346,20 +347,20 @@ func (n *Node) Clear() {
 }
 
 // Incr atomically increments the value of database node by amount.
-//   - The amount may be an integer, float or string representation of the same, and defaults to 1 if not supplied.
+//   - The amount may be an integer, float or string representation of the same.
 //   - Convert the value of the node to a number first by discarding any trailing non-digits and returning zero if it is still not a number.
 //   - Return the new value of the node.
 //   - Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
-func (n *Node) Incr(amount ...interface{}) float64 {
+func (n *Node) Incr(amount any) float64 {
 	cnode := n.cnode // access C equivalents of Go types
 	cconn := cnode.conn
 
-	var numberString string
-	if len(amount) == 0 {
-		numberString = "1"
-	} else {
-		numberString = fmt.Sprint(amount[0])
+	str, ok := amount.(string)
+	if ok && str == "" {
+		panic(`YDBGo: cannot increment by the empty string ""`)
 	}
+
+	numberString := fmt.Sprint(amount)
 	n.conn.setValue(numberString)
 
 	n.conn.prepAPI()
@@ -378,10 +379,10 @@ func (n *Node) Incr(amount ...interface{}) float64 {
 
 // Lock attempts to acquire or increment the count a lock matching this node, waiting up to timeout for availability.
 // Equivalent to the M `LOCK +lockpath` command.
-//   - The timeout is supplied in timeout[0] in seconds. If no timeout is supplied, wait forever. A timeout of zero means try only once.
+//   - If no timeout is supplied, wait forever. A timeout of zero means try only once.
 //   - Return true if lock was acquired; otherwise false.
 //   - Panics with TIME2LONG if the timeout exceeds YDB_MAX_TIME_NSEC or on other panic-worthy errors (e.g. invalid variable names).
-func (n *Node) Lock(timeout ...float64) bool {
+func (n *Node) Lock(timeout ...time.Duration) bool {
 	cnode := n.cnode // access C equivalents of Go types
 	cconn := cnode.conn
 
@@ -390,11 +391,7 @@ func (n *Node) Lock(timeout ...float64) bool {
 	if forever {
 		timeoutNsec = YDB_MAX_TIME_NSEC
 	} else {
-		// Prevent overflow in timeout conversion to ulonglong and ensure the proper error is created
-		timeoutNsec = C.ulonglong(timeout[0] * 1000000000)
-		if timeout[0] > YDB_MAX_TIME_NSEC {
-			timeoutNsec = YDB_MAX_TIME_NSEC + 1
-		}
+		timeoutNsec = C.ulonglong(timeout[0].Nanoseconds())
 	}
 
 	for {
@@ -531,12 +528,12 @@ func (n *Node) Prev() *Node {
 	return n._next(true)
 }
 
-// _iterate returns an interator that can FOR-loop through all a node's single-depth child subscripts.
+// _children returns an interator that can FOR-loop through all a node's single-depth child subscripts.
 // This implements the logic for both Iterate() and IterateBackward().
 //   - If the parameter reverse is true, iterate nodes in reverse order.
 //
 // See further documentation at Iterate().
-func (n *Node) _iterate(reverse bool) iter.Seq[*Node] {
+func (n *Node) _children(reverse bool) iter.Seq[*Node] {
 	// The next 3 lines are functionally n := n.Child("") but result in faster subsequent code because they create a mutable
 	// node with enough spare subscript space to avoid Node.Next() having to immediately create a mutable node.
 	n = n.Child(preallocSubscript)
@@ -556,8 +553,8 @@ func (n *Node) _iterate(reverse bool) iter.Seq[*Node] {
 	}
 }
 
-// Iterate returns an interator that can FOR-loop through all a node's single-depth child subscripts.
-// This iterator is a wrapper for [Node.Next](). It yields a mutable node with final subscripts changed
+// Children returns an interator over immediate child nodes for use in a FOR-loop.
+// This iterator is a wrapper for [Node.Next](). It yields a mutable node instance with final subscripts changed
 // to successive subscript names.
 //   - Treats 'null subscripts' (i.e. empty strings) in the same way as M function [$ORDER()].
 //   - The order of returned nodes matches the collation order of the M database.
@@ -567,18 +564,18 @@ func (n *Node) _iterate(reverse bool) iter.Seq[*Node] {
 // Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
 //
 // See:
-//   - [Node.IterateBackwardJ]().
-//   - [Node.TreeNext]() for traversal of nodes in a way that descends into the entire tree.
+//   - [Node.ChildrenBackward]().
+//   - [Node.Tree]() for traversal of nodes in a way that descends into the entire tree.
 //
 // [$ORDER()]: https://docs.yottadb.com/ProgrammersGuide/functions.html#order
-func (n *Node) Iterate() iter.Seq[*Node] {
-	return n._iterate(false)
+func (n *Node) Children() iter.Seq[*Node] {
+	return n._children(false)
 }
 
-// IterateBackward is the same as Iterate but operates in reverse order.
-// See [Node.Iterate]().
-func (n *Node) IterateBackward() iter.Seq[*Node] {
-	return n._iterate(true)
+// ChildrenBackward is the same as Children but operates in reverse order.
+// See [Node.Children]().
+func (n *Node) ChildrenBackward() iter.Seq[*Node] {
+	return n._children(true)
 }
 
 // _treeNext returns the next node in the traversal of a database tree of a database variable.
@@ -646,12 +643,12 @@ func (n *Node) _treeNext(reverse bool) *Node {
 }
 
 // TreeNext returns the next node in the traversal of a database tree of a database variable.
-// Equivalent to the M function [$QUERY()].
+// Equivalent to the M function [$QUERY()]. It yields immutable nodes instances.
 //   - The next node is chosen in depth-first order (i.e by descending deeper into the subscript tree before moving to the next node at the same level).
+//   - The order of returned nodes matches the collation order of the M database.
 //   - The node path supplied does not need to exist in the database to find the next match.
 //   - Returns nil when there are no more nodes after the given node path within the given database variable (GLVN).
 //   - Nodes that have 'null subscripts' (i.e. empty string) are all returned in their place except for the top-level GLVN(""), which is never returned.
-//   - Only immutable nodes are returned.
 //   - Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
 //
 // See:
@@ -667,4 +664,42 @@ func (n *Node) TreeNext() *Node {
 // See [Node.TreeNext]().
 func (n *Node) TreePrev() *Node {
 	return n._treeNext(true)
+}
+
+// Tree returns an interator over all descendants of node for use in a FOR-loop.
+// This iterator is a wrapper for [Node.TreeNext](). It yields immutable node instances.
+//   - The next node is chosen in depth-first order (i.e by descending deeper into the subscript tree before moving to the next node at the same level).
+//   - The order of returned nodes matches the collation order of the M database.
+//   - Nodes that have 'null subscripts' (i.e. empty string) are all returned in their place.
+//   - Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
+//
+// See:
+//   - [Node.TreeNext](), [Node.TreePrev]()
+//   - [Node.Children]() for traversal of only immediate children.
+//
+// [$ORDER()]: https://docs.yottadb.com/ProgrammersGuide/functions.html#query
+func (n *Node) Tree() iter.Seq[*Node] {
+	len1 := int(n.cnode.len)
+	subs1 := n.Subscripts()
+
+	return func(yield func(*Node) bool) {
+		for {
+			n = n.TreeNext()
+			if n == nil || int(n.cnode.len) < len1 {
+				return
+			}
+			// Ensure that returned node is still a descendent of first node; i.e. all initial subscripts match
+			// Don't need to check varname (i=0) as TreeNext() doesn't search beyond varname
+			for i := 1; i < len1; i++ {
+				buf := bufferIndex(&n.cnode.buffers, int(i))
+				// Access buf string using unsafe.String because it doesn't make a time-consuming copy of the string like GoStringN does.
+				if unsafe.String((*byte)(unsafe.Pointer(buf.buf_addr)), buf.len_used) != subs1[i] {
+					return
+				}
+			}
+			if !yield(n) {
+				return
+			}
+		}
+	}
 }

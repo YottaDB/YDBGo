@@ -101,8 +101,7 @@ func printEntry(funcName string) {
 }
 
 // syslogEntry records the given message in the syslog. Since these are rare or one-time per process type errors
-// that get recorded here, we open a new syslog handle each time to reduce complexity of single threading access
-// across goroutines.
+// that get recorded here, we open a new syslog handle each time to reduce complexity of access across goroutines.
 func syslogEntry(logMsg string) {
 	syslogr, err := syslog.New(syslog.LOG_INFO+syslog.LOG_USER, "[YottaDB-Go-Wrapper]")
 	if err != nil {
@@ -218,10 +217,10 @@ func shutdownSignalGoroutines() {
 		if dbgSigHandling {
 			fmt.Fprintln(os.Stderr, "YDBGo: shutdownSignalGoroutines: All signal goroutines successfully closed or active")
 		}
-	case <-time.After(MaximumSigShutDownWait):
+	case <-time.After(MaxSigShutdownWait):
 		// Notify syslog that this timeout happened
 		if dbgSigHandling {
-			fmt.Fprintln(os.Stderr, "YDBGo: shutdownSignalGoroutines: Timeout! Some signal threads did not shutdown")
+			fmt.Fprintln(os.Stderr, "YDBGo: shutdownSignalGoroutines: Timeout! Some signal goroutines did not shutdown")
 		}
 		errstr := getWrapperErrorMsg(ydberr.SIGGORTNTIMEOUT)
 		syslogEntry(errstr)
@@ -330,7 +329,7 @@ func initializeYottaDB() {
 			MinimumYDBRelease, releaseMajorStr, releaseMinorStr))
 	}
 	// Start up a goroutine for each signal we want to be notified of. This is so that if one signal is in process,
-	// we can still catch a different signal and deliver it appropriately (probably to the same thread). For each signal,
+	// we can still catch a different signal and deliver it appropriately (probably to the same goroutine). For each signal,
 	// bump our wait group counter so we don't proceed until all of these goroutines are initialized.
 	// If you need to handle any more or fewer signals, alter ydbSignals at the top of this module.
 	for i := range ydbSignals {
@@ -373,7 +372,7 @@ func notifyUserSignalChannel(sig os.Signal, notification sigNotificationEntry, w
 func waitForSignalAckWTimeout(ackChan chan struct{}, whatAck string) {
 	select { // Wait for an acknowledgement but put a timer on it
 	case <-ackChan:
-	case <-time.After(MaximumSigAckWait):
+	case <-time.After(MaxSigAckWait):
 		syslogEntry(strings.Replace(getWrapperErrorMsg(ydberr.SIGACKTIMEOUT), "!AD", whatAck, 1))
 	}
 }
@@ -574,9 +573,9 @@ func Shutdown(handle DB) error {
 	// This is not a real issue because the signal handler would have driven the exit handler to clean things up already.
 	// On the other hand, if this is a normal exit, we need to be able to wait a reasonably long time in case there is
 	// a significant amount of data to flush.
-	exitWait := MaximumNormalExitWait
+	exitWait := MaxNormalExitWait
 	if ydbSigPanicCalled.Load() {
-		exitWait = MaximumPanicExitWait
+		exitWait = MaxPanicExitWait
 	}
 	var errstr string
 	var errNum int
