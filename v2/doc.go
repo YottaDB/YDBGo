@@ -25,13 +25,13 @@ Its use of the `Node` type to pin memory references to database subscript string
 	n.Child("first").Set("Joe")
 	n.Child("last").Set("Bloggs")
 	for x := range n.Iterate() {
-		fmt.Printf("%s = %s\n", x, yottadb.Quote(x.Get()))
+		fmt.Printf("%s = %s\n", x, x.Get())
 	}
 
 Output:
 
-	person("name","first") = "Joe"
-	person("name","last") = "Bloggs"
+	person("name","first") = Joe
+	person("name","last") = Bloggs
 
 # Installation
 

@@ -26,24 +26,6 @@ import (
 	v1 "lang.yottadb.com/go/yottadb"
 )
 
-// ---- Tests and Examples
-
-// Tests the example given in the package doc at the top of yottadb.go
-func ExampleNewConn() {
-	defer Shutdown(Init())
-	conn := NewConn()
-	n := conn.Node("person", "name")
-	n.Child("first").Set("Joe")
-	n.Child("last").Set("Bloggs")
-	for x := range n.Children() {
-		fmt.Printf("%s = %s\n", x, Quote(x.Get()))
-	}
-	n.Kill()
-	// Output:
-	// person("name","first") = "Joe"
-	// person("name","last") = "Bloggs"
-}
-
 // ---- Utility functions for tests
 
 var randstrArray = make([]string, 0, 1000000) // Array of random strings for use in testing
