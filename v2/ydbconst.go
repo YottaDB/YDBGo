@@ -7,7 +7,7 @@ import "C"
 
 // Define constants exported by YottaDB
 //
-// Note: YDB_ERR_* error constants are defined in sub-package ydberr.
+// Note: YDB_ERR_* error constants are defined in sub-package [pkg/lang.yottadb.com/go/yottadb/v2/ydberr].
 const (
 	// YottaDB Enum constants
 	YDB_DEL_NODE               = C.YDB_DEL_NODE

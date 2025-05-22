@@ -10,27 +10,8 @@
 //
 //////////////////////////////////////////////////////////////////
 
-// Package yottadb is a Go wrapper for a YottaDB database.
-//
-// The package requires Go 1.24. It uses CGo to interface between this Go wrapper and the YottaDB engine written in C.
-// Its use of the `Node` type to pin memory references to database subscript strings gives it optimal speed.
-//
-// Example:
-//
-//	package yottadb
-//	defer yottadb.Shutdown(yottadb.Init())
-//	conn := yottadb.NewConn()
-//	n := conn.Node("person", "name")
-//	n.Child("first").Set("Joe")
-//	n.Child("last").Set("Bloggs")
-//	for x := range n.Iterate() {
-//	  fmt.Printf("%s = %s\n", x, yottadb.Quote(x.Get()))
-//	}
-//
-// Output:
-//
-//	person("name","first") = "Joe"
-//	person("name","last") = "Bloggs"
+// See package doc in doc.go
+
 package yottadb
 
 // go 1.24 required for the use of AddCleanup() instead of SetFinalizer(), and to run tests: testing.Loop
@@ -49,9 +30,9 @@ import "C"
 
 // ---- Release version constants - be sure to change all of them appropriately
 
-// MinimumYDBRelease - (string) Minimum YottaDB release name required by this wrapper.
+// MinYDBRelease - (string) Minimum YottaDB release name required by this wrapper.
 // This is checked on init.
-const MinimumYDBRelease string = "r1.34"
+const MinYDBRelease string = "r1.34"
 
 // WrapperRelease - (string) The Go wrapper release version for YottaDB SimpleAPI. Note the third piece of this version
 // will be even for a production release and odd for a development release. When released, depending

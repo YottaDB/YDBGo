@@ -321,13 +321,13 @@ func initializeYottaDB() {
 	if err != nil {
 		panic(err) // shouldn't happen due to check above
 	}
-	minimumYDBRelease, err := strconv.ParseFloat(MinimumYDBRelease[1:], 64)
+	minYDBRelease, err := strconv.ParseFloat(MinYDBRelease[1:], 64)
 	if err != nil {
-		panic("source code constant MinimumYDBRelease is not formatted correctly as rX.YY")
+		panic("source code constant MinYDBRelease is not formatted correctly as rX.YY")
 	}
-	if minimumYDBRelease > runningYDBRelease {
+	if minYDBRelease > runningYDBRelease {
 		panic(fmt.Sprintf("YDBGo: Not running with at least minimum YottaDB release. Needed: %s  Have: r%s.%s",
-			MinimumYDBRelease, releaseMajorStr, releaseMinorStr))
+			MinYDBRelease, releaseMajorStr, releaseMinorStr))
 	}
 	// Start up a goroutine for each signal we want to be notified of. This is so that if one signal is in process,
 	// we can still catch a different signal and deliver it appropriately (probably to the same goroutine). For each signal,

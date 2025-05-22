@@ -11,6 +11,7 @@
 #								#
 #################################################################
 
+# This program is run by `go generate`
 # Usage: gen_error_codes.sh <errfile> [<constfile>] <err_package]]
 #
 # Generates files <errfile>.{go,h} and <constfile>.{go,h}
@@ -115,7 +116,7 @@ EOF
 # Note: the following must be sorted so that in the pipeline, there will be no change in error_codes.go even when the latest .h files have moved some definitions
 if [ "$err_package" != "yottadb" ]; then
     echo >>$constfile.go "//"
-    echo >>$constfile.go "// Note: YDB_ERR_* error constants are defined in sub-package ydberr."
+    echo >>$constfile.go "// Note: YDB_ERR_* error constants are defined in sub-package [pkg/lang.yottadb.com/go/yottadb/v2/ydberr]."
 fi
 echo >>$constfile.go "const ("
 echo >>$constfile.go -e "\t// YottaDB Enum constants"

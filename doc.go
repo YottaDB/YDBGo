@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2018-2023 YottaDB LLC and/or its subsidiaries.	//
+// Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -13,7 +13,13 @@
 /*
 Package yottadb provides a Go wrapper for YottaDB - a mature, high performance, transactional NoSQL engine with proven speed and stability.
 
-YottaDB Quick Start
+# v2
+
+v2 docs are at [pkg/lang.yottadb.com/go/yottadb/v2].
+
+Deprecated: This doc is for the deprecated v1.
+
+# YottaDB Quick Start
 
 Before starting, consider reading the introduction to YottaDB's data model at https://docs.yottadb.com/MultiLangProgGuide/MultiLangProgGuide.html#concepts
 
@@ -27,32 +33,32 @@ described at https://yottadb.com/product/get-started/.
 
 After installing YottaDB, install the Go wrapper:
 
-    go get lang.yottadb.com/go/yottadb
+	go get lang.yottadb.com/go/yottadb
 
-Easy API
+# Easy API
 
 The Easy API provides a set of functions that are very easy to use at the expense of
 some additional copies for each operation. These functions all end with the letter 'E',
 and are available in the yottadb package. They include:
 
-    - DataE
-    - DeleteE
-    - DeleteExclE
-    - IncrE
-    - LockDecrE
-    - LockIncrE
-    - LockE
-    - NodeNextE
-    - NodePrevE
-    - SetValE
-    - SubNextE
-    - SubPrevE
-    - TpE
-    - ValE
+  - DataE
+  - DeleteE
+  - DeleteExclE
+  - IncrE
+  - LockDecrE
+  - LockIncrE
+  - LockE
+  - NodeNextE
+  - NodePrevE
+  - SetValE
+  - SubNextE
+  - SubPrevE
+  - TpE
+  - ValE
 
 Please see the Easy API example below for usage.
 
-Simple API
+# Simple API
 
 The simple API provides a better one-to-one mapping to the underlying C API, and
 provides better performance at the cost of convenience. These functions are mostly
@@ -72,14 +78,14 @@ Note - freeing a never allocated or already freed structure does NOT cause an er
 
 Please see the Simple API example below for usage.
 
-Transactions in YottaDB
+# Transactions in YottaDB
 
 YottaDB implements strong ACID transactions see https://en.wikipedia.org/wiki/ACID_(computer_science).
 Please review the documentation related to transactions in YottaDB at https://docs.yottadb.com/MultiLangProgGuide/MultiLangProgGuide.html#transaction-processing
 
 To use YottaDB transactions in Go, please see the Transaction Example below for further information.
 
-Go Error Interface
+# Go Error Interface
 
 YottaDB has a comprehensive set of error return codes. Each has a unique
 number and a mnemonic. Thus, for example, to return an error that a

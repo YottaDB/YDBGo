@@ -10,6 +10,7 @@
 //
 //////////////////////////////////////////////////////////////////
 
+// YottaDB constants generated from YottaDB source
 package ydberr
 
 // // The next line lets error_codes.go find libyottadb
