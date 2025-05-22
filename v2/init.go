@@ -162,11 +162,12 @@ func SignalNotify(sig os.Signal, notifyChan chan os.Signal, ackChan chan struct{
 	sigNotificationMap.Store(sig, sigNotificationEntry{notifyChan, ackChan, notifyWhen})
 }
 
-// SignalReset removes a notification request for the given signal.
+// SignalReset removes a notification request for the given signals.
 // No error is raised if the signal did not already have a notification request in effect.
-func SignalReset(sig syscall.Signal) {
-	validateNotifySignal(sig)
-	sigNotificationMap.Delete(sig)
+func SignalReset(signals ...os.Signal) {
+	for _, sig := range signals {
+		sigNotificationMap.Delete(sig)
+	}
 }
 
 // shutdownSignalGoroutines is a function to stop the signal handling goroutines used to tell the YDB engine what signals
@@ -501,10 +502,9 @@ type DB struct{}
 // Although Init could be made to be called automatically, this more explicit approach clarifies that Shutdown() MUST be
 // called before process exit. Init may be called multiple times (e.g. by different goroutines) but [Shutdown]() must be
 // called exactly once for each time Init() was called. See [Shutdown] for more detail on the fallout from incorrect usage.
-func Init() DB {
+func Init() *DB {
 	initializeYottaDB()
-	var ret DB
-	return ret
+	return &DB{}
 }
 
 // Shutdown invokes YottaDB's rundown function ydb_exit() to shut down the database properly.
@@ -532,7 +532,7 @@ func Init() DB {
 // [Go Using Signals]: https://docs.yottadb.com/MultiLangProgGuide/goprogram.html#go-using-signals
 //
 // [exceptions]: https://github.com/golang/go/issues/20713#issuecomment-1518197679
-func Shutdown(handle DB) error {
+func Shutdown(handle *DB) error {
 	// use the same mutex as Init because we don't want either to run simultaneously
 	inInit.Lock()         // One goroutine at a time through here else we can get DATA-RACE warnings accessing wgexit wait group
 	defer inInit.Unlock() // Release lock when we leave this routine

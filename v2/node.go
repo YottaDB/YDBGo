@@ -158,7 +158,7 @@ func (parent *Node) Clone() (clone *Node) {
 	return parent.conn._Node(parent)
 }
 
-// Quite adds quotes around string for display purposes if it cannot be represented as a number.
+// Quote adds quotes around string for display purposes if it cannot be represented as a number as YottaDB would display it.
 //   - The input value is treated as a string if it cannot be converted, unchanged, to and from float64
 //     using [strconv.ParseFloat](value, 64) and [strconv.FormatFloat](number, 'f', -1, 64)
 //   - This is exported so that the user can validate against the same conversion that is used by the YDBGo.
