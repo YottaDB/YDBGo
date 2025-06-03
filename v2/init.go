@@ -32,6 +32,8 @@ import (
 // extern void *ydb_signal_exit_callback(void);
 import "C"
 
+// ---- Signal Handling
+
 // sigInfo holds info for each signal that YDBGo handles and defers to YottaDB.
 type sigInfo struct {
 	signal       os.Signal      // signal number for this entry
@@ -169,196 +171,6 @@ func SignalReset(signals ...os.Signal) {
 	}
 }
 
-// sutdownSignalGoroutine tells routine for signal sig to shutdown.
-// This is Non-blocking.
-func shutdownSignalGoroutine(info *sigInfo) {
-	// Perform non-blocking send
-	select {
-	// Wake up signal goroutine and make it exit
-	case info.shutdownNow <- struct{}{}:
-	default:
-	}
-}
-
-// shutdownSignalGoroutines is a function to stop the signal handling goroutines used to tell the YDB engine what signals
-// have occurred. No signals are recognized by the Go wrapper or YottaDB once this is done. All signal handling reverts to
-// Go standard handling.
-func shutdownSignalGoroutines() {
-	printEntry("shutdownSignalGoroutines")
-	shutdownSigGoroutinesMutex.Lock()
-	if shutdownSigGoroutines { // Nothing to do if already done
-		shutdownSigGoroutinesMutex.Unlock()
-		if dbgSigHandling {
-			fmt.Println("YDBGo: shutdownSignalGoroutines: Bypass shutdownSignalGoroutines as it has already run")
-		}
-		return
-	}
-	// Send shutdown signal to each goroutine
-	for _, sig := range YDBSignals {
-		value, _ := ydbSignalMap.Load(sig)
-		shutdownSignalGoroutine(value.(*sigInfo))
-	}
-	// Wait for the signal goroutines to exit but with a timeout
-	doneChan := make(chan struct{})
-	go func() {
-		// Loop handling channel notifications as goroutines shutdown. If we are currently handling a fatal signal
-		// like a SIGQUIT, that channel is active but is busy so will not respond to a shutdown request. For this
-		// reason, we treat active goroutines the same as successfully shutdown goroutines so we don't delay
-		// shutdown. No need to wait for something that is likely to not occur (The YottaDB handlers for fatal signals
-		// drive a process-ending panic and never return).
-		for {
-			<-ydbShutdownCheck // A goroutine finished - check if all are shutdown or otherwise busy
-			done := true
-			for _, sig := range YDBSignals {
-				value, _ := ydbSignalMap.Load(sig)
-				sigData := value.(*sigInfo)
-				shutdownDone := sigData.shutdownDone.Load()
-				signalActive := sigData.servicing.Load()
-				if !shutdownDone && !signalActive {
-					// A goroutine is not shutdown and not active so to wait for more
-					// goroutine(s) to complete, break out of this scan loop
-					done = false
-					break
-				}
-			}
-			if done {
-				close(doneChan) // Notify select loop below that this is complete
-				return
-			}
-		}
-	}()
-	select {
-	case <-doneChan: // All signal monitoring goroutines are shutdown or are busy!
-		if dbgSigHandling {
-			fmt.Fprintln(os.Stderr, "YDBGo: shutdownSignalGoroutines: All signal goroutines successfully closed or active")
-		}
-	case <-time.After(MaxSigShutdownWait):
-		// Notify syslog that this timeout happened
-		if dbgSigHandling {
-			fmt.Fprintln(os.Stderr, "YDBGo: shutdownSignalGoroutines: Timeout! Some signal goroutines did not shutdown")
-		}
-		errstr := getWrapperErrorMsg(ydberr.SIGGORTNTIMEOUT)
-		syslogEntry(errstr)
-	}
-	shutdownSigGoroutines = true
-	shutdownSigGoroutinesMutex.Unlock()
-	// All signal routines should be finished or otherwise occupied
-	if dbgSigHandling {
-		fmt.Fprintln(os.Stderr, "YDBGo: shutdownSignalGoroutines: Channel closings complete")
-	}
-}
-
-// signalExitCallback is called from C by YottaDB to perform an exit when YottaDB gets a fatal signal.
-// Its purpose make sure defers get called before exit, which it does by calling panic.
-// This function is passed to YottaDB during init by ydb_main_lang_init().
-// YDB calls this exit handler after rundown (equivalent to ydb_exit()).
-// The sigNum parameter is reported in the panic message.
-//
-//export signalExitCallback
-func signalExitCallback(sigNum C.int) {
-	printEntry("YDBWrapperPanic()")
-	ydbSigPanicCalled.Store(true) // Need "atomic" usage to avoid read/write DATA RACE issues
-	shutdownSignalGoroutines()    // Close the goroutines down with their signal notification channels
-	sig := syscall.Signal(sigNum) // Convert numeric signal number to Signal type for use in panic() message
-	panic(fmt.Sprintf("YDBGo: Fatal signal %d (%v) occurred", sig, sig))
-}
-
-var initCount atomic.Int64 // Increment when Init() called and decrement when Shutdown() called; shutdown when it reaches 0
-
-// initializeYottaDB initializes the YottaDB engine if necessary.
-// This is an atypical method of doing simple API initialization compared to
-// other language APIs, where you can just make any API call, and initialization is automatic.
-// But the Go wrapper needs to do its initialization differently to setup signal handling differently.
-// Usually, YottaDB sets up its signal handling, but to work well with Go, Go itself needs to do the
-// signal handling and forward it as needed to the YottaDB engine.
-func initializeYottaDB() {
-	var releaseMajorStr, releaseMinorStr string
-
-	inInit.Lock()
-	defer inInit.Unlock()     // Release lock when we leave this routine
-	if initCount.Add(1) > 1 { // Must increment this before calling NewConn() below or it will fail initCheck()
-		return // already initialized
-	}
-
-	// Init YottaDB engine/runtime
-	// In Go, instead of ydb_init(), use ydb_main_lang_init() which lets us pass an exit handler for YDB to call on fatal signals.
-	// We must make the exit handler panic to ensure defers get called before exit.
-	// YDB calls the exit handler after rundown (equivalent to ydb_exit()).
-	printEntry("initializeYottaDB()")
-	rc := C.ydb_main_lang_init(C.YDB_MAIN_LANG_GO, C.ydb_signal_exit_callback)
-	if rc != YDB_OK {
-		panic(fmt.Sprintf("YDBGo: YottaDB initialization failed with return code %d", rc))
-	}
-
-	releaseInfoString := NewConn().Node("$ZYRELEASE").Get()
-
-	// The returned output should have the YottaDB version as the 2nd token in the form rX.YY[Y] where:
-	//   - 'r' is a fixed character
-	//   - X is a numeric digit specifying the major version number
-	//   - YY[Y] are basically the remaining digits and specify the minor release number.
-	releaseInfoTokens := strings.Fields(releaseInfoString)
-	releaseNumberStr := releaseInfoTokens[1] // Fetch second token
-	if releaseNumberStr[:1] != "r" {         // Better start with 'r'
-		panic(fmt.Sprintf("YDBGo: expected $ZYRELEASE to start with 'r' but it returned: %s", releaseInfoString))
-	}
-	releaseNumberStr = releaseNumberStr[1:]          // Remove starting 'r' in the release number
-	dotIndex := strings.Index(releaseNumberStr, ".") // Look for the decimal point that separates major/minor values
-	if dotIndex >= 0 {                               // Decimal point found
-		releaseMajorStr = string(releaseNumberStr[:dotIndex])
-		releaseMinorStr = string(releaseNumberStr[dotIndex+1:])
-	} else {
-		releaseMajorStr = releaseNumberStr // Isolate the major version number
-		releaseMinorStr = "00"
-	}
-	// Note it is possible for either the major or minor release values to have a single letter suffix that is primarily
-	// for use in a development environment (no production releases have character suffixes). If we get an error, try
-	// removing a char off the end and retry.
-	// The possibility of major release having a letter suffix prevents the use of fmt.Scanf()
-	_, err := strconv.Atoi(releaseMajorStr)
-	if err != nil {
-		releaseMajorStr = releaseMajorStr[:len(releaseMajorStr)-1]
-		_, err = strconv.Atoi(releaseMajorStr)
-		if err != nil {
-			panic(fmt.Sprintf("YDBGo: Failure trying to convert $ZYRELEASE major release number to integer: %s", err))
-		}
-	}
-	_, err = strconv.Atoi(releaseMinorStr)
-	if err != nil { // Strip off last char and try again
-		releaseMinorStr = releaseMinorStr[:len(releaseMinorStr)-1]
-		_, err = strconv.Atoi(releaseMinorStr)
-		if err != nil {
-			panic(fmt.Sprintf("YDBGo: Failure trying to convert $ZYRELEASE minor release number to integer: %s", err))
-		}
-	}
-	// Verify we are running with the minimum YottaDB version or later
-	runningYDBRelease, err := strconv.ParseFloat(releaseMajorStr+"."+releaseMinorStr, 64)
-	if err != nil {
-		panic(err) // shouldn't happen due to check above
-	}
-	minYDBRelease, err := strconv.ParseFloat(MinYDBRelease[1:], 64)
-	if err != nil {
-		panic("source code constant MinYDBRelease is not formatted correctly as rX.YY")
-	}
-	if minYDBRelease > runningYDBRelease {
-		panic(fmt.Sprintf("YDBGo: Not running with at least minimum YottaDB release. Needed: %s  Have: r%s.%s",
-			MinYDBRelease, releaseMajorStr, releaseMinorStr))
-	}
-
-	// Start up a goroutine for each signal we want to be notified of. This is so that if one signal is in process,
-	// we can still catch a different signal and deliver it appropriately (probably to the same goroutine). For each signal,
-	// bump our wait group counter so we don't proceed until all of these goroutines are initialized.
-	// If you need to handle any more or fewer signals, alter YDBSignals at the top of this module.
-	for _, sig := range YDBSignals {
-		// Populate ydbSignalMap
-		info := sigInfo{sig, nil, make(chan struct{}), atomic.Bool{}, atomic.Bool{}, NewConn()}
-		ydbSignalMap.Store(sig, &info)
-		wgSigInit.Add(1) // Indicate this signal goroutine is not yet initialized
-		go handleSignal(&info)
-	}
-	// Now wait for the goroutine to initialize and get signals all set up. When that is done, we can return
-	wgSigInit.Wait()
-}
-
 // NotifyYDB calls the YottaDB signal handler for sig.
 // Return whether YottaDB returned a CALLINAFTEREXIT error.
 // If YottaDB deferred handling of the signal, return false; otherwise return true.
@@ -458,6 +270,198 @@ func handleSignal(info *sigInfo) {
 	}
 	info.shutdownDone.Store(true)  // Indicate this channel is closed
 	ydbShutdownCheck <- struct{}{} // Notify shutdownSignalGoroutines that it needs to check if all channels closed now
+}
+
+// sutdownSignalGoroutine tells routine for signal sig to shutdown.
+// This is Non-blocking.
+func shutdownSignalGoroutine(info *sigInfo) {
+	// Perform non-blocking send
+	select {
+	// Wake up signal goroutine and make it exit
+	case info.shutdownNow <- struct{}{}:
+	default:
+	}
+}
+
+// shutdownSignalGoroutines is a function to stop the signal handling goroutines used to tell the YDB engine what signals
+// have occurred. No signals are recognized by the Go wrapper or YottaDB once this is done. All signal handling reverts to
+// Go standard handling.
+func shutdownSignalGoroutines() {
+	printEntry("shutdownSignalGoroutines")
+	shutdownSigGoroutinesMutex.Lock()
+	if shutdownSigGoroutines { // Nothing to do if already done
+		shutdownSigGoroutinesMutex.Unlock()
+		if dbgSigHandling {
+			fmt.Println("YDBGo: shutdownSignalGoroutines: Bypass shutdownSignalGoroutines as it has already run")
+		}
+		return
+	}
+	// Send shutdown signal to each goroutine
+	for _, sig := range YDBSignals {
+		value, _ := ydbSignalMap.Load(sig)
+		shutdownSignalGoroutine(value.(*sigInfo))
+	}
+	// Wait for the signal goroutines to exit but with a timeout
+	doneChan := make(chan struct{})
+	go func() {
+		// Loop handling channel notifications as goroutines shutdown. If we are currently handling a fatal signal
+		// like a SIGQUIT, that channel is active but is busy so will not respond to a shutdown request. For this
+		// reason, we treat active goroutines the same as successfully shutdown goroutines so we don't delay
+		// shutdown. No need to wait for something that is likely to not occur (The YottaDB handlers for fatal signals
+		// drive a process-ending panic and never return).
+		for {
+			<-ydbShutdownCheck // A goroutine finished - check if all are shutdown or otherwise busy
+			done := true
+			for _, sig := range YDBSignals {
+				value, _ := ydbSignalMap.Load(sig)
+				sigData := value.(*sigInfo)
+				shutdownDone := sigData.shutdownDone.Load()
+				signalActive := sigData.servicing.Load()
+				if !shutdownDone && !signalActive {
+					// A goroutine is not shutdown and not active so to wait for more
+					// goroutine(s) to complete, break out of this scan loop
+					done = false
+					break
+				}
+			}
+			if done {
+				close(doneChan) // Notify select loop below that this is complete
+				return
+			}
+		}
+	}()
+	select {
+	case <-doneChan: // All signal monitoring goroutines are shutdown or are busy!
+		if dbgSigHandling {
+			fmt.Fprintln(os.Stderr, "YDBGo: shutdownSignalGoroutines: All signal goroutines successfully closed or active")
+		}
+	case <-time.After(MaxSigShutdownWait):
+		// Notify syslog that this timeout happened
+		if dbgSigHandling {
+			fmt.Fprintln(os.Stderr, "YDBGo: shutdownSignalGoroutines: Timeout! Some signal goroutines did not shutdown")
+		}
+		errstr := getWrapperErrorMsg(ydberr.SIGGORTNTIMEOUT)
+		syslogEntry(errstr)
+	}
+	shutdownSigGoroutines = true
+	shutdownSigGoroutinesMutex.Unlock()
+	// All signal routines should be finished or otherwise occupied
+	if dbgSigHandling {
+		fmt.Fprintln(os.Stderr, "YDBGo: shutdownSignalGoroutines: Channel closings complete")
+	}
+}
+
+// signalExitCallback is called from C by YottaDB to perform an exit when YottaDB gets a fatal signal.
+// Its purpose make sure defers get called before exit, which it does by calling panic.
+// This function is passed to YottaDB during init by ydb_main_lang_init().
+// YDB calls this exit handler after rundown (equivalent to ydb_exit()).
+// The sigNum parameter is reported in the panic message.
+//
+//export signalExitCallback
+func signalExitCallback(sigNum C.int) {
+	printEntry("YDBWrapperPanic()")
+	ydbSigPanicCalled.Store(true) // Need "atomic" usage to avoid read/write DATA RACE issues
+	shutdownSignalGoroutines()    // Close the goroutines down with their signal notification channels
+	sig := syscall.Signal(sigNum) // Convert numeric signal number to Signal type for use in panic() message
+	panic(fmt.Sprintf("YDBGo: Fatal signal %d (%v) occurred", sig, sig))
+}
+
+// ---- Init and Exit
+
+var initCount atomic.Int64 // Increment when Init() called and decrement when Shutdown() called; shutdown when it reaches 0
+
+// initializeYottaDB initializes the YottaDB engine if necessary.
+// This is an atypical method of doing simple API initialization compared to
+// other language APIs, where you can just make any API call, and initialization is automatic.
+// But the Go wrapper needs to do its initialization differently to setup signal handling differently.
+// Usually, YottaDB sets up its signal handling, but to work well with Go, Go itself needs to do the
+// signal handling and forward it as needed to the YottaDB engine.
+func initializeYottaDB() {
+	var releaseMajorStr, releaseMinorStr string
+
+	inInit.Lock()
+	defer inInit.Unlock()     // Release lock when we leave this routine
+	if initCount.Add(1) > 1 { // Must increment this before calling NewConn() below or it will fail initCheck()
+		return // already initialized
+	}
+
+	// Init YottaDB engine/runtime
+	// In Go, instead of ydb_init(), use ydb_main_lang_init() which lets us pass an exit handler for YDB to call on fatal signals.
+	// We must make the exit handler panic to ensure defers get called before exit.
+	// YDB calls the exit handler after rundown (equivalent to ydb_exit()).
+	printEntry("initializeYottaDB()")
+	rc := C.ydb_main_lang_init(C.YDB_MAIN_LANG_GO, C.ydb_signal_exit_callback)
+	if rc != YDB_OK {
+		panic(fmt.Sprintf("YDBGo: YottaDB initialization failed with return code %d", rc))
+	}
+
+	releaseInfoString := NewConn().Node("$ZYRELEASE").Get()
+
+	// The returned output should have the YottaDB version as the 2nd token in the form rX.YY[Y] where:
+	//   - 'r' is a fixed character
+	//   - X is a numeric digit specifying the major version number
+	//   - YY[Y] are basically the remaining digits and specify the minor release number.
+	releaseInfoTokens := strings.Fields(releaseInfoString)
+	releaseNumberStr := releaseInfoTokens[1] // Fetch second token
+	if releaseNumberStr[:1] != "r" {         // Better start with 'r'
+		panic(fmt.Sprintf("YDBGo: expected $ZYRELEASE to start with 'r' but it returned: %s", releaseInfoString))
+	}
+	releaseNumberStr = releaseNumberStr[1:]          // Remove starting 'r' in the release number
+	dotIndex := strings.Index(releaseNumberStr, ".") // Look for the decimal point that separates major/minor values
+	if dotIndex >= 0 {                               // Decimal point found
+		releaseMajorStr = string(releaseNumberStr[:dotIndex])
+		releaseMinorStr = string(releaseNumberStr[dotIndex+1:])
+	} else {
+		releaseMajorStr = releaseNumberStr // Isolate the major version number
+		releaseMinorStr = "00"
+	}
+	// Note it is possible for either the major or minor release values to have a single letter suffix that is primarily
+	// for use in a development environment (no production releases have character suffixes). If we get an error, try
+	// removing a char off the end and retry.
+	// The possibility of major release having a letter suffix prevents the use of fmt.Scanf()
+	_, err := strconv.Atoi(releaseMajorStr)
+	if err != nil {
+		releaseMajorStr = releaseMajorStr[:len(releaseMajorStr)-1]
+		_, err = strconv.Atoi(releaseMajorStr)
+		if err != nil {
+			panic(fmt.Sprintf("YDBGo: Failure trying to convert $ZYRELEASE major release number to integer: %s", err))
+		}
+	}
+	_, err = strconv.Atoi(releaseMinorStr)
+	if err != nil { // Strip off last char and try again
+		releaseMinorStr = releaseMinorStr[:len(releaseMinorStr)-1]
+		_, err = strconv.Atoi(releaseMinorStr)
+		if err != nil {
+			panic(fmt.Sprintf("YDBGo: Failure trying to convert $ZYRELEASE minor release number to integer: %s", err))
+		}
+	}
+	// Verify we are running with the minimum YottaDB version or later
+	runningYDBRelease, err := strconv.ParseFloat(releaseMajorStr+"."+releaseMinorStr, 64)
+	if err != nil {
+		panic(err) // shouldn't happen due to check above
+	}
+	minYDBRelease, err := strconv.ParseFloat(MinYDBRelease[1:], 64)
+	if err != nil {
+		panic("source code constant MinYDBRelease is not formatted correctly as rX.YY")
+	}
+	if minYDBRelease > runningYDBRelease {
+		panic(fmt.Sprintf("YDBGo: Not running with at least minimum YottaDB release. Needed: %s  Have: r%s.%s",
+			MinYDBRelease, releaseMajorStr, releaseMinorStr))
+	}
+
+	// Start up a goroutine for each signal we want to be notified of. This is so that if one signal is in process,
+	// we can still catch a different signal and deliver it appropriately (probably to the same goroutine). For each signal,
+	// bump our wait group counter so we don't proceed until all of these goroutines are initialized.
+	// If you need to handle any more or fewer signals, alter YDBSignals at the top of this module.
+	for _, sig := range YDBSignals {
+		// Populate ydbSignalMap
+		info := sigInfo{sig, nil, make(chan struct{}), atomic.Bool{}, atomic.Bool{}, NewConn()}
+		ydbSignalMap.Store(sig, &info)
+		wgSigInit.Add(1) // Indicate this signal goroutine is not yet initialized
+		go handleSignal(&info)
+	}
+	// Now wait for the goroutine to initialize and get signals all set up. When that is done, we can return
+	wgSigInit.Wait()
 }
 
 // initCheck Panics if Init() has not been called
