@@ -90,9 +90,9 @@ func Benchmark________________________________(b *testing.B) {
 	b.Skip()
 }
 
-func setupLogger(test_dir string, verbose bool) (*log.Logger, *os.File) {
-	test_log_file := filepath.Join(test_dir, "output.log")
-	f, err := os.OpenFile(test_log_file, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+func setupLogger(testDir string, verbose bool) (*log.Logger, *os.File) {
+	testLogFile := filepath.Join(testDir, "output.log")
+	f, err := os.OpenFile(testLogFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -104,22 +104,22 @@ func setupLogger(test_dir string, verbose bool) (*log.Logger, *os.File) {
 	return logger, f
 }
 
-func createDatabase(test_dir string, logger *log.Logger) string {
+func createDatabase(testDir string, logger *log.Logger) string {
 	// Setup environment variables
-	logger.Printf("Test directory is %s", test_dir)
-	ydb_gbldir := filepath.Join(test_dir, "mumps.gld")
-	ydb_datfile := filepath.Join(test_dir, "mumps.dat")
-	os.Setenv("ydb_gbldir", ydb_gbldir)
-	ydb_dist := os.Getenv("ydb_dist")
-	if ydb_dist == "" {
+	logger.Printf("Test directory is %s", testDir)
+	ydbGbldir := filepath.Join(testDir, "mumps.gld")
+	ydbDatfile := filepath.Join(testDir, "mumps.dat")
+	os.Setenv("ydb_gbldir", ydbGbldir)
+	ydbDist := os.Getenv("ydb_dist")
+	if ydbDist == "" {
 		panic("ydb_dist must be set")
 	}
-	mumps_exe := filepath.Join(ydb_dist, "mumps")
-	mupip_exe := filepath.Join(ydb_dist, "mupip")
+	mumpsExe := filepath.Join(ydbDist, "mumps")
+	mupipExe := filepath.Join(ydbDist, "mupip")
 
 	// Create global directory
-	cmd := exec.Command(mumps_exe, "-run", "^GDE",
-		"change -seg DEFAULT -file="+ydb_datfile)
+	cmd := exec.Command(mumpsExe, "-run", "^GDE",
+		"change -seg DEFAULT -file="+ydbDatfile)
 	output, err := cmd.CombinedOutput()
 	logger.Printf("%s\n", output)
 	if err != nil {
@@ -127,25 +127,25 @@ func createDatabase(test_dir string, logger *log.Logger) string {
 	}
 
 	// Create database itself
-	cmd = exec.Command(mupip_exe, "create")
+	cmd = exec.Command(mupipExe, "create")
 	output, err = cmd.CombinedOutput()
 	logger.Printf("%s\n", output)
 	if err != nil {
 		logger.Fatal(err)
 	}
-	return test_dir
+	return testDir
 }
 
-func cleanupDatabase(logger *log.Logger, test_dir string) {
+func cleanupDatabase(logger *log.Logger, testDir string) {
 	logger.Printf("Cleaning up test directory")
-	os.RemoveAll(test_dir)
+	os.RemoveAll(testDir)
 }
 
 // _testMain is factored out of TestMain to let us defer Init() properly
 // since os.Exit() must not be run in the same function as defer.
 func _testMain(m *testing.M) int {
 	// Get a temporary directory to put the database and logfile in
-	test_dir, err := os.MkdirTemp("", "ydbgotest-")
+	testDir, err := os.MkdirTemp("", "ydbgotest-")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -157,16 +157,16 @@ func _testMain(m *testing.M) int {
 			verbose = true
 		}
 	}
-	logger, logfile := setupLogger(test_dir, verbose)
+	logger, logfile := setupLogger(testDir, verbose)
 	defer logfile.Close()
 
 	// Create test database if necessary.
 	// Determine if this is an invocation of "go test" from the YDBTest repo (YottaDB test system).
 	// If so, skip temporary database setup as test system sets up databases with random parameters
 	// (qdbrundown, replication etc.) and will get more coverage using that database than this on-the-fly database.
-	_, is_ydbtest_invocation := os.LookupEnv("tst_working_dir")
-	if !is_ydbtest_invocation {
-		test_dir = createDatabase(test_dir, logger)
+	_, isYDBTestInvocation := os.LookupEnv("tst_working_dir")
+	if !isYDBTestInvocation {
+		testDir = createDatabase(testDir, logger)
 	}
 
 	// run init/exit for both v1 and v2 code so we can compare them
@@ -184,8 +184,8 @@ func _testMain(m *testing.M) int {
 	}
 
 	// Cleanup the temp directory, but leave it if we are in verbose mode or the test failed
-	if !is_ydbtest_invocation && !verbose && ret == 0 {
-		cleanupDatabase(logger, test_dir)
+	if !isYDBTestInvocation && !verbose && ret == 0 {
+		cleanupDatabase(logger, testDir)
 	}
 	return ret
 }

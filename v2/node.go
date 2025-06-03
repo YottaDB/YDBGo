@@ -146,16 +146,16 @@ func (conn *Conn) CloneNode(n *Node) *Node {
 
 // Child creates a child node of parent that represents parent with subscripts appended.
 //   - [Node.Clone]() without parameters is equivalent to [Node.Child]() without parameters.
-func (parent *Node) Child(subscripts ...string) (n *Node) {
-	return parent.conn._Node(parent, subscripts...)
+func (n *Node) Child(subscripts ...string) (child *Node) {
+	return n.conn._Node(n, subscripts...)
 }
 
 // Clone creates an immutable copy of node.
 //   - [Node.Clone]() is equivalent to calling [Node.Child]() without parameters.
 //
 // See [Node.IsMutable]() for notes on mutability.
-func (parent *Node) Clone() (clone *Node) {
-	return parent.conn._Node(parent)
+func (n *Node) Clone() (clone *Node) {
+	return n.conn._Node(n)
 }
 
 // Quote adds quotes around string for display purposes if it cannot be represented as a number as YottaDB would display it.
@@ -333,7 +333,7 @@ func (n *Node) Kill() {
 	}
 }
 
-// Delete the node value, not its child subscripts.
+// Clear deletes the node value, not its child subscripts.
 //   - Equivalent to YottaDB M command ZKILL
 //   - Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
 func (n *Node) Clear() {

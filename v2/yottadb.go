@@ -20,7 +20,6 @@ package yottadb
 // go 1.19 required for sync/atomic -- safer than previous options
 
 import (
-	"sync/atomic"
 	"time"
 )
 
@@ -64,29 +63,10 @@ var (
 	MaxSigAckWait time.Duration = 10 * time.Second
 )
 
-// ---- Enums for signal functions
-
-// YDBHandlerFlag type is the flag type passed to yottadb.RegisterSignalNotify() to indicate when or whether the driver
-// should run the YottaDB signal handler. It must be set to one of the constants defined below.
-type YDBHandlerFlag int
-
-const (
-	NotifyBeforeYDBSigHandler    YDBHandlerFlag = iota + 1 // Request sending notification BEFORE running YDB signal handler
-	NotifyAfterYDBSigHandler                               // Request sending notification AFTER running YDB signal handler
-	NotifyAsyncYDBSigHandler                               // Notify user and run YDB handler simultaneously (non-fatal signals only)
-	NotifyInsteadOfYDBSigHandler                           // Do the signal notification but do NOT drive the YDB handler
-)
-
-const dbgSigHandling bool = false // Print extra info when running if true
-
-// ---- Init locks
-
-var ydbInitialized atomic.Bool    // Set to true when YDB has been initialized with a call to ydb_main_lang_init()
-var ydbSigPanicCalled atomic.Bool // True when our exit is panic driven due to a signal
-
 // ---- Debug settings
 
 var debug bool                    // false by default -- can be enabled by test/debugging code to turn things on
 const dbgPrintEPHdrs bool = false // Print entry point headers when routine is entered
+const dbgSigHandling bool = false // Print extra signal processing info when true
 
 //go:generate ../scripts/gen_error_codes.sh ydberr/error_codes ydbconst ydberr

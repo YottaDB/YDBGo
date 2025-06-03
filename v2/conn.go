@@ -235,7 +235,7 @@ func (conn *Conn) Zwr2Str(zstr string) (string, error) {
 }
 
 // Str2Zwr takes the given Go string and converts it to return a ZWRITE-formatted string
-//   - If the returned zwrite-formatted string does not fit within the maximum YottaDB string size, return a *YDBError with Code=ydberr.INVSTRLEN.
+//   - If the returned zwrite-formatted string does not fit within the maximum YottaDB string size, return a *Error with code=ydberr.INVSTRLEN.
 //     Otherwise, return the ZWRITE-formatted string.
 //   - Note that the length of a string in zwrite format is always greater than or equal to the string in its original, unencoded format.
 func (conn *Conn) Str2Zwr(str string) (string, error) {
@@ -344,7 +344,7 @@ type tpInfo struct {
 // [Transaction Processing]: https://docs.yottadb.com/ProgrammersGuide/langfeat.html#transaction-processing
 // [$trestart]: https://docs.yottadb.com/ProgrammersGuide/isv.html#trestart
 // [$tlevel]: https://docs.yottadb.com/ProgrammersGuide/isv.html#tlevel
-func (conn *Conn) Transaction(transId string, localsToRestore []string, callback func() int) bool {
+func (conn *Conn) Transaction(transID string, localsToRestore []string, callback func() int) bool {
 	cconn := conn.cconn
 	info := tpInfo{conn, callback}
 	handle := C.uintptr_t(cgo.NewHandle(info))
@@ -352,13 +352,13 @@ func (conn *Conn) Transaction(transId string, localsToRestore []string, callback
 	if len(localsToRestore) == 0 {
 		conn.prepAPI()
 		status = C.ydb_tp_st(cconn.tptoken, &cconn.errstr, C.ydb_tpfnptr_t(C.tp_callback_wrapper), unsafe.Pointer(&handle),
-			(*C.char)(unsafe.Pointer(unsafe.StringData(transId))), 0, nil)
+			(*C.char)(unsafe.Pointer(unsafe.StringData(transID))), 0, nil)
 	} else {
 		// use a Node type just as a handy way to store exclusions strings as a ydb_buffer_t array
 		namelist := conn.Node(localsToRestore[0], localsToRestore[1:]...)
 		conn.prepAPI()
 		status = C.ydb_tp_st(cconn.tptoken, &cconn.errstr, C.ydb_tpfnptr_t(C.tp_callback_wrapper), unsafe.Pointer(&handle),
-			(*C.char)(unsafe.Pointer(unsafe.StringData(transId))), C.int(len(localsToRestore)), &namelist.cnode.buffers)
+			(*C.char)(unsafe.Pointer(unsafe.StringData(transID))), C.int(len(localsToRestore)), &namelist.cnode.buffers)
 	}
 	if status == YDB_TP_ROLLBACK {
 		return false
@@ -371,7 +371,7 @@ func (conn *Conn) Transaction(transId string, localsToRestore []string, callback
 
 // TransactionFast is a faster version of Transaction that does not ensure durability,
 // for applications that do not require durability or have alternate durability mechanisms (such as checkpoints).
-// It is implemented by setting the transId to the special name "BATCH" as discussed in [Transaction Processing].
+// It is implemented by setting the transID to the special name "BATCH" as discussed in [Transaction Processing].
 //   - Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
 //
 // [Transaction Processing]: https://docs.yottadb.com/ProgrammersGuide/langfeat.html#transaction-processing
