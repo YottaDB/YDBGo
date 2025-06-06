@@ -10,54 +10,69 @@
 //
 //////////////////////////////////////////////////////////////////
 
+// ---- Error types for YottaDB errors, YDBGo Init errors, and YDBGo Signal errors
+
 package yottadb
 
 import (
-	"lang.yottadb.com/go/yottadb/v2/ydberr"
+	"errors"
 )
 
-// ---- Error type to contain/manage wrapper errors
-
-// Error is a structure that defines the error message format which includes both the formated $ZSTATUS
-// type message and the numeric error value.
-type Error struct {
-	code    int    // The error value (e.g. ydberr.DBFILERR, etc)
-	message string // The error string - generally from $ZSTATUS when available
+// Error is a base type for all errors produced by YDBGo, including various YDBGo-specific errors and also [YDBError] for YottaDB errors with code.
+type BaseError struct {
+	Message string // The error string - generally from $ZSTATUS when available
 }
 
-// Error is a type method of yottadb.Error to return the error message string.
-func (err *Error) Error() string {
-	return err.message
+// Error is a type method of [yottadb.Error] to return the error message string.
+func (err BaseError) Error() string {
+	return err.Message
 }
 
-// Code is a type method of yottadb.Error to return the error status code.
-// If err was supplied as a type error, then you'll need to cast it to type *Error as follows
+// YDBError type holds YottaDB errors including numeric error code and the formated $ZSTATUS message.
+// It embeds base error type [yottadb.BaseError] so that you can test [errors.Is](err, yottadb.BaseError)
+type YDBError struct {
+	BaseError
+	Code int // The error value (e.g. ydberr.INVSTRLEN, etc)
+}
+
+// Is lets [errors.Is]() search an error or chain of wrapped errors for a YDBError with a matching ydberr code.
+// See [ErrorIs]() for a more practical way to use this capability.
+// Only the error code is matched, not the message, to support YottaDB error messages that vary.
+func (err YDBError) Is(target error) bool {
+	t, ok := target.(YDBError)
+	return ok && err.Code == t.Code
+}
+
+// ErrorIs uses [errors.Is]() to search an error or chain of wrapped errors for a YDBError with a matching ydberr code.
+// Only the error code is matched, not the message, to support YottaDB error messages that vary.
+// For example, to test for YottaDB INVSTRLEN error:
 //
-//	status := err.(*Error).Code()
-func (err *Error) Code() int {
-	return err.code
+//	if ErrorIs(err, ydberr.INVSTRLEN) {
+//
+// is a short equivalent of:
+//
+//	if errors.Is(err, YDBError{BaseError{}, ydberr.INVSTRLEN}) {
+//
+// It differs from a simple type test using YDBError.Code in that it searches for a match in the entire chain of wrapped errors
+func ErrorIs(err error, code int) bool {
+	return errors.Is(err, YDBError{BaseError{}, code})
 }
 
-// newError returns error code and message as a yottadb.Error error type.
-func newError(code int, message string) error {
-	return &Error{code, message}
+// newYDBError returns error code and message as a [yottadb.Error] error type.
+func newYDBError(code int, message string) error {
+	return YDBError{BaseError{message}, code}
 }
 
-// ---- Simulate YDB error messages for certain Go-specific error conditions
+// ---- YDBGo errors (not from YottaDB)
 
-// ydbGoErrors is a map of error messages for the Go-specific set of errors.
-// These are sent to syslog, so are formatted in the same way as other YDB messages to syslog.
-var ydbGoErrors = map[int]string{
-	-ydberr.DBRNDWNBYPASS:   "%YDB-W-DBRNDWNBYPASS, YottaDB database rundown may have been bypassed due to timeout - run MUPIP JOURNAL ROLLBACK BACKWARD / MUPIP JOURNAL RECOVER BACKWARD / MUPIP RUNDOWN",
-	-ydberr.SIGACKTIMEOUT:   "%YDB-E-SIGACKTIMEOUT, Signal completion acknowledgement timeout: !AD",
-	-ydberr.SIGGORTNTIMEOUT: "%YDB-W-ERR_SIGGORTNTIMEOUT, Shutdown of signal goroutines timed out",
+type InitError struct {
+	BaseError
 }
 
-// getWrapperErrorMsg returns a Go-specific YottaDB-formatted error message given its error number.
-// If the error is not found in local list map of Go-specific errors, an empty string is returned.
-func getWrapperErrorMsg(errNum int) string {
-	if 0 > errNum {
-		errNum = -errNum
-	}
-	return ydbGoErrors[errNum]
+type ShutdownIncompleteError struct {
+	BaseError
+}
+
+type ShutdownSignalsError struct {
+	BaseError
 }

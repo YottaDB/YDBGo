@@ -24,7 +24,10 @@ import (
 
 // ExampleDoc tests the example given in the package doc at the top of doc.go
 func ExampleNewConn() {
-	db := yottadb.Init()
+	db, err := yottadb.Init()
+	if err != nil {
+		panic(err)
+	}
 	defer yottadb.Shutdown(db)
 	conn := yottadb.NewConn()
 	n := conn.Node("person", "name")

@@ -173,7 +173,12 @@ func _testMain(m *testing.M) int {
 	// Run v2 code last so that it sets signals to point to itself
 	v1.Init()
 	defer v1.Exit()
-	defer Shutdown(Init())
+	db, err := Init()
+	if err != nil {
+		panic(err)
+	}
+	defer Shutdown(db)
+
 	initRandstr()
 	ret := m.Run()
 

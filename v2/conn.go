@@ -43,8 +43,8 @@ int fill_buffer(ydb_buffer_t *buf, _GoString_ val) {
 	return len <= buf->len_alloc;
 }
 
-// C routine to get around the cgo issue and its lack of support for variadic plist routines
-void *get_ydb_lock_st_ptr(void) {
+// C routine to get address of ydb_lock_st() since CGo doesn't let you take the address of a variadic parameter-list function.
+void *getfunc_ydb_lock_st(void) {
         return (void *)&ydb_lock_st;
 }
 
@@ -76,13 +76,7 @@ func NewConn() *Conn {
 	initCheck()
 
 	var conn Conn
-	// This initial call must be to calloc() to get initialized (cleared) storage: due to a documented cgo bug
-	// we must not let Go store pointer values in uninitialized C-allocated memory or errors may result.
-	// See the cgo bug mentioned at https://golang.org/cmd/cgo/#hdr-Passing_pointers.
-	conn.cconn = (*C.conn)(C.calloc(1, C.sizeof_conn))
-	if conn.cconn == nil {
-		panic("YDBGo: out of memory when allocating new database connection")
-	}
+	conn.cconn = (*C.conn)(calloc(C.sizeof_conn)) // must use our calloc, not malloc: see calloc doc
 	conn.cconn.tptoken = C.YDB_NOTTP
 	// Create space for err
 	conn.cconn.errstr.buf_addr = (*C.char)(C.malloc(C.YDB_MAX_ERRORMSG))
@@ -155,7 +149,7 @@ func (conn *Conn) lastError(code C.int) error {
 	msg := conn.getErrorString()
 	if msg == "" { // See if msg is still empty (we set it to empty before calling the API in conn.prepAPI()
 		// This code gets run, for example, if ydb_exit() is called before a YDB function is invoked.
-		return newError(int(code), conn.recoverMessage(code))
+		return newYDBError(int(code), conn.recoverMessage(code))
 	}
 
 	pattern := ",(SimpleThreadAPI),"
@@ -163,10 +157,10 @@ func (conn *Conn) lastError(code C.int) error {
 	// If msg is improperly formatted, return it verbatim with a -1 code (this should never happen)
 	if index == -1 {
 		// If msg is improperly formatted, return it verbatim (this should never happen)
-		return fmt.Errorf("YDBGo: could not parse error message: %w", newError(-1, msg))
+		return fmt.Errorf("YDBGo: could not parse error message: %w", newYDBError(-1, msg))
 	}
 	text := msg[index+len(pattern):]
-	return newError(int(code), text)
+	return newYDBError(int(code), text)
 }
 
 // lastCode extracts the ydb error status code from the message stored by the previous YottaDB call.
@@ -181,12 +175,12 @@ func (conn *Conn) lastCode() C.int {
 	index := strings.Index(msg, ",")
 	if index == -1 {
 		// If msg is improperly formatted, return it verbatim with a -1 code (this should never happen)
-		panic(fmt.Errorf("YDBGo: could not parse error message: %w", newError(-1, msg)))
+		panic(fmt.Errorf("YDBGo: could not parse error message: %w", newYDBError(-1, msg)))
 	}
 	code, err := strconv.ParseInt(msg[:index], 10, 64)
 	if err != nil {
 		// If msg is improperly formatted, return it verbatim with a -1 code (this should never happen)
-		panic(fmt.Errorf("%w: %w", err, newError(-1, msg)))
+		panic(fmt.Errorf("%w: %w", err, newYDBError(-1, msg)))
 	}
 	return C.int(-code)
 }
@@ -292,22 +286,21 @@ func (conn *Conn) Lock(timeout time.Duration, nodes ...*Node) bool {
 	cconn := conn.cconn
 
 	// Add each parameter to the vararg list
-	conn.vpaddParam64(uint64(cconn.tptoken))
-	conn.vpaddParam(uintptr(unsafe.Pointer(&cconn.errstr)))
-	conn.vpaddParam64(uint64(timeoutNsec))
-	conn.vpaddParam(uintptr(len(nodes)))
+	conn.vpAddParam64(uint64(cconn.tptoken))
+	conn.vpAddParam(uintptr(unsafe.Pointer(&cconn.errstr)))
+	conn.vpAddParam64(uint64(timeoutNsec))
+	conn.vpAddParam(uintptr(len(nodes)))
 	for _, node := range nodes {
 		cnode := node.cnode
-		conn.vpaddParam(uintptr(unsafe.Pointer(&cnode.buffers)))
-		conn.vpaddParam(uintptr(cnode.len - 1))
-		conn.vpaddParam(uintptr(unsafe.Pointer(bufferIndex(&cnode.buffers, 1))))
+		conn.vpAddParam(uintptr(unsafe.Pointer(&cnode.buffers)))
+		conn.vpAddParam(uintptr(cnode.len - 1))
+		conn.vpAddParam(uintptr(unsafe.Pointer(bufferIndex(&cnode.buffers, 1))))
 	}
 
 	// vplist now contains the parameter list we want to send to ydb_lock_st(). But CGo doesn't permit us
-	// to call or even create a function pointer to ydb_lock_st(). So instead of calling vplist.CallVariadicPlistFuncST()
-	// directly, we have to call it via C function get_ydb_lock_st_ptr().
+	// to call or even create a function pointer to ydb_lock_st(). So get it with getfunc_ydb_lock_st().
 	conn.prepAPI()
-	status := conn.vpcall(C.get_ydb_lock_st_ptr()) // call ydb_lock_st()
+	status := conn.vpcall(C.getfunc_ydb_lock_st()) // call ydb_lock_st()
 	if status != YDB_OK && status != C.YDB_LOCK_TIMEOUT {
 		panic(conn.lastError(status))
 	}

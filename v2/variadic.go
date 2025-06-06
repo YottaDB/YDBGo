@@ -33,7 +33,7 @@ const maxARM32RegParms uint32 = 4 // Max number of parms passed in registers in 
 
 // vpcall method calls a variadic function with the parameters previously added.
 // The function pointer `vpfunc` must point to the C variadic function to call.
-// The instance vplist must have been previously initialized with any parameters using call(s) to vpaddParam*().
+// The instance vplist must have been previously initialized with any parameters using call(s) to vpAddParam*().
 func (conn *Conn) vpcall(vpfunc unsafe.Pointer) C.int {
 	cconn := conn.cconn
 	retval := C.ydb_call_variadic_plist_func((C.ydb_vplist_func)(vpfunc), cconn.vplist)
@@ -48,21 +48,15 @@ func (conn *Conn) vpalloc() *C.gparam_list {
 	if cconn.vplist != nil {
 		return cconn.vplist
 	}
-	// This initial call must be to calloc() to get initialized (cleared) storage: due to a documented cgo bug
-	// we must not let Go store pointer values in uninitialized C-allocated memory or errors may result.
-	// See the cgo bug mentioned at https://golang.org/cmd/cgo/#hdr-Passing_pointers.
-	cconn.vplist = (*C.gparam_list)(C.calloc(1, C.size_t(C.sizeof_gparam_list)))
-	if cconn.vplist == nil {
-		panic("YDBGo: out of memory when allocating storage for variadac parameter list")
-	}
+	cconn.vplist = (*C.gparam_list)(calloc(C.sizeof_gparam_list)) // must use our calloc, not malloc: see calloc doc
 	// Note this gets freed by conn cleanup
 	cconn.vplist.n = 0 // initialize to 0 now and at the end of every vpcall()
 	return cconn.vplist
 }
 
-// vpaddParam adds another parameter to the variadic parameter list that will be used at the next invocation of conn.vpcall().
+// vpAddParam adds another parameter to the variadic parameter list that will be used at the next invocation of conn.vpcall().
 // Note that any supplied addresses must point to C allocated memory, not Go allocated memory, or CGo will panic.
-func (conn *Conn) vpaddParam(value uintptr) {
+func (conn *Conn) vpAddParam(value uintptr) {
 	vplist := conn.vpalloc() // Lazily allocate vplist only if needed
 	n := vplist.n
 	if n >= C.MAX_GPARAM_LIST_ARGS {
@@ -74,12 +68,12 @@ func (conn *Conn) vpaddParam(value uintptr) {
 	vplist.n++
 }
 
-// vpaddParam64 adds a specifically 64-bit parameter to the variadic parameter list that will be used at the next invocation of conn.vpcall().
+// vpAddParam64 adds a specifically 64-bit parameter to the variadic parameter list that will be used at the next invocation of conn.vpcall().
 // On 32-bit platforms this will push the 64-bit value in two 32-bit slots in the correct endian order.
 // Note that any supplied addresses must point to C allocated memory, not Go allocated memory, or CGo will panic.
-func (conn *Conn) vpaddParam64(value uint64) {
+func (conn *Conn) vpAddParam64(value uint64) {
 	if strconv.IntSize == 64 { // if we're on a 64-bit machine
-		conn.vpaddParam(uintptr(value))
+		conn.vpAddParam(uintptr(value))
 		return
 	}
 	vplist := conn.vpalloc() // Lazily allocate vplist only if needed
@@ -92,14 +86,14 @@ func (conn *Conn) vpaddParam64(value uint64) {
 			// loaded into registers and not to parms pushed on the stack.
 			const maxARM32RegParms = 4 // Max number of parms passed in registers in ARM32
 			if vplist.n&1 == 1 && int(vplist.n) < maxARM32RegParms {
-				conn.vpaddParam(0) // skip odd-indexed spots
+				conn.vpAddParam(0) // skip odd-indexed spots
 			}
 		}
-		conn.vpaddParam(uintptr(value & 0xffffffff))
-		conn.vpaddParam(uintptr(value >> 32))
+		conn.vpAddParam(uintptr(value & 0xffffffff))
+		conn.vpAddParam(uintptr(value >> 32))
 	} else {
-		conn.vpaddParam(uintptr(value >> 32))
-		conn.vpaddParam(uintptr(value & 0xffffffff))
+		conn.vpAddParam(uintptr(value >> 32))
+		conn.vpAddParam(uintptr(value & 0xffffffff))
 	}
 }
 

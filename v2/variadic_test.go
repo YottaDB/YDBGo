@@ -29,8 +29,8 @@ func TestVpdump(t *testing.T) {
 	//~ 	n1 := tconn.Node("var", "sub1", "sub2")
 	//~ 	n2 := n1.Child("sub3", "sub4")
 	//~ 	Lock()
-	tconn.vpaddParam(1)
-	tconn.vpaddParam64(2)
+	tconn.vpAddParam(1)
+	tconn.vpAddParam64(2)
 
 	arm32 := strconv.IntSize != 64
 	arm32int := 0

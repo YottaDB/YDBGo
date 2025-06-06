@@ -84,13 +84,7 @@ func (conn *Conn) _Node(varname any, subscripts ...string) (n *Node) {
 	size := C.sizeof_node + C.sizeof_ydb_buffer_t*(firstLen-1+len(subscripts)) + joiner.Len()
 	var goNode Node
 	n = &goNode
-	// This initial call must be to calloc() to get initialized (cleared) storage: due to a documented cgo bug
-	// we must not let Go store pointer values in uninitialized C-allocated memory or errors may result.
-	// See the cgo bug mentioned at https://golang.org/cmd/cgo/#hdr-Passing_pointers.
-	n.cnode = (*C.node)(C.calloc(1, C.size_t(size)))
-	if n.cnode == nil {
-		panic("YDBGo: out of memory when allocating new reference to database node")
-	}
+	n.cnode = (*C.node)(calloc(C.size_t(size))) // must use our calloc, not malloc: see calloc doc
 	// Queue the cleanup function to free it
 	runtime.AddCleanup(n, func(cnode *C.node) {
 		C.free(unsafe.Pointer(cnode))

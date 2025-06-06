@@ -10,16 +10,10 @@
 //
 //////////////////////////////////////////////////////////////////
 
-// YottaDB constants generated from YottaDB source
+// ydberr contains YottaDB constants generated from YottaDB source.
 package ydberr
 
-// // The next line lets error_codes.go find libyottadb
+// The above line with the following import lets error_codes.go find libyottadb
+
 // #cgo pkg-config: yottadb
 import "C"
-
-// Go-specific error constants used in syslog messaging.
-const (
-	DBRNDWNBYPASS   = -151552026
-	SIGACKTIMEOUT   = -151552034
-	SIGGORTNTIMEOUT = -151552040
-)

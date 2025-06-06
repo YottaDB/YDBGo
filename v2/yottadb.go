@@ -21,6 +21,7 @@ package yottadb
 
 import (
 	"time"
+	"unsafe"
 )
 
 // #cgo pkg-config: yottadb
@@ -68,5 +69,20 @@ var (
 var debug bool                    // false by default -- can be enabled by test/debugging code to turn things on
 const dbgPrintEPHdrs bool = false // Print entry point headers when routine is entered
 const dbgSigHandling bool = false // Print extra signal processing info when true
+
+// ---- Utility functions
+
+// calloc allocates c memory and clears it; a wrapper for C.calloc() that panics on error.
+// It must be used instead of C.malloc() if Go will write to pointers within the allocation.
+// This is due to documented bug: https://golang.org/cmd/cgo/#hdr-Passing_pointers.
+// The user must call C.free() to free the allocation.
+func calloc(size C.size_t) unsafe.Pointer {
+	// Use calloc: can't let Go store pointers in uninitialized C memory per CGo bug: https://golang.org/cmd/cgo/#hdr-Passing_pointers
+	mem := C.calloc(1, size)
+	if mem == nil {
+		panic("YDBGo: out of memory")
+	}
+	return mem
+}
 
 //go:generate ../scripts/gen_error_codes.sh ydberr/error_codes ydbconst ydberr
