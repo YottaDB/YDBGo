@@ -29,6 +29,7 @@ func TestVpdump(t *testing.T) {
 	//~ 	n1 := tconn.Node("var", "sub1", "sub2")
 	//~ 	n2 := n1.Child("sub3", "sub4")
 	//~ 	Lock()
+	tconn.vpStart()
 	tconn.vpAddParam(1)
 	tconn.vpAddParam64(2)
 
@@ -44,7 +45,7 @@ func TestVpdump(t *testing.T) {
 		expected += "   Elem 2  Value: 0 (0x0)\n"
 	}
 	var b bytes.Buffer
-	tconn.vpdump(&b)
+	tconn.vpDump(&b)
 	remove := regexp.MustCompile(`\(0x[0-9A-Fa-f]+\) Value:`)
 	output := remove.ReplaceAllString(b.String(), " Value:")
 	assert.Equal(t, expected, output)

@@ -19,6 +19,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -33,8 +34,13 @@ type DB struct {
 	YDBRelease float64 // release version of the installed YottaDB
 }
 
-var internalDB = &DB{}     // make this a single instance per app because we can: so that e.g. mcall can check YDBRelease without having access to a particular DB instance
-var initCount atomic.Int64 // Increment when Init() called and decrement when Shutdown() called; shutdown when it reaches 0
+var internalDB = &DB{} // make this a single instance per app because we can: so that e.g. mcall can check YDBRelease without having access to a particular DB instance
+
+// Init and Exit globals
+var wgexit sync.WaitGroup
+var inInit sync.Mutex        // Mutex for access to init AND exit
+var wgSigInit sync.WaitGroup // Used to make sure signals are setup before Init() exits
+var initCount atomic.Int64   // Increment when Init() called and decrement when Shutdown() called; shutdown when it reaches 0
 
 // Init initializes the YottaDB engine and set up signal handling.
 // Init may be called multiple times (e.g. by different goroutines) but [Shutdown]() must be called exactly once

@@ -1,0 +1,19 @@
+//////////////////////////////////////////////////////////////////
+//
+// Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.
+// All rights reserved.
+//
+//	This source code contains the intellectual property
+//	of its copyright holder(s), and is made available
+//	under a license.  If you do not know the terms of
+//	the license, please stop and do not read further.
+//
+//////////////////////////////////////////////////////////////////
+
+// YDBGo: example M-call table to call M from Go
+
+AddVerbose: string[1024] addVerbose^arithmetic(string, int64, int64)
+Add: int64 add^arithmetic(int64, int64)
+Sub: int64 sub^arithmetic(int64, int64)
+AddFloat32: float64 add^arithmetic(float32, float32)
+AddFloat64: float64 add^arithmetic(float64, float64)

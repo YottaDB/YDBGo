@@ -91,6 +91,7 @@ func NewConn() *Conn {
 		C.free(unsafe.Pointer(cn.value.buf_addr))
 		C.free(unsafe.Pointer(cn.errstr.buf_addr))
 		C.free(unsafe.Pointer(cn.vplist))
+		C.free(unsafe.Pointer(cn.paramBlock))
 		C.free(unsafe.Pointer(cn))
 	}, conn.cconn)
 	return &conn
@@ -286,6 +287,7 @@ func (conn *Conn) Lock(timeout time.Duration, nodes ...*Node) bool {
 	cconn := conn.cconn
 
 	// Add each parameter to the vararg list
+	conn.vpStart() // restart parameter list
 	conn.vpAddParam64(uint64(cconn.tptoken))
 	conn.vpAddParam(uintptr(unsafe.Pointer(&cconn.errstr)))
 	conn.vpAddParam64(uint64(timeoutNsec))
@@ -299,8 +301,7 @@ func (conn *Conn) Lock(timeout time.Duration, nodes ...*Node) bool {
 
 	// vplist now contains the parameter list we want to send to ydb_lock_st(). But CGo doesn't permit us
 	// to call or even create a function pointer to ydb_lock_st(). So get it with getfunc_ydb_lock_st().
-	conn.prepAPI()
-	status := conn.vpcall(C.getfunc_ydb_lock_st()) // call ydb_lock_st()
+	status := conn.vpCall(C.getfunc_ydb_lock_st()) // call ydb_lock_st()
 	if status != YDB_OK && status != C.YDB_LOCK_TIMEOUT {
 		panic(conn.lastError(status))
 	}

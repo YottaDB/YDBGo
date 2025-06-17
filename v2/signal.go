@@ -70,10 +70,7 @@ var YDBSignals = []os.Signal{
 var ydbSignalMap sync.Map
 var ydbSigPanicCalled atomic.Bool // True when our exit is panic driven due to a signal
 
-// Init and Exit globals
-var wgexit sync.WaitGroup
-var inInit sync.Mutex                      // Mutex for access to init AND exit
-var wgSigInit sync.WaitGroup               // Used to make sure signals are setup before Init() exits
+// Shutdown globals
 var ydbShutdownCheck = make(chan struct{}) // Channel used to check if all signal routines have been shutdown
 var shutdownSigGoroutines bool             // Flag that we have completed shutdownSignalGoroutines()
 var shutdownSigGoroutinesMutex sync.Mutex  // Serialize access to shutdownSignalGoroutines()
