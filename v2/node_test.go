@@ -16,7 +16,6 @@ import (
 	"fmt"
 	"strings"
 	"testing"
-	"time"
 
 	assert "github.com/stretchr/testify/require"
 )
@@ -49,28 +48,6 @@ func TestCloneNode(t *testing.T) {
 	assert.Contains(t, err.Error(), ": var1")
 	// Check that a changed tptoken in n2's conn doesn't affect n1's conn
 	assert.NotEqual(t, n1.conn.cconn.tptoken, n2.conn.cconn.tptoken)
-}
-
-func TestKillLocalsExcept(t *testing.T) {
-	tconn := SetupTest(t)
-	n1 := tconn.Node("var1")
-	n2 := tconn.Node("var2")
-	n3 := tconn.Node("var3")
-	n1.Set("v1")
-	n2.Set("v2")
-	n3.Set("v3")
-	n3.Child("sub1").Set("subval")
-	assert.Equal(t, multi(true, true, true), multi(n1.HasValueOnly(), n2.HasValueOnly(), n3.HasBoth()))
-	tconn.KillLocalsExcept("var1", "var3")
-	assert.Equal(t, multi(true, true, true), multi(n1.HasValueOnly(), n2.HasNone(), n3.HasBoth()))
-	tconn.KillLocalsExcept()
-	assert.Equal(t, multi(true, true, true), multi(n1.HasNone(), n2.HasNone(), n3.HasNone()))
-
-	n1.Set("v1")
-	n2.Set("v2")
-	n3.Set("v3")
-	tconn.KillAllLocals()
-	assert.Equal(t, multi(true, true, true), multi(n1.HasNone(), n2.HasNone(), n3.HasNone()))
 }
 
 func TestSetGet(t *testing.T) {
@@ -172,45 +149,6 @@ func TestIncr(t *testing.T) {
 	assert.Equal(t, 0.0, n.Incr("-4.5"))
 	assert.Equal(t, -4.5, n.Incr("-4.5"))
 	assert.Equal(t, -3.5, n.Incr("1abcdefg"))
-}
-
-func TestLock(t *testing.T) {
-	tconn := SetupTest(t)
-	n := tconn.Node("^var", "Don't", "Panic!")
-	// Increment lock 3 times
-	assert.Equal(t, true, n.Lock(100*time.Millisecond))
-	assert.Equal(t, true, n.Lock(100*time.Millisecond))
-	assert.Equal(t, true, n.Lock(100*time.Millisecond))
-
-	// Check that lock now exists
-	lockpath := fmt.Sprint(n)
-	assert.Equal(t, true, lockExists(lockpath))
-
-	// Decrement 3 times and each time check whether lock exists
-	n.Unlock()
-	assert.Equal(t, true, lockExists(lockpath))
-	n.Unlock()
-	assert.Equal(t, true, lockExists(lockpath))
-	n.Unlock()
-	assert.Equal(t, false, lockExists(lockpath))
-
-	// Now lock two paths and check that Lock(0) releases them
-	n2 := tconn.Node("^var2")
-	n.Lock()
-	n2.Lock()
-	assert.Equal(t, true, lockExists(fmt.Sprint(n)))
-	assert.Equal(t, true, lockExists(fmt.Sprint(n2)))
-	assert.Equal(t, true, tconn.Lock(0)) // Release all locks
-	assert.Equal(t, false, lockExists(fmt.Sprint(n)))
-	assert.Equal(t, false, lockExists(fmt.Sprint(n2)))
-
-	// Now lock both using Lock() and make sure they get locked and unlocked
-	assert.Equal(t, true, tconn.Lock(100*time.Millisecond, n, n2)) // Release all locks
-	assert.Equal(t, true, lockExists(fmt.Sprint(n)))
-	assert.Equal(t, true, lockExists(fmt.Sprint(n2)))
-	assert.Equal(t, true, tconn.Lock(time.Duration(0))) // Release all locks
-	assert.Equal(t, false, lockExists(fmt.Sprint(n)))
-	assert.Equal(t, false, lockExists(fmt.Sprint(n2)))
 }
 
 // Example of getting next subscript

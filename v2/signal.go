@@ -92,15 +92,15 @@ func printEntry(funcName string) {
 func syslogEntry(logMsg string) {
 	syslogr, err := syslog.New(syslog.LOG_INFO+syslog.LOG_USER, "[YottaDB-Go-Wrapper]")
 	if err != nil {
-		panic(fmt.Sprintf("syslog.New() failed unexpectedly with error: %s", err))
+		panic(newYDBError(ydberr.Syslog, fmt.Sprintf("syslog.New() failed unexpectedly with error: %s", err)))
 	}
 	err = syslogr.Info(logMsg)
 	if err != nil {
-		panic(fmt.Sprintf("syslogr.Info() failed unexpectedly with error: %s", err))
+		panic(newYDBError(ydberr.Syslog, fmt.Sprintf("syslogr.Info() failed unexpectedly with error: %s", err)))
 	}
 	err = syslogr.Close()
 	if err != nil {
-		panic(fmt.Sprintf("syslogr.Close() failed unexpectedly with error: %s", err))
+		panic(newYDBError(ydberr.Syslog, fmt.Sprintf("syslogr.Close() failed unexpectedly with error: %s", err)))
 	}
 }
 
@@ -109,7 +109,7 @@ func lookupYDBSignal(sig os.Signal) *sigInfo {
 	initCheck() // Make sure ydbSignalMap is populated
 	value, ok := ydbSignalMap.Load(sig)
 	if !ok {
-		panic(fmt.Errorf("YDBGo: The specified signal %d (%v) is not a YottaDB signal so is unsupported for signal notification", sig, sig))
+		panic(newYDBError(ydberr.SignalUnsupported, fmt.Sprintf("The specified signal %d (%v) is not a YottaDB signal so is unsupported for signal notification", sig, sig)))
 	}
 	info := value.(*sigInfo)
 	return info
@@ -126,7 +126,7 @@ func validateYDBSignal(sig os.Signal) *sigInfo {
 
 	info := lookupYDBSignal(sig)
 	if sig == syscall.SIGTSTP || sig == syscall.SIGTTIN || sig == syscall.SIGTTOU {
-		panic(fmt.Errorf("YDBGo: handling signal %d (%v) hangs, so handling it is not supported", sig, sig))
+		panic(newYDBError(ydberr.SignalUnsupported, fmt.Sprintf("handling signal %d (%v) hangs, so handling it is not supported", sig, sig)))
 	}
 	return info
 }
@@ -173,7 +173,7 @@ func SignalReset(signals ...os.Signal) {
 func NotifyYDB(sig os.Signal) bool {
 	value, ok := ydbSignalMap.Load(sig)
 	if !ok {
-		panic(fmt.Errorf("YDBGo: goroutine-sighandler: called NotifyYDB with a non-YottaDB signal %d (%v)", sig, sig))
+		panic(newYDBError(ydberr.SignalUnsupported, fmt.Sprintf("goroutine-sighandler: called NotifyYDB with a non-YottaDB signal %d (%v)", sig, sig)))
 	}
 	info := value.(*sigInfo)
 	conn := info.conn
@@ -184,7 +184,7 @@ func NotifyYDB(sig os.Signal) bool {
 
 	if dbgSigHandling && (sig != syscall.SIGURG) {
 		// SIGURG happens almost continually, so don't report it.
-		fmt.Fprintf(os.Stderr, "YDBGo: goroutine-sighandler: calling YottaDB signal handler for signal %d (%v)\n", sig, sig)
+		fmt.Fprintf(os.Stderr, "goroutine-sighandler: calling YottaDB signal handler for signal %d (%v)\n", sig, sig)
 	}
 	signum := C.int(sig.(syscall.Signal)) // have to type-assert before converting to an int
 	// Note this call to ydb_sig_dispatch() does not pass a tptoken. The reason for this is that inside
@@ -199,13 +199,14 @@ func NotifyYDB(sig os.Signal) bool {
 	case YDB_DEFER_HANDLER:
 		// Signal was deferred for some reason
 		// Not an error, but the fact is logged
-		fmt.Fprintf(os.Stderr, "YDBGo: goroutine-sighandler: YottaDB deferred signal %d (%v)\n", sig, sig)
+		fmt.Fprintf(os.Stderr, "goroutine-sighandler: YottaDB deferred signal %d (%v)\n", sig, sig)
 		return false
 	case ydberr.CALLINAFTERXIT, -ydberr.CALLINAFTERXIT:
 		// If CALLINAFTERXIT (positive or negative version) we're done - exit goroutine
 		shutdownSignalGoroutine(info)
 	default: // Some sort of error occurred during signal handling
-		panic(fmt.Errorf("YDBGo: goroutine_sighandler: error from ydb_sig_dispatch() of signal %d (%v): %w", sig, sig, conn.lastError(rc)))
+		err := conn.lastError(rc)
+		panic(newYDBError(ydberr.SignalHandling, fmt.Sprintf("goroutine_sighandler: error from ydb_sig_dispatch() of signal %d (%v): %s", sig, sig, err), err))
 	}
 	return true
 }
@@ -224,7 +225,7 @@ func handleSignal(info *sigInfo) {
 	// Tell Go to pass this signal to our channel.
 	signal.Notify(sigchan, sig)
 	if dbgSigHandling {
-		fmt.Fprintf(os.Stderr, "YDBGo: goroutine-sighandler: Signal handler initialized for %d (%v)\n", sig, sig)
+		fmt.Fprintf(os.Stderr, "goroutine-sighandler: Signal handler initialized for %d (%v)\n", sig, sig)
 	}
 	wgSigInit.Done() // Signal parent goroutine that we have completed initializing signal handling
 	allDone := false
@@ -247,7 +248,7 @@ func handleSignal(info *sigInfo) {
 		if info.notifyChan != nil {
 			// Notify user code via the supplied channel
 			if dbgSigHandling {
-				fmt.Fprintf(os.Stderr, "YDBGo: goroutine-sighandler: notifying user-specified channel of signal %d (%v)\n", sig, sig)
+				fmt.Fprintf(os.Stderr, "goroutine-sighandler: notifying user-specified channel of signal %d (%v)\n", sig, sig)
 			}
 			// Send to channel without blocking (same as Signal.Notify)
 			select {
@@ -261,7 +262,7 @@ func handleSignal(info *sigInfo) {
 	}
 	signal.Stop(sigchan) // No more signal notification for this signal channel
 	if dbgSigHandling {
-		fmt.Fprintf(os.Stderr, "YDBGo: goroutine-sighandler: exiting goroutine for signal %d (%v)\n", sig, sig)
+		fmt.Fprintf(os.Stderr, "goroutine-sighandler: exiting goroutine for signal %d (%v)\n", sig, sig)
 	}
 	info.shutdownDone.Store(true)  // Indicate this channel is closed
 	ydbShutdownCheck <- struct{}{} // Notify shutdownSignalGoroutines that it needs to check if all channels closed now
@@ -287,7 +288,7 @@ func shutdownSignalGoroutines() {
 	if shutdownSigGoroutines { // Nothing to do if already done
 		shutdownSigGoroutinesMutex.Unlock()
 		if dbgSigHandling {
-			fmt.Println("YDBGo: shutdownSignalGoroutines: Bypass shutdownSignalGoroutines as it has already run")
+			fmt.Println("shutdownSignalGoroutines: Bypass shutdownSignalGoroutines as it has already run")
 		}
 		return
 	}
@@ -328,12 +329,12 @@ func shutdownSignalGoroutines() {
 	select {
 	case <-doneChan: // All signal monitoring goroutines are shutdown or are busy!
 		if dbgSigHandling {
-			fmt.Fprintln(os.Stderr, "YDBGo: shutdownSignalGoroutines: All signal goroutines successfully closed or active")
+			fmt.Fprintln(os.Stderr, "shutdownSignalGoroutines: All signal goroutines successfully closed or active")
 		}
 	case <-time.After(MaxSigShutdownWait):
 		// Notify syslog that this timeout happened
 		if dbgSigHandling {
-			fmt.Fprintln(os.Stderr, "YDBGo: shutdownSignalGoroutines: Timeout! Some signal goroutines did not shutdown")
+			fmt.Fprintln(os.Stderr, "shutdownSignalGoroutines: Timeout! Some signal goroutines did not shutdown")
 		}
 		syslogEntry("Shutdown of signal goroutines timed out")
 	}
@@ -341,7 +342,7 @@ func shutdownSignalGoroutines() {
 	shutdownSigGoroutinesMutex.Unlock()
 	// All signal routines should be finished or otherwise occupied
 	if dbgSigHandling {
-		fmt.Fprintln(os.Stderr, "YDBGo: shutdownSignalGoroutines: Channel closings complete")
+		fmt.Fprintln(os.Stderr, "shutdownSignalGoroutines: Channel closings complete")
 	}
 }
 
@@ -357,5 +358,5 @@ func signalExitCallback(sigNum C.int) {
 	ydbSigPanicCalled.Store(true) // Need "atomic" usage to avoid read/write DATA RACE issues
 	shutdownSignalGoroutines()    // Close the goroutines down with their signal notification channels
 	sig := syscall.Signal(sigNum) // Convert numeric signal number to Signal type for use in panic() message
-	panic(fmt.Sprintf("YDBGo: Fatal signal %d (%v) occurred", sig, sig))
+	panic(newYDBError(ydberr.SignalFatal, fmt.Sprintf("Fatal signal %d (%v) occurred", sig, sig)))
 }

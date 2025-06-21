@@ -106,14 +106,14 @@ func (conn *Conn) prepAPI() {
 // ensureValueSize reallocates value.buf_addr if necessary to fit a string of size.
 func (conn *Conn) ensureValueSize(cap int) {
 	if cap > C.YDB_MAX_STR {
-		panic("YDBGo: tried to set database value to a string longer than the maximum length YDB_MAX_STR")
+		panic(newYDBError(ydberr.InvalidStringLength, fmt.Sprintf("Invalid string length %d: max %d", cap, C.YDB_MAX_STR)))
 	}
 	value := &conn.cconn.value
 	if cap > int(value.len_alloc) {
 		cap += overalloc // allocate some extra for potential future use
 		addr := (*C.char)(C.realloc(unsafe.Pointer(value.buf_addr), C.size_t(cap)))
 		if addr == nil {
-			panic("YDBGo: out of memory when allocating more space for string data transfer to YottaDB")
+			panic(newYDBError(ydberr.OutOfMemory, fmt.Sprintf("out of memory when allocating %d bytes for string data transfer to YottaDB", cap)))
 		}
 		value.buf_addr = addr
 		value.len_alloc = C.uint(cap)
@@ -155,10 +155,9 @@ func (conn *Conn) lastError(code C.int) error {
 
 	pattern := ",(SimpleThreadAPI),"
 	index := strings.Index(msg, pattern)
-	// If msg is improperly formatted, return it verbatim with a -1 code (this should never happen)
 	if index == -1 {
-		// If msg is improperly formatted, return it verbatim (this should never happen)
-		return fmt.Errorf("YDBGo: could not parse error message: %w", newYDBError(-1, msg))
+		// If msg is improperly formatted, return it verbatim as an error with code YDBMessageInvalid (this should never happen with messages from YottaDB)
+		return newYDBError(ydberr.YDBMessageInvalid, fmt.Sprintf("could not parse YottaDB error message: %s", msg))
 	}
 	text := msg[index+len(pattern):]
 	return newYDBError(int(code), text)
@@ -175,13 +174,13 @@ func (conn *Conn) lastCode() C.int {
 	// Extract the error code from msg
 	index := strings.Index(msg, ",")
 	if index == -1 {
-		// If msg is improperly formatted, return it verbatim with a -1 code (this should never happen)
-		panic(fmt.Errorf("YDBGo: could not parse error message: %w", newYDBError(-1, msg)))
+		// If msg is improperly formatted, panic it verbatim with an YDBMessageInvalid code (this should never happen with messages from YottaDB)
+		panic(newYDBError(ydberr.YDBMessageInvalid, fmt.Sprintf("could not parse YottaDB error message: %s", msg)))
 	}
 	code, err := strconv.ParseInt(msg[:index], 10, 64)
 	if err != nil {
-		// If msg is improperly formatted, return it verbatim with a -1 code (this should never happen)
-		panic(fmt.Errorf("%w: %w", err, newYDBError(-1, msg)))
+		// If msg is improperly formatted, panic it verbatim with an YDBMessageInvalid code (this should never happen with messages from YottaDB)
+		panic(newYDBError(ydberr.YDBMessageInvalid, fmt.Sprintf("%s: %s", err, msg), err))
 	}
 	return C.int(-code)
 }
@@ -200,7 +199,8 @@ func (conn *Conn) recoverMessage(status C.int) string {
 	}
 	rc := C.ydb_message_t(cconn.tptoken, nil, -status, &cconn.errstr)
 	if rc != YDB_OK {
-		panic(fmt.Sprintf("YDBGo: error %d when trying to recover error message for error %d using ydb_message_t()", int(rc), int(-status)))
+		err := conn.lastError(rc)
+		panic(newYDBError(ydberr.YDBMessageRecoveryFailure, fmt.Sprintf("error %d when trying to recover error message for error %d using ydb_message_t(): %s", int(rc), int(-status), err), err))
 	}
 	return conn.getErrorString()
 }
@@ -224,7 +224,7 @@ func (conn *Conn) Zwr2Str(zstr string) (string, error) {
 	}
 	val := conn.getValue()
 	if val == "" && zstr != "" {
-		return "", errors.New("YDBGo: string has invalid ZWRITE-format")
+		return "", errors.New("string has invalid ZWRITE-format")
 	}
 	return val, nil
 }

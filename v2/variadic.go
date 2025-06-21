@@ -21,6 +21,8 @@ import (
 	"runtime"
 	"strconv"
 	"unsafe"
+
+	"lang.yottadb.com/go/yottadb/v2/ydberr"
 )
 
 // #include <stdlib.h> /* For uint64_t definition on Linux */
@@ -67,10 +69,10 @@ func (conn *Conn) vpAddParam(value uintptr) {
 	vplist := conn.vpAlloc() // Lazily allocate vplist only if needed
 	n := vplist.n
 	if n < 0 {
-		panic(fmt.Errorf("YDBGo: programmer forgot to call vpStart() before vpAddParam()"))
+		panic(newYDBError(ydberr.Variadic, "programmer forgot to call vpStart() before vpAddParam()"))
 	}
 	if n >= C.MAX_GPARAM_LIST_ARGS {
-		panic(fmt.Errorf("YDBGo: variadic parameter item count %d exceeds maximum count of %d", n+1, C.MAX_GPARAM_LIST_ARGS))
+		panic(newYDBError(ydberr.Variadic, fmt.Sprintf("variadic parameter item count %d exceeds maximum count of %d", n+1, C.MAX_GPARAM_LIST_ARGS)))
 	}
 	// Compute address of indexed element
 	elemptr := (*uintptr)(unsafe.Pointer(&vplist.arg[n]))
@@ -111,7 +113,7 @@ func (conn *Conn) vpAddParam64(value uint64) {
 func (conn *Conn) vpDump(w io.Writer) {
 	vplist := conn.cconn.vplist
 	if vplist == nil {
-		panic("YDBGo: could not dump nil vararg list")
+		panic(newYDBError(ydberr.Variadic, "could not dump nil vararg list"))
 	}
 	n := int(vplist.n)
 	argbase := unsafe.Add(unsafe.Pointer(vplist), unsafe.Sizeof(vplist))

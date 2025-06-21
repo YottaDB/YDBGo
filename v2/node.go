@@ -351,7 +351,7 @@ func (n *Node) Incr(amount any) float64 {
 
 	str, ok := amount.(string)
 	if ok && str == "" {
-		panic(`YDBGo: cannot increment by the empty string ""`)
+		panic(newYDBError(ydberr.IncrementEmpty, `cannot increment by the empty string ""`))
 	}
 
 	numberString := fmt.Sprint(amount)
@@ -366,7 +366,7 @@ func (n *Node) Incr(amount any) float64 {
 	valuestring := C.GoStringN(cconn.value.buf_addr, C.int(cconn.value.len_used))
 	value, err := strconv.ParseFloat(valuestring, 64)
 	if err != nil {
-		panic(err)
+		panic(newYDBError(ydberr.IncrementReturnInvalid, fmt.Sprintf("ydb_incr_st returned an invalid floating point number (%s): %s", valuestring, err)))
 	}
 	return value
 }

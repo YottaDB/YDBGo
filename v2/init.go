@@ -22,6 +22,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"lang.yottadb.com/go/yottadb/v2/ydberr"
 )
 
 // #include "libyottadb.h"
@@ -49,9 +51,9 @@ var initCount atomic.Int64   // Increment when Init() called and decrement when 
 // Shutdown() MUST be called before process exit.
 //   - Be sure to read the cautions at [Shutdown].
 //   - Init returns a value of type DB that must be passed to the [Shutdown] function.
-//   - Returns InitError on failure. If the error is from YottaDB, the YDBError will be second in the error chain.
+//   - Returns YDBError with Code=ydberr.Init on failure, which will also wrap any errors from YottaDB in the error chain.
 //
-// Users should defer [Shutdown] from their main routine before using other database functions as follows:
+// Users should defer [Shutdown] from their main routine before using other database functions; for example:
 //
 //	db, err := yottadb.Init()
 //	if err != nil {
@@ -81,7 +83,8 @@ func Init() (*DB, error) {
 	conn := NewConn()
 	status := C.ydb_main_lang_init(C.YDB_MAIN_LANG_GO, C.ydb_signal_exit_callback)
 	if status != YDB_OK {
-		return nil, fmt.Errorf("%w: YDBGo: YottaDB initialization failed: %w", InitError{}, newYDBError(int(status), conn.recoverMessage(status)))
+		dberror := newYDBError(int(status), conn.recoverMessage(status))
+		return nil, newYDBError(ydberr.Init, "YottaDB initialization failed", dberror)
 	}
 
 	var releaseMajorStr, releaseMinorStr string
@@ -94,7 +97,7 @@ func Init() (*DB, error) {
 	releaseInfoTokens := strings.Fields(releaseInfoString)
 	releaseNumberStr := releaseInfoTokens[1] // Fetch second token
 	if releaseNumberStr[:1] != "r" {         // Better start with 'r'
-		return nil, InitError{BaseError{fmt.Sprintf("YDBGo: expected YottaDB version $ZYRELEASE value to start with 'r' but it returned: %s", releaseInfoString)}}
+		return nil, newYDBError(ydberr.Init, fmt.Sprintf("expected YottaDB version $ZYRELEASE value to start with 'r' but it returned: %s", releaseInfoString))
 	}
 	releaseNumberStr = releaseNumberStr[1:]          // Remove starting 'r' in the release number
 	dotIndex := strings.Index(releaseNumberStr, ".") // Look for the decimal point that separates major/minor values
@@ -114,7 +117,7 @@ func Init() (*DB, error) {
 		releaseMajorStr = releaseMajorStr[:len(releaseMajorStr)-1]
 		_, err = strconv.Atoi(releaseMajorStr)
 		if err != nil {
-			return nil, InitError{BaseError{fmt.Sprintf("YDBGo: Failure trying to convert YottaDB version $ZYRELEASE (%s) major release number to integer", releaseInfoString)}}
+			return nil, newYDBError(ydberr.Init, fmt.Sprintf("Failure trying to convert YottaDB version $ZYRELEASE (%s) major release number to integer", releaseInfoString))
 		}
 	}
 	_, err = strconv.Atoi(releaseMinorStr)
@@ -122,21 +125,21 @@ func Init() (*DB, error) {
 		releaseMinorStr = releaseMinorStr[:len(releaseMinorStr)-1]
 		_, err = strconv.Atoi(releaseMinorStr)
 		if err != nil {
-			return nil, InitError{BaseError{fmt.Sprintf("YDBGo: Failure trying to convert YottaDB version $ZYRELEASE (%s) minor release number to integer", releaseInfoString)}}
+			return nil, newYDBError(ydberr.Init, fmt.Sprintf("Failure trying to convert YottaDB version $ZYRELEASE (%s) minor release number to integer", releaseInfoString))
 		}
 	}
 	// Verify we are running with the minimum YottaDB version or later
 	runningYDBRelease, err := strconv.ParseFloat(releaseMajorStr+"."+releaseMinorStr, 64)
 	if err != nil {
-		panic(err) // shouldn't happen due to check above
+		panic(newYDBError(ydberr.Init, err.Error(), err)) // shouldn't happen due to check above
 	}
 	minYDBRelease, err := strconv.ParseFloat(MinYDBRelease[1:], 64)
 	if err != nil {
-		panic("YDBGo: source code constant MinYDBRelease is not formatted correctly as rX.YY")
+		panic(newYDBError(ydberr.Init, fmt.Sprintf("source code constant MinYDBRelease (%s) is not formatted correctly as rX.YY", MinYDBRelease)))
 	}
 	if minYDBRelease > runningYDBRelease {
-		return nil, InitError{BaseError{fmt.Sprintf("YDBGo: Not running with at least minimum YottaDB release. Needed: %s  Have: r%s.%s",
-			MinYDBRelease, releaseMajorStr, releaseMinorStr)}}
+		return nil, newYDBError(ydberr.Init, fmt.Sprintf("Not running with at least minimum YottaDB release. Needed: %s  Have: r%s.%s",
+			MinYDBRelease, releaseMajorStr, releaseMinorStr))
 	}
 
 	// Start up a goroutine for each signal we want to be notified of. This is so that if one signal is in process,
@@ -159,7 +162,7 @@ func Init() (*DB, error) {
 // initCheck Panics if Init() has not been called
 func initCheck() {
 	if initCount.Load() == 0 {
-		panic("YDBGo: Init() must be called first")
+		panic(newYDBError(ydberr.Init, "Init() must be called first"))
 	}
 }
 
@@ -195,7 +198,7 @@ func Shutdown(handle *DB) error {
 	inInit.Lock()         // One goroutine at a time through here else we can get DATA-RACE warnings accessing wgexit wait group
 	defer inInit.Unlock() // Release lock when we leave this routine
 	if initCount.Load() == 0 {
-		panic("YDBGo: Shutdown() called more times than Init()")
+		panic(newYDBError(ydberr.Shutdown, "Shutdown() called more times than Init()"))
 	}
 	if initCount.Add(-1) > 0 {
 		// Don't shutdown if some other goroutine is still using the dbase
@@ -203,7 +206,7 @@ func Shutdown(handle *DB) error {
 	}
 
 	if dbgSigHandling {
-		fmt.Fprintln(os.Stderr, "YDBGo: Exit(): YDB Engine shutdown started")
+		fmt.Fprintln(os.Stderr, "Exit(): YDB Engine shutdown started")
 	}
 	// When we run ydb_exit(), set up a timer that will pop if ydb_exit() gets stuck in a deadlock or whatever. We could
 	// be running after some fatal error has occurred so things could potentially be fairly screwed up and ydb_exit() may
@@ -242,7 +245,7 @@ func Shutdown(handle *DB) error {
 		// best we can as this is the end of using the YottaDB engine in this process.
 	case <-time.After(exitWait):
 		if dbgSigHandling {
-			fmt.Fprintln(os.Stderr, "YDBGo: Shutdown(): Wait for ydb_exit() expired")
+			fmt.Fprintln(os.Stderr, "Shutdown(): Wait for ydb_exit() expired")
 		}
 		errstr = "YottaDB database rundown may have been bypassed due to timeout - run MUPIP JOURNAL ROLLBACK BACKWARD / MUPIP JOURNAL RECOVER BACKWARD / MUPIP RUNDOWN"
 		if !ydbSigPanicCalled.Load() {
@@ -252,7 +255,7 @@ func Shutdown(handle *DB) error {
 		}
 	}
 	if errstr != "" {
-		return ShutdownIncompleteError{BaseError{errstr}}
+		return newYDBError(ydberr.ShutdownIncomplete, errstr)
 	}
 	return nil
 }

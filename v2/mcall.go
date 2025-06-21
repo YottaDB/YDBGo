@@ -25,6 +25,8 @@ import (
 	"strings"
 	"sync"
 	"unsafe"
+
+	"lang.yottadb.com/go/yottadb/v2/ydberr"
 )
 
 /* #include "libyottadb.h"
@@ -94,7 +96,7 @@ func (m *MFunctions) WrapErr(rname string) func(args ...any) (any, error) {
 func (m *MFunctions) getRoutine(name string) *RoutineData {
 	routine, ok := m.Table.Routines[name]
 	if !ok {
-		panic(fmt.Errorf("YDBGo: M routine '%s' not found in M-call table", name))
+		panic(newYDBError(ydberr.MCallNotFound, fmt.Sprintf("M routine '%s' not found in M-call table", name)))
 	}
 	return routine
 }
@@ -169,12 +171,12 @@ func parseType(typeStr string) (*typeSpec, error) {
 	pattern := regexp.MustCompile(`(\*?)([\w_]+)(\*?)(.*)`)
 	m := pattern.FindStringSubmatch(typeStr)
 	if m == nil {
-		return nil, fmt.Errorf("does not match a YottaDB call-in table type specification")
+		return nil, errorf(ydberr.MCallTypeUnhandled, "does not match a YottaDB call-in table type specification")
 	}
 	asterisk, typ, badAsterisk, allocStr := m[1], m[2], m[3], m[4]
 	// Check that user didn't accidentally place * after the retType like he would in C
 	if badAsterisk == "*" {
-		return nil, fmt.Errorf("should not have asterisk at the end")
+		return nil, errorf(ydberr.MCallBadAsterisk, "should not have asterisk at the end")
 	}
 	pointer := asterisk == "*"
 	pattern = regexp.MustCompile(`\[(\d+)\]`)
@@ -186,19 +188,19 @@ func parseType(typeStr string) (*typeSpec, error) {
 		}
 	}
 	if preallocation == -1 && typ == "string" && pointer {
-		return nil, fmt.Errorf("[preallocation] must be supplied after *string type")
+		return nil, errorf(ydberr.MCallPreallocRequired, "[preallocation] must be supplied after *string type")
 	}
 	if preallocation != -1 && typ != "string" {
-		return nil, fmt.Errorf("[preallocation] should not be supplied for number type")
+		return nil, errorf(ydberr.MCallPreallocInvalid, "[preallocation] should not be supplied for number type")
 	}
 	if preallocation != -1 && !pointer {
-		return nil, fmt.Errorf("[preallocation] should not be specified for non-pointer type because it is not an output from M")
+		return nil, errorf(ydberr.MCallPreallocInvalid, "[preallocation] should not be specified for non-pointer type because it is not an output from M")
 	}
 	if preallocation == -1 {
 		preallocation = 0 // default to zero if not supplied
 	}
 	if _, ok := typeMapper[typ]; !ok {
-		return nil, fmt.Errorf("unknown type")
+		return nil, errorf(ydberr.MCallTypeUnknown, "unknown type")
 	}
 	kind := typeMapper[typ].kind
 	return &typeSpec{pointer, preallocation, typ, kind}, nil
@@ -223,7 +225,7 @@ func parsePrototype(line string) (*RoutineData, error) {
 	pattern := regexp.MustCompile(`\s*([^:\s]+)\s*:\s*(\*?\s*?[\w_]*\s*?\*?\s*?\[?\s*?[\d]*\s*?\]?)(\s*)([^(\s]+)\s*\(([^)]*)\)`)
 	m := pattern.FindStringSubmatch(line)
 	if m == nil {
-		return nil, fmt.Errorf("line does not match prototype format 'Go_name: [ret_type] M_entrypoint([*]type, [*]type, ...)'")
+		return nil, errorf(ydberr.MCallInvalidPrototype, "line does not match prototype format 'Go_name: [ret_type] M_entrypoint([*]type, [*]type, ...)'")
 	}
 	name, retType, space, entrypoint, params := m[1], m[2], m[3], m[4], m[5]
 
@@ -236,29 +238,31 @@ func parsePrototype(line string) (*RoutineData, error) {
 	// Check for a valid M entrypoint. It contain only %^@+ and alphanumeric characters.
 	// Here I only check valid characters. YottaDB will produce an error in case of incorrect positioning of those characters
 	if !regexp.MustCompile(`[%^@+0-9a-zA-Z]+`).MatchString(entrypoint) {
-		return nil, fmt.Errorf("entrypoint (%s) to call M must contain only alphanumeric and %%^@+ characters", entrypoint)
+		return nil, errorf(ydberr.MCallEntrypointInvalid, "entrypoint (%s) to call M must contain only alphanumeric and %%^@+ characters", entrypoint)
 	}
 
 	// Create list of types for return value and each parameter
 	typ, err := parseType("*" + retType) // treat it as if it were a pointer type since it has to receive back a value
 	if err != nil {
-		return nil, fmt.Errorf("return type (%s) %s", retType, err)
+		err.(*YDBError).Message = fmt.Sprintf("return type (%s) %s", retType, err)
+		return nil, err
 	}
 	if _, ok := returnTypes[typ.typ]; !ok {
-		return nil, fmt.Errorf("invalid return type %s (must be string, int64, or float64)", retType)
+		return nil, errorf(ydberr.MCallTypeUnknown, "invalid return type %s (must be string, int64, or float64)", retType)
 	}
 	if strings.Contains(retType, "*") {
-		return nil, fmt.Errorf("return type (%s) must not be a pointer type", retType)
+		return nil, errorf(ydberr.MCallTypeMismatch, "return type (%s) must not be a pointer type", retType)
 	}
 	types := []typeSpec{*typ}
 	// Now iterate each parameter
 	for i, typeStr := range regexp.MustCompile(`[^,\)]+`).FindAllString(params, -1) {
 		typ, err = parseType(typeStr)
 		if err != nil {
-			return nil, fmt.Errorf("parameter %d (%s) %s", i+1, typeStr, err)
+			err.(*YDBError).Message = fmt.Sprintf("parameter %d (%s) %s", i+1, retType, err)
+			return nil, err
 		}
 		if typ.typ == "" {
-			return nil, fmt.Errorf("parameter %d is empty but should contain a type", i+1)
+			return nil, errorf(ydberr.MCallTypeMissing, "parameter %d is empty but should contain a type", i+1)
 		}
 		types = append(types, *typ)
 	}
@@ -273,7 +277,7 @@ func parsePrototype(line string) (*RoutineData, error) {
 	// Make sure we aren't trying to send too many parameters.
 	// The -1 is because the return value doesn't count against YDB_MAX_PARMS.
 	if len(types)-1 > int(C.YDB_MAX_PARMS) {
-		return nil, fmt.Errorf("number of parameters %d exceeds YottaDB maximum of %d", len(types)-1, int(C.YDB_MAX_PARMS))
+		return nil, errorf(ydberr.MCallTooManyParameters, "number of parameters %d exceeds YottaDB maximum of %d", len(types)-1, int(C.YDB_MAX_PARMS))
 	}
 
 	// Create routine struct
@@ -332,7 +336,7 @@ func (conn *Conn) Import(table string) (*MFunctions, error) {
 		var err error
 		prototypes, err = os.ReadFile(table)
 		if err != nil {
-			return nil, fmt.Errorf("YDBGo: could not read call-in table file '%s': %w", table, err)
+			return nil, errorf(ydberr.ImportRead, "could not read call-in table file '%s': %s", table, err)
 		}
 	}
 
@@ -342,7 +346,8 @@ func (conn *Conn) Import(table string) (*MFunctions, error) {
 	for i, line := range bytes.Split(prototypes, []byte{'\n'}) {
 		routine, err := parsePrototype(string(line))
 		if err != nil {
-			return nil, fmt.Errorf("YDBGo: %s line %d", err, i+1)
+			err := err.(*YDBError)
+			return nil, newYDBError(err.Code, fmt.Sprintf("%s line %d", err, i+1), newYDBError(ydberr.ImportParse, "")) // wrap ImportError under err
 		}
 		if routine == nil {
 			continue
@@ -385,7 +390,7 @@ func (conn *Conn) Import(table string) (*MFunctions, error) {
 	// Now create a ydb version of the call-in table without any preallocation specs (which YDB doesn't currently support)
 	f, err := os.CreateTemp("", "YDBGo_callins_*.ci")
 	if err != nil {
-		return nil, fmt.Errorf("YDBGo: could not open temporary call-in table file '%s': %w", f.Name(), err)
+		return nil, errorf(ydberr.ImportTemp, "could not open temporary call-in table file '%s': %s", f.Name(), err)
 	}
 	if !debug {
 		defer os.Remove(f.Name())
@@ -393,7 +398,7 @@ func (conn *Conn) Import(table string) (*MFunctions, error) {
 	_, err = f.WriteString(tbl.YDBTable)
 	f.Close()
 	if err != nil {
-		return nil, fmt.Errorf("YDBGo: could not write temporary call-in table file '%s': %w", f.Name(), err)
+		return nil, errorf(ydberr.ImportTemp, "could not write temporary call-in table file '%s': %s", f.Name(), err)
 	}
 
 	// Tell YottaDB to process the call-in table
@@ -405,7 +410,8 @@ func (conn *Conn) Import(table string) (*MFunctions, error) {
 	status := C.ydb_ci_tab_open_t(cconn.tptoken, &cconn.errstr, cstr, handle)
 	tbl.handle = *handle
 	if status != YDB_OK {
-		return nil, fmt.Errorf("%w while processing call-in table:\n%s", conn.lastError(status), tbl.YDBTable)
+		err := conn.lastError(status).(*YDBError)
+		return nil, newYDBError(err.Code, fmt.Sprintf("%s while processing call-in table:\n%s", err, tbl.YDBTable), newYDBError(ydberr.ImportOpen, ""))
 	}
 
 	mfunctions := MFunctions{&tbl, conn}
@@ -436,12 +442,12 @@ func (conn *Conn) paramAlloc() unsafe.Pointer {
 // Return value is nil if the routine is not defined to return anything.
 func (conn *Conn) callM(routine *RoutineData, args []any) (any, error) {
 	if routine == nil {
-		panic("YDBGo: routine data passed to Conn.CallM() must not be nil")
+		panic(newYDBError(ydberr.MCallNil, "routine data passed to Conn.CallM() must not be nil"))
 	}
 	cconn := conn.cconn
 
 	if len(args) != len(routine.Types)-1 {
-		panic(fmt.Errorf("YDBGo: %d parameters supplied whereas the M-call table specifies %d", len(args), len(routine.Types)-1))
+		panic(newYDBError(ydberr.MCallWrongNumberOfParameters, fmt.Sprintf("%d parameters supplied whereas the M-call table specifies %d", len(args), len(routine.Types)-1)))
 	}
 	printEntry("CallTable.CallM()")
 	// If we haven't already fetched the call description from YDB, do that now.
@@ -534,7 +540,7 @@ func (conn *Conn) callM(routine *RoutineData, args []any) (any, error) {
 			if typ.pointer {
 				asterisk = "*"
 			}
-			panic(fmt.Errorf("YDBGo: parameter %d is %s but %s%s is specified in the M-call table", i+1, reflect.TypeOf(val), asterisk, typ.typ))
+			panic(newYDBError(ydberr.MCallTypeMismatch, fmt.Sprintf("parameter %d is %s but %s%s is specified in the M-call table", i+1, reflect.TypeOf(val), asterisk, typ.typ)))
 		}
 		switch val := args[i].(type) {
 		case string:
@@ -603,7 +609,7 @@ func (conn *Conn) callM(routine *RoutineData, args []any) (any, error) {
 			typeAssert(val, reflect.Float64)
 			*(*C.ydb_double_t)(param) = C.ydb_double_t(*val)
 		default:
-			panic(fmt.Errorf("YDBGo: unhandled type (%s) in parameter %d", reflect.TypeOf(val), i+1))
+			panic(newYDBError(ydberr.MCallTypeUnhandled, fmt.Sprintf("unhandled type (%s) in parameter %d", reflect.TypeOf(val), i+1)))
 		}
 		conn.vpAddParam(uintptr(unsafe.Pointer(param)))
 		param = unsafe.Add(param, paramSize)
@@ -644,7 +650,7 @@ func (conn *Conn) callM(routine *RoutineData, args []any) (any, error) {
 			ptr := (*C.ydb_double_t)(param)
 			retval = float64(*ptr)
 		default:
-			panic(fmt.Errorf("YDBGo: unhandled type (%s) in return of return value; report bug in YDBGo", typ.typ))
+			panic(newYDBError(ydberr.MCallTypeUnhandled, fmt.Sprintf("unhandled type (%s) in return of return value; report bug in YDBGo", typ.typ)))
 		}
 		param = unsafe.Add(param, paramSize)
 	}
@@ -680,7 +686,7 @@ func (conn *Conn) callM(routine *RoutineData, args []any) (any, error) {
 				*val = float64(*ptr)
 			case string, int, uint, int32, uint32, int64, uint64, float32, float64:
 			default:
-				panic(fmt.Errorf("YDBGo: unhandled type (%s) in parameter %d; report bug in YDBGo", reflect.TypeOf(val), i+1))
+				panic(newYDBError(ydberr.MCallTypeUnhandled, fmt.Sprintf("unhandled type (%s) in parameter %d; report bug in YDBGo", reflect.TypeOf(val), i+1)))
 			}
 		}
 		param = unsafe.Add(param, paramSize)

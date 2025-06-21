@@ -2,7 +2,7 @@
 
 package ydberr
 
-// #include "error_codes.h"
+// #include "errorcodes.h"
 import "C"
 
 // YottaDB Error constants

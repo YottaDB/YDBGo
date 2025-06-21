@@ -22,6 +22,8 @@ package yottadb
 import (
 	"time"
 	"unsafe"
+
+	"lang.yottadb.com/go/yottadb/v2/ydberr"
 )
 
 // #cgo pkg-config: yottadb
@@ -80,9 +82,9 @@ func calloc(size C.size_t) unsafe.Pointer {
 	// Use calloc: can't let Go store pointers in uninitialized C memory per CGo bug: https://golang.org/cmd/cgo/#hdr-Passing_pointers
 	mem := C.calloc(1, size)
 	if mem == nil {
-		panic("YDBGo: out of memory")
+		panic(newYDBError(ydberr.OutOfMemory, "out of memory"))
 	}
 	return mem
 }
 
-//go:generate ../scripts/gen_error_codes.sh ydberr/error_codes ydbconst ydberr
+//go:generate ../scripts/gen_error_codes.sh ydberr/errorcodes ydbconst ydberr

@@ -20,6 +20,8 @@ import "C"
 import (
 	"runtime/cgo"
 	"unsafe"
+
+	"lang.yottadb.com/go/yottadb/v2/ydberr"
 )
 
 // transactionCallbackWrapper lets Transaction() invoke a Go callback closure from C.
@@ -32,7 +34,7 @@ func tpCallbackWrapper(tptoken C.uint64_t, errstr *C.ydb_buffer_t, handle unsafe
 	saveToken := cconn.tptoken
 	cconn.tptoken = tptoken
 	if errstr != &cconn.errstr {
-		panic("YDBGo: YDBGo design fault: callback invoked with a different errstr than the one used by the connection")
+		panic(newYDBError(ydberr.CallbackWrongGoroutine, "YDBGo design fault: callback invoked from a different groutine than the one used by the connection"))
 	}
 	retval := info.callback()
 	cconn.tptoken = saveToken
