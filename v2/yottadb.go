@@ -82,7 +82,7 @@ func calloc(size C.size_t) unsafe.Pointer {
 	// Use calloc: can't let Go store pointers in uninitialized C memory per CGo bug: https://golang.org/cmd/cgo/#hdr-Passing_pointers
 	mem := C.calloc(1, size)
 	if mem == nil {
-		panic(newYDBError(ydberr.OutOfMemory, "out of memory"))
+		panic(newError(ydberr.OutOfMemory, "out of memory"))
 	}
 	return mem
 }

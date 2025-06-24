@@ -18,7 +18,7 @@ package ydberr
 // #cgo pkg-config: yottadb
 import "C"
 
-// YDBError error codes for use by YDBGo. These are positive numbers as negative numbers are used by YottatDB (see errorcodes.go).
+// yottadb.Error codes for use by YDBGo. These are positive numbers as negative numbers are used by YottatDB (see errorcodes.go).
 const (
 	Init                         = iota + 1
 	Shutdown                     // Error during shutdown
@@ -52,4 +52,5 @@ const (
 	ImportParse                  // Import parsing error that wraps other parsing errors
 	ImportTemp                   // Error opening temporary call-in file
 	ImportOpen                   // ydb_ci_tab_open_t error when YottaDB tried to open temp import table
+	InvalidZwriteFormat          // String supplied to ZwrStr() contains invalid Zwrite format
 )

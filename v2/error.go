@@ -17,36 +17,52 @@ package yottadb
 import (
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
+
+	"lang.yottadb.com/go/yottadb/v2/ydberr"
 )
 
-// YDBError type holds YottaDB errors including the formated $ZSTATUS message and the numeric error code.
-// It implements [YDBError.Is] so you can do [errors.Is](err, yottadb.BaseError)
-// Note: YottaDB error codes used with YDBError are defined in ydberr/errorcodes.go and YDBGo error codes are in ydberr/ydberr.go.
-type YDBError struct {
+// #include "libyottadb.h"
+import "C"
+
+// Error type holds YDBGo and YottaDB errors including a numeric error code.
+// YDBGo error strategy is as follows. Database setup functions like Init, Import (and its returned functions) return errors.
+// However, Node functions panic on errors because Node errors are caused by either programmer blunders (like invalid variable name)
+// or system-level events (like out of memory). This approach greatly simplifies the use of Node methods.
+//
+// If a particular panic needs to be captured this can be done with recover as YDBGo ensures that all its errors and panics
+// are of type yottadb.Error to facilitate capture of the specific cause using the embedded code:
+//   - All YottaDB errors are formated in $ZSTATUS format message and the YottaDB numeric error code with negative value,
+//     defined in ydberr/errorscodes.go.
+//   - All YDBGo errors likewise have a message string, but have a positive error code, defined in ydberr.ydberr.go.
+//
+// The yottadb.Error type implements the method [yottatdb.Error.Is] so you can identify a specific error with [ErrorIs](err, ydberr.<ErrorCode>).
+type Error struct {
 	Message string  // The error string - generally from $ZSTATUS when available
 	Code    int     // The error value (e.g. ydberr.INVSTRLEN, etc)
 	chain   []error // Lists any errors wrapped by this one
 }
 
-// Error is a type method of [YDBError] to return the error message string.
-func (err *YDBError) Error() string {
+// Error is a type method of [yottadb.Error] to return the error message string.
+func (err *Error) Error() string {
 	return err.Message // The error code's name is already included in the message from YottaDB, so don't add the code
 }
 
-// Unwrap allows YDBError to wrap other underlying errors.
-func (err *YDBError) Unwrap() []error {
+// Unwrap allows yottadb.Error to wrap other underlying errors. See [newError].
+func (err *Error) Unwrap() []error {
 	return err.chain
 }
 
-// Is lets [errors.Is]() search an error or chain of wrapped errors for a YDBError with a matching ydberr code.
+// Is lets [errors.Is]() search an error or chain of wrapped errors for a yottadb.Error with a matching ydberr code.
 // See [ErrorIs]() for a more practical way to use this capability.
 // Only the error code is matched, not the message: this supports matching errors even when YottaDB messages vary.
-func (err *YDBError) Is(target error) bool {
-	t, ok := target.(*YDBError)
+func (err *Error) Is(target error) bool {
+	t, ok := target.(*Error)
 	return ok && err.Code == t.Code
 }
 
-// ErrorIs uses [errors.Is]() to search an error or chain of wrapped errors for a YDBError with a matching ydberr code.
+// ErrorIs uses [errors.Is]() to search an error or chain of wrapped errors for a yottadb.Error with a matching ydberr code.
 // Only the error code is matched, not the message, to support YottaDB error messages that vary.
 // For example, to test for YottaDB INVSTRLEN error:
 //
@@ -54,23 +70,98 @@ func (err *YDBError) Is(target error) bool {
 //
 // is a short equivalent of:
 //
-//	if errors.Is(err, &YDBError{Code: ydberr.INVSTRLEN}) {
+//	if errors.Is(err, &Error{Code: ydberr.INVSTRLEN}) {
 //
-// It differs from a simple type test using YDBError.Code in that it searches for a match in the entire chain of wrapped errors
+// It differs from a simple type test using yottadb.Error.Code in that it searches for a match in the entire chain of wrapped errors
 func ErrorIs(err error, code int) bool {
-	return errors.Is(err, &YDBError{Code: code})
+	return errors.Is(err, &Error{Code: code})
 }
 
-// newYDBError returns error code and message as a [yottadb.Error] error type.
+// newError returns error code and message as a [yottadb.Error] error type.
 // Any errors supplied in wrapErrors are wrapped in the returned error.
-func newYDBError(code int, message string, wrapErrors ...error) error {
+// For YDBGo error strategy see [yottadb.Error]
+func newError(code int, message string, wrapErrors ...error) error {
 	for _, err := range wrapErrors {
 		message = message + ": " + err.Error()
 	}
-	return &YDBError{Code: code, Message: message, chain: wrapErrors}
+	return &Error{Code: code, Message: message, chain: wrapErrors}
 }
 
-// errorf same as fmt.Errorf except that it returns error type YDBError with specified code; and doesn't handle %w.
+// errorf same as fmt.Errorf except that it returns error type yottadb.Error with specified code; and doesn't handle %w.
 func errorf(code int, format string, args ...any) error {
-	return newYDBError(code, fmt.Sprintf(format, args...))
+	return newError(code, fmt.Sprintf(format, args...))
+}
+
+// ---- Error Functions dependent on yottadb.Conn to fetch message strings from YottaDB
+
+// getErrorString returns a copy of conn.cconn.errstr as a Go string.
+func (conn *Conn) getErrorString() string {
+	// len_used should never be greater than len_alloc since all errors should fit into errstr, but just in case, take the min
+	errstr := conn.cconn.errstr
+	return C.GoStringN(errstr.buf_addr, C.int(min(errstr.len_used, errstr.len_alloc)))
+}
+
+// lastError returns, given error code, the ydb error message stored by the previous YottaDB call as an error type or nil if there was no error.
+func (conn *Conn) lastError(code C.int) error {
+	if code == C.YDB_OK {
+		return nil
+	}
+	// Take a copy of errstr as a Go String
+	// (len_used should never be greater than len_alloc since all errors should fit into errstr, but just in case, take the min)
+	msg := conn.getErrorString()
+	if msg == "" { // See if msg is still empty (we set it to empty before calling the API in conn.prepAPI()
+		// This code gets run, for example, if ydb_exit() is called before a YDB function is invoked.
+		return newError(int(code), conn.recoverMessage(code))
+	}
+
+	pattern := ",(SimpleThreadAPI),"
+	index := strings.Index(msg, pattern)
+	if index == -1 {
+		// If msg is improperly formatted, return it verbatim as an error with code YDBMessageInvalid (this should never happen with messages from YottaDB)
+		return newError(ydberr.YDBMessageInvalid, fmt.Sprintf("could not parse YottaDB error message: %s", msg))
+	}
+	text := msg[index+len(pattern):]
+	return newError(int(code), text)
+}
+
+// lastCode extracts the ydb error status code from the message stored by the previous YottaDB call.
+func (conn *Conn) lastCode() C.int {
+	msg := conn.getErrorString()
+	if msg == "" {
+		// if msg is empty there was no error because we set it to empty before calling the API in conn.prepAPI()
+		return C.int(YDB_OK)
+	}
+
+	// Extract the error code from msg
+	index := strings.Index(msg, ",")
+	if index == -1 {
+		// If msg is improperly formatted, panic it verbatim with an YDBMessageInvalid code (this should never happen with messages from YottaDB)
+		panic(newError(ydberr.YDBMessageInvalid, fmt.Sprintf("could not parse YottaDB error message: %s", msg)))
+	}
+	code, err := strconv.ParseInt(msg[:index], 10, 64)
+	if err != nil {
+		// If msg is improperly formatted, panic it verbatim with an YDBMessageInvalid code (this should never happen with messages from YottaDB)
+		panic(newError(ydberr.YDBMessageInvalid, fmt.Sprintf("%s: %s", err, msg), err))
+	}
+	return C.int(-code)
+}
+
+// recoverMessage tries to get the error message (albeit without argument substitution) from the supplied status code in cases where the message has been lost.
+func (conn *Conn) recoverMessage(status C.int) string {
+	cconn := conn.cconn
+	// Check for a couple of special cases first.
+	switch status {
+	case ydberr.THREADEDAPINOTALLOWED:
+		// This error will prevent ydb_message_t() from working below, so instead return a hard-coded error message.
+		return "%YDB-E-THREADEDAPINOTALLOWED, Process cannot switch to using threaded Simple API while already using Simple API"
+	case ydberr.CALLINAFTERXIT:
+		// The engine is shut down so calling ydb_message_t will fail if we attempt it so just hard-code this error return value.
+		return "%YDB-E-CALLINAFTERXIT, After a ydb_exit(), a process cannot create a valid YottaDB context"
+	}
+	rc := C.ydb_message_t(cconn.tptoken, nil, -status, &cconn.errstr)
+	if rc != YDB_OK {
+		err := conn.lastError(rc)
+		panic(newError(ydberr.YDBMessageRecoveryFailure, fmt.Sprintf("error %d when trying to recover error message for error %d using ydb_message_t(): %s", int(rc), int(-status), err), err))
+	}
+	return conn.getErrorString()
 }

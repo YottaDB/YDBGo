@@ -22,30 +22,30 @@ import (
 
 // Example checking whether error is a particular YottaDB error.
 func ExampleErrorIs() {
-	err := &yottadb.YDBError{Code: ydberr.INVSTRLEN, Message: "string too long"}
+	err := &yottadb.Error{Code: ydberr.INVSTRLEN, Message: "string too long"}
 
 	fmt.Println("Error is INVSTRLEN:", yottadb.ErrorIs(err, ydberr.INVSTRLEN))
-	fmt.Println(" or using longform:", errors.Is(err, &yottadb.YDBError{Code: ydberr.INVSTRLEN}))
+	fmt.Println(" or using longform:", errors.Is(err, &yottadb.Error{Code: ydberr.INVSTRLEN}))
 
 	wrapped := fmt.Errorf("wrapped: %w", err)
 	fmt.Println("Wrapped error is still INVSTRLEN:", yottadb.ErrorIs(wrapped, ydberr.INVSTRLEN))
 
-	var e *yottadb.YDBError
-	fmt.Println("Error is type YDBError:", errors.As(err, &e))
+	var e *yottadb.Error
+	fmt.Println("Error is type yottadb.Error:", errors.As(err, &e))
 	if errors.As(err, &e) {
 		fmt.Println("  and the error is:", e)
 	}
 
 	err2 := fmt.Errorf("string too long")
-	fmt.Println("Error is type YDBError:", errors.As(err2, &e))
+	fmt.Println("Error is type yottadb.Error:", errors.As(err2, &e))
 	if errors.As(err2, &e) {
-		fmt.Println("Error is type YDBError:", e)
+		fmt.Println("Error is type yottadb.Error:", e)
 	}
 	// Output:
 	// Error is INVSTRLEN: true
 	//  or using longform: true
 	// Wrapped error is still INVSTRLEN: true
-	// Error is type YDBError: true
+	// Error is type yottadb.Error: true
 	//   and the error is: string too long
-	// Error is type YDBError: false
+	// Error is type yottadb.Error: false
 }

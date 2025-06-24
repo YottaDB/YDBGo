@@ -34,7 +34,7 @@ func tpCallbackWrapper(tptoken C.uint64_t, errstr *C.ydb_buffer_t, handle unsafe
 	saveToken := cconn.tptoken
 	cconn.tptoken = tptoken
 	if errstr != &cconn.errstr {
-		panic(newYDBError(ydberr.CallbackWrongGoroutine, "YDBGo design fault: callback invoked from a different groutine than the one used by the connection"))
+		panic(newError(ydberr.CallbackWrongGoroutine, "YDBGo design fault: callback invoked from a different groutine than the one used by the connection"))
 	}
 	retval := info.callback()
 	cconn.tptoken = saveToken

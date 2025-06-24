@@ -15,12 +15,9 @@
 package yottadb
 
 import (
-	"errors"
 	"fmt"
 	"runtime"
 	"runtime/cgo"
-	"strconv"
-	"strings"
 	"time"
 	"unsafe"
 
@@ -106,14 +103,14 @@ func (conn *Conn) prepAPI() {
 // ensureValueSize reallocates value.buf_addr if necessary to fit a string of size.
 func (conn *Conn) ensureValueSize(cap int) {
 	if cap > C.YDB_MAX_STR {
-		panic(newYDBError(ydberr.InvalidStringLength, fmt.Sprintf("Invalid string length %d: max %d", cap, C.YDB_MAX_STR)))
+		panic(newError(ydberr.InvalidStringLength, fmt.Sprintf("Invalid string length %d: max %d", cap, C.YDB_MAX_STR)))
 	}
 	value := &conn.cconn.value
 	if cap > int(value.len_alloc) {
 		cap += overalloc // allocate some extra for potential future use
 		addr := (*C.char)(C.realloc(unsafe.Pointer(value.buf_addr), C.size_t(cap)))
 		if addr == nil {
-			panic(newYDBError(ydberr.OutOfMemory, fmt.Sprintf("out of memory when allocating %d bytes for string data transfer to YottaDB", cap)))
+			panic(newError(ydberr.OutOfMemory, fmt.Sprintf("out of memory when allocating %d bytes for string data transfer to YottaDB", cap)))
 		}
 		value.buf_addr = addr
 		value.len_alloc = C.uint(cap)
@@ -133,81 +130,11 @@ func (conn *Conn) getValue() string {
 	return C.GoStringN(cconn.value.buf_addr, C.int(cconn.value.len_used))
 }
 
-// getErrorString returns a copy of conn.cconn.errstr as a Go string.
-func (conn *Conn) getErrorString() string {
-	// len_used should never be greater than len_alloc since all errors should fit into errstr, but just in case, take the min
-	errstr := conn.cconn.errstr
-	return C.GoStringN(errstr.buf_addr, C.int(min(errstr.len_used, errstr.len_alloc)))
-}
-
-// lastError returns, given error code, the ydb error message stored by the previous YottaDB call as an error type or nil if there was no error.
-func (conn *Conn) lastError(code C.int) error {
-	if code == C.YDB_OK {
-		return nil
-	}
-	// Take a copy of errstr as a Go String
-	// (len_used should never be greater than len_alloc since all errors should fit into errstr, but just in case, take the min)
-	msg := conn.getErrorString()
-	if msg == "" { // See if msg is still empty (we set it to empty before calling the API in conn.prepAPI()
-		// This code gets run, for example, if ydb_exit() is called before a YDB function is invoked.
-		return newYDBError(int(code), conn.recoverMessage(code))
-	}
-
-	pattern := ",(SimpleThreadAPI),"
-	index := strings.Index(msg, pattern)
-	if index == -1 {
-		// If msg is improperly formatted, return it verbatim as an error with code YDBMessageInvalid (this should never happen with messages from YottaDB)
-		return newYDBError(ydberr.YDBMessageInvalid, fmt.Sprintf("could not parse YottaDB error message: %s", msg))
-	}
-	text := msg[index+len(pattern):]
-	return newYDBError(int(code), text)
-}
-
-// lastCode extracts the ydb error status code from the message stored by the previous YottaDB call.
-func (conn *Conn) lastCode() C.int {
-	msg := conn.getErrorString()
-	if msg == "" {
-		// if msg is empty there was no error because we set it to empty before calling the API in conn.prepAPI()
-		return C.int(YDB_OK)
-	}
-
-	// Extract the error code from msg
-	index := strings.Index(msg, ",")
-	if index == -1 {
-		// If msg is improperly formatted, panic it verbatim with an YDBMessageInvalid code (this should never happen with messages from YottaDB)
-		panic(newYDBError(ydberr.YDBMessageInvalid, fmt.Sprintf("could not parse YottaDB error message: %s", msg)))
-	}
-	code, err := strconv.ParseInt(msg[:index], 10, 64)
-	if err != nil {
-		// If msg is improperly formatted, panic it verbatim with an YDBMessageInvalid code (this should never happen with messages from YottaDB)
-		panic(newYDBError(ydberr.YDBMessageInvalid, fmt.Sprintf("%s: %s", err, msg), err))
-	}
-	return C.int(-code)
-}
-
-// recoverMessage tries to get the error message (albeit without argument substitution) from the supplied status code in cases where the message has been lost.
-func (conn *Conn) recoverMessage(status C.int) string {
-	cconn := conn.cconn
-	// Check for a couple of special cases first.
-	switch status {
-	case ydberr.THREADEDAPINOTALLOWED:
-		// This error will prevent ydb_message_t() from working below, so instead return a hard-coded error message.
-		return "%YDB-E-THREADEDAPINOTALLOWED, Process cannot switch to using threaded Simple API while already using Simple API"
-	case ydberr.CALLINAFTERXIT:
-		// The engine is shut down so calling ydb_message_t will fail if we attempt it so just hard-code this error return value.
-		return "%YDB-E-CALLINAFTERXIT, After a ydb_exit(), a process cannot create a valid YottaDB context"
-	}
-	rc := C.ydb_message_t(cconn.tptoken, nil, -status, &cconn.errstr)
-	if rc != YDB_OK {
-		err := conn.lastError(rc)
-		panic(newYDBError(ydberr.YDBMessageRecoveryFailure, fmt.Sprintf("error %d when trying to recover error message for error %d using ydb_message_t(): %s", int(rc), int(-status), err), err))
-	}
-	return conn.getErrorString()
-}
-
 // Zwr2Str takes the given ZWRITE-formatted string and converts it to return as a normal ASCII string.
-//   - If zstr is not in valid zwrite format, return the empty string. Otherwise, return the unencoded string.
+//   - If zstr is not in valid zwrite format, return the empty string and yottadb.Error.Code=ydberr.InvalidZwriteFormat.
 //   - Note that the length of a string in zwrite format is always greater than or equal to the string in its original, unencoded format.
+//
+// Panics on other errors because they are are all panic-worthy (e.g. invalid variable names).
 func (conn *Conn) Zwr2Str(zstr string) (string, error) {
 	cconn := conn.cconn
 	cbuf := conn.setValue(zstr)
@@ -224,15 +151,21 @@ func (conn *Conn) Zwr2Str(zstr string) (string, error) {
 	}
 	val := conn.getValue()
 	if val == "" && zstr != "" {
-		return "", errors.New("string has invalid ZWRITE-format")
+		s := zstr
+		if len(s) > 80 {
+			s = s[:80] + "..."
+		}
+		return "", errorf(ydberr.InvalidZwriteFormat, "string (%s) has invalid ZWRITE-format", s)
 	}
 	return val, nil
 }
 
 // Str2Zwr takes the given Go string and converts it to return a ZWRITE-formatted string
-//   - If the returned zwrite-formatted string does not fit within the maximum YottaDB string size, return a *Error with code=ydberr.INVSTRLEN.
+//   - If the returned zwrite-formatted string does not fit within the maximum YottaDB string size, return a *Error with Code=ydberr.INVSTRLEN.
 //     Otherwise, return the ZWRITE-formatted string.
 //   - Note that the length of a string in zwrite format is always greater than or equal to the string in its original, unencoded format.
+//
+// Panics on other errors because they are are all panic-worthy (e.g. invalid variable names).
 func (conn *Conn) Str2Zwr(str string) (string, error) {
 	cconn := conn.cconn
 	cbuf := conn.setValue(str)
@@ -322,7 +255,7 @@ type tpInfo struct {
 //     If localsToRestore[0] equals "*" then all local M database variables are restored on restart. Note that since Go has its own local
 //     variables it is unlikely that you will need this feature in Go.
 //   - Returns true to indicate that the transaction logic was successful and has been committed to the database, or false if a rollback was necessary.
-//   - Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
+//   - Panics on errors because they are are all panic-worthy (e.g. invalid variable names). See [yottadb.Error] for rationale.
 //
 // The callback function should:
 //   - Implement the required database logic taking into account key considerations for [Transaction Processing] code.
@@ -366,7 +299,7 @@ func (conn *Conn) Transaction(transID string, localsToRestore []string, callback
 // TransactionFast is a faster version of Transaction that does not ensure durability,
 // for applications that do not require durability or have alternate durability mechanisms (such as checkpoints).
 // It is implemented by setting the transID to the special name "BATCH" as discussed in [Transaction Processing].
-//   - Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
+//   - Panics on errors because they are are all panic-worthy (e.g. invalid variable names). See [yottadb.Error] for rationale.
 //
 // [Transaction Processing]: https://docs.yottadb.com/ProgrammersGuide/langfeat.html#transaction-processing
 func (conn *Conn) TransactionFast(localsToRestore []string, callback func() int) bool {

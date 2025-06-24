@@ -33,7 +33,7 @@ import (
 import "C"
 
 // indexBuf finds the address of index i within a ydb_buffer_t array.
-// - This function is necessary because CGo discards Node.cnode.buffersn[] since it has no size.
+//   - This function is necessary because CGo discards Node.cnode.buffersn[] since it has no size.
 func bufferIndex(buf *C.ydb_buffer_t, i int) *C.ydb_buffer_t {
 	return (*C.ydb_buffer_t)(unsafe.Add(unsafe.Pointer(buf), C.sizeof_ydb_buffer_t*i))
 }
@@ -48,6 +48,9 @@ func bufferIndex(buf *C.ydb_buffer_t, i int) *C.ydb_buffer_t {
 //   - Concurrency: Do not run database actions on node objects created in another goroutine. If you want to
 //     act on a node object passed in from another goroutine, first call [Node.Clone](conn) to make a copy of the
 //     other goroutine's node object using the current goroutine's connection `conn`. Then perform methods on that.
+//
+// Node methods panic on errors because they are are all panic-worthy (e.g. invalid variable names).
+// See [yottadb.Error] for error strategy and rationale.
 type Node struct {
 	// Node type wraps a C.node struct in a Go struct so Go can add methods to it.
 	// Pointer to C.node rather than the item itself so we can point to it from C without Go moving it.
@@ -202,7 +205,6 @@ func (n *Node) String() string {
 
 // Set applies val to the value of a database node.
 //   - The val may be a string, integer, or float because it is converted to a string using fmt.Sprint().
-//   - Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
 func (n *Node) Set(val any) {
 	cnode := n.cnode // access C equivalents of Go types
 	cconn := cnode.conn
@@ -234,7 +236,6 @@ func (n *Node) Get(defaultValue ...string) string {
 //     If you need to distinguish between an empty string and a value-less node you must use [Node.HasValue]()
 //   - bool false is returned on errors GVUNDEF (undefined M global), LVUNDEF (undefined M local), or INVSVN (invalid Special Variable Name).
 //   - You may use [Node.Get]() to replace undefined variable errors with a default value.
-//   - Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
 func (n *Node) Lookup() (string, bool) {
 	cnode := n.cnode // access C equivalents of Go types
 	cconn := cnode.conn
@@ -264,8 +265,6 @@ func (n *Node) Lookup() (string, bool) {
 //   - 11: node has both value and subtree
 //
 // It is private because it really isn't a nice name.
-//
-// Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
 func (n *Node) data() int {
 	cnode := n.cnode // access C equivalents of Go types
 	cconn := cnode.conn
@@ -279,44 +278,37 @@ func (n *Node) data() int {
 }
 
 // HasValue returns whether the database node has a value.
-//   - Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
 func (n *Node) HasValue() bool {
 	return (n.data() & 1) == 1
 }
 
 // HasValueOnly returns whether the database node has a value but no tree.
-//   - Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
 func (n *Node) HasValueOnly() bool {
 	return n.data() == 1
 }
 
 // HasTree returns whether the database node has a tree of subscripts containing data.
-//   - Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
 func (n *Node) HasTree() bool {
 	return (n.data() & 10) == 10
 }
 
 // HasTreeOnly returns whether the database node has no value but does have a tree of subscripts that contain data
-//   - Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
 func (n *Node) HasTreeOnly() bool {
 	return n.data() == 10
 }
 
 // HasBoth returns whether the database node has both tree and value.
-//   - Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
 func (n *Node) HasBoth() bool {
 	return (n.data() & 11) == 11
 }
 
 // HasNone returns whether the database node has neither tree nor value.
-//   - Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
 func (n *Node) HasNone() bool {
 	return (n.data() & 11) == 0
 }
 
 // Kill deletes a database node including its value and any subtree.
 //   - To delete only the value of a node use [Node.Clear]()
-//   - Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
 func (n *Node) Kill() {
 	cnode := n.cnode // access C equivalents of Go types
 	cconn := cnode.conn
@@ -329,7 +321,6 @@ func (n *Node) Kill() {
 
 // Clear deletes the node value, not its child subscripts.
 //   - Equivalent to YottaDB M command ZKILL
-//   - Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
 func (n *Node) Clear() {
 	cnode := n.cnode // access C equivalents of Go types
 	cconn := cnode.conn
@@ -344,14 +335,13 @@ func (n *Node) Clear() {
 //   - The amount may be an integer, float or string representation of the same.
 //   - Convert the value of the node to a number first by discarding any trailing non-digits and returning zero if it is still not a number.
 //   - Return the new value of the node.
-//   - Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
 func (n *Node) Incr(amount any) float64 {
 	cnode := n.cnode // access C equivalents of Go types
 	cconn := cnode.conn
 
 	str, ok := amount.(string)
 	if ok && str == "" {
-		panic(newYDBError(ydberr.IncrementEmpty, `cannot increment by the empty string ""`))
+		panic(newError(ydberr.IncrementEmpty, `cannot increment by the empty string ""`))
 	}
 
 	numberString := fmt.Sprint(amount)
@@ -366,7 +356,7 @@ func (n *Node) Incr(amount any) float64 {
 	valuestring := C.GoStringN(cconn.value.buf_addr, C.int(cconn.value.len_used))
 	value, err := strconv.ParseFloat(valuestring, 64)
 	if err != nil {
-		panic(newYDBError(ydberr.IncrementReturnInvalid, fmt.Sprintf("ydb_incr_st returned an invalid floating point number (%s): %s", valuestring, err)))
+		panic(newError(ydberr.IncrementReturnInvalid, fmt.Sprintf("ydb_incr_st returned an invalid floating point number (%s): %s", valuestring, err)))
 	}
 	return value
 }
@@ -406,7 +396,6 @@ func (n *Node) Lock(timeout ...time.Duration) bool {
 // Unlock decrements the count of a lock matching this node, releasing it if zero.
 // Equivalent to the M `LOCK -lockpath` command.
 //   - Returns nothing since releasing a lock cannot fail.
-//   - Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
 func (n *Node) Unlock() {
 	cnode := n.cnode // access C equivalents of Go types
 	cconn := cnode.conn
@@ -499,7 +488,6 @@ func (n *Node) _next(reverse bool) *Node {
 //   - The order of returned nodes matches the collation order of the M database.
 //   - The node path supplied does not need to exist in the database to find the next match.
 //   - If the supplied node n contains only a variable name without subscripts, the next variable (GLVN) name is returned instead of the next subscript.
-//   - Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
 //
 // Returns nil when there are no more subscripts at the level of the supplied node path, or a mutable node as follows:
 //   - if the supplied node is immutable, a mutable clone of n with its final subscript changed to the next node.
@@ -554,8 +542,6 @@ func (n *Node) _children(reverse bool) iter.Seq[*Node] {
 //   - The order of returned nodes matches the collation order of the M database.
 //   - This function never adjusts the supplied node even if it is mutable (it always creates its own mutable copy).
 //   - If you need to take an immutable snapshot of the returned mutable node, use [Node.Clone]().
-//
-// Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
 //
 // See:
 //   - [Node.ChildrenBackward]().
@@ -643,7 +629,6 @@ func (n *Node) _treeNext(reverse bool) *Node {
 //   - The node path supplied does not need to exist in the database to find the next match.
 //   - Returns nil when there are no more nodes after the given node path within the given database variable (GLVN).
 //   - Nodes that have 'null subscripts' (i.e. empty string) are all returned in their place except for the top-level GLVN(""), which is never returned.
-//   - Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
 //
 // See:
 //   - [Node.TreePrev]().
@@ -665,7 +650,6 @@ func (n *Node) TreePrev() *Node {
 //   - The next node is chosen in depth-first order (i.e by descending deeper into the subscript tree before moving to the next node at the same level).
 //   - The order of returned nodes matches the collation order of the M database.
 //   - Nodes that have 'null subscripts' (i.e. empty string) are all returned in their place.
-//   - Panics on errors because they are are all panic-worthy (e.g. invalid variable names).
 //
 // See:
 //   - [Node.TreeNext](), [Node.TreePrev]()

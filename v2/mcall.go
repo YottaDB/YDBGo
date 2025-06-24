@@ -48,7 +48,12 @@ type MFunctions struct {
 }
 
 // Call calls an M routine rname with parameters args and returns string, int64 or float64.
-// This version panics on errors. See [CallErr]() for a version that returns errors.
+// Since the programmer knows the return-type in advance from the M-call table, the return type may be safely
+// forced to that type with an unchecked type assertion. For example:
+//
+//	x = m.Call("add", 1, 2).(int64)
+//
+// This version panics on errors. See [MFunctions.CallErr]() for a version that returns errors.
 func (m *MFunctions) Call(rname string, args ...any) any {
 	routine := m.getRoutine(rname)
 	ret, err := m.Conn.callM(routine, args)
@@ -96,7 +101,7 @@ func (m *MFunctions) WrapErr(rname string) func(args ...any) (any, error) {
 func (m *MFunctions) getRoutine(name string) *RoutineData {
 	routine, ok := m.Table.Routines[name]
 	if !ok {
-		panic(newYDBError(ydberr.MCallNotFound, fmt.Sprintf("M routine '%s' not found in M-call table", name)))
+		panic(newError(ydberr.MCallNotFound, fmt.Sprintf("M routine '%s' not found in M-call table", name)))
 	}
 	return routine
 }
@@ -207,7 +212,7 @@ func parseType(typeStr string) (*typeSpec, error) {
 }
 
 // ParsePrototype parses one line of the ydb call-in file format.
-// - line is the text in the current line of the call-in file
+//   - line is the text in the current line of the call-in file
 //
 // Return *RoutineData containing routine name and Go function that wraps the M routine, and some metadata.
 // Note that the returned RoutineData.table is not filled in (nil) as this function does not know the table.
@@ -244,7 +249,7 @@ func parsePrototype(line string) (*RoutineData, error) {
 	// Create list of types for return value and each parameter
 	typ, err := parseType("*" + retType) // treat it as if it were a pointer type since it has to receive back a value
 	if err != nil {
-		err.(*YDBError).Message = fmt.Sprintf("return type (%s) %s", retType, err)
+		err.(*Error).Message = fmt.Sprintf("return type (%s) %s", retType, err)
 		return nil, err
 	}
 	if _, ok := returnTypes[typ.typ]; !ok {
@@ -258,7 +263,7 @@ func parsePrototype(line string) (*RoutineData, error) {
 	for i, typeStr := range regexp.MustCompile(`[^,\)]+`).FindAllString(params, -1) {
 		typ, err = parseType(typeStr)
 		if err != nil {
-			err.(*YDBError).Message = fmt.Sprintf("parameter %d (%s) %s", i+1, retType, err)
+			err.(*Error).Message = fmt.Sprintf("parameter %d (%s) %s", i+1, retType, err)
 			return nil, err
 		}
 		if typ.typ == "" {
@@ -296,13 +301,10 @@ func parsePrototype(line string) (*RoutineData, error) {
 }
 
 // Import loads a call-in table for use by this connection only.
-// The M routines listed in the call-in 'table' (specified below) are each wrapped in a Go function and returned in a map, indexed by routine name.
-// If 'table' contains ":" it is considered to be the call-in table specification itself; otherwise it is treated as the filename of a call-in file to be opened and read.
-// After calling Import, you can call an imported M routine using map[name](<parameters>).
+// The M routines listed in the call-in 'table' (specified below) are each wrapped in a Go function which may be subsequently
+// called using the returned [MFunctions.Call](name) or referenced as a Go function using [MFunctions.Wrap](name).
 //
-// Returns an MFunctions struct which contains three maps: one for routines that return string, one map for routines that return int64, and one float64.
-// For example, if your M function "Add" returns float64 you would call this using the third: sum := map3["Add"](3, 4)
-// Routines that do not return a value in M appear in the string map and actually return "". For example: map1["noop"]()
+// If 'table' string contains ":" it is considered to be the call-in table specification itself; otherwise it is treated as the filename of a call-in file to be opened and read.
 //
 // # M-call table format specification
 //
@@ -312,14 +314,17 @@ func parsePrototype(line string) (*RoutineData, error) {
 //
 //	Go_name: [ret_type] M_entrypoint(type, type, ...)
 //
-// - The Go_name may be any go string.
-// - The M_entrypoint is any valid [M entry reference].
-// - ret_type may be omitted if an M return value is not supplied. Otherwise it must be a pointer type matching one of: string, int64, float64
-// - Any spaces adjacent to commas, asterisk and square brackets (,*[]) are ignored.
-// Zero or more type specifications are allowed and must be a Go type specifier from the list: string, int, uint, int32, uint32, int64, uint64, float32, float64
+// Elements of that line are defined as follows:
+//   - Go_name may be any go string.
+//   - M_entrypoint is any valid [M entry reference].
+//   - ret_type may be omitted if an M return value is not supplied. Otherwise it must be *string, *int64, *float64 or omitted (for void return)
+//   - any spaces adjacent to commas, asterisk and square brackets (,*[]) are ignored.
+//
+// Zero or more parameter type specifications are allowed and must be a Go type specifier: string, int, uint, int32, uint32, int64, uint64, float32, float64,
 // or a pointer version of the same in Go type format (e.g. *int).
-// - If a pointer type is selected then the parameter is passed by reference so that the M routine can modify the parameter.
-// - Any *string types and string return values must be followed by a preallocation value in square brackets (e.g. *string[100]).
+//   - If a pointer type is selected then the parameter is passed by reference so that the M routine can modify the parameter.
+//   - Any *string types and string return values must be followed by a preallocation value in square brackets (e.g. *string[100]).
+//
 // This allows Go to preallocate enough space for the returned string. If necessary, YottaDB will truncate returned strings so they fit.
 //
 // Comments begin with // and continue to the end of the line. Blank lines or pure-comment lines are ignored.
@@ -346,8 +351,8 @@ func (conn *Conn) Import(table string) (*MFunctions, error) {
 	for i, line := range bytes.Split(prototypes, []byte{'\n'}) {
 		routine, err := parsePrototype(string(line))
 		if err != nil {
-			err := err.(*YDBError)
-			return nil, newYDBError(err.Code, fmt.Sprintf("%s line %d", err, i+1), newYDBError(ydberr.ImportParse, "")) // wrap ImportError under err
+			err := err.(*Error)
+			return nil, newError(err.Code, fmt.Sprintf("%s line %d", err, i+1), newError(ydberr.ImportParse, "")) // wrap ImportError under err
 		}
 		if routine == nil {
 			continue
@@ -410,8 +415,8 @@ func (conn *Conn) Import(table string) (*MFunctions, error) {
 	status := C.ydb_ci_tab_open_t(cconn.tptoken, &cconn.errstr, cstr, handle)
 	tbl.handle = *handle
 	if status != YDB_OK {
-		err := conn.lastError(status).(*YDBError)
-		return nil, newYDBError(err.Code, fmt.Sprintf("%s while processing call-in table:\n%s", err, tbl.YDBTable), newYDBError(ydberr.ImportOpen, ""))
+		err := conn.lastError(status).(*Error)
+		return nil, newError(err.Code, fmt.Sprintf("%s while processing call-in table:\n%s", err, tbl.YDBTable), newError(ydberr.ImportOpen, ""))
 	}
 
 	mfunctions := MFunctions{&tbl, conn}
@@ -442,12 +447,12 @@ func (conn *Conn) paramAlloc() unsafe.Pointer {
 // Return value is nil if the routine is not defined to return anything.
 func (conn *Conn) callM(routine *RoutineData, args []any) (any, error) {
 	if routine == nil {
-		panic(newYDBError(ydberr.MCallNil, "routine data passed to Conn.CallM() must not be nil"))
+		panic(newError(ydberr.MCallNil, "routine data passed to Conn.CallM() must not be nil"))
 	}
 	cconn := conn.cconn
 
 	if len(args) != len(routine.Types)-1 {
-		panic(newYDBError(ydberr.MCallWrongNumberOfParameters, fmt.Sprintf("%d parameters supplied whereas the M-call table specifies %d", len(args), len(routine.Types)-1)))
+		panic(newError(ydberr.MCallWrongNumberOfParameters, fmt.Sprintf("%d parameters supplied whereas the M-call table specifies %d", len(args), len(routine.Types)-1)))
 	}
 	printEntry("CallTable.CallM()")
 	// If we haven't already fetched the call description from YDB, do that now.
@@ -540,7 +545,7 @@ func (conn *Conn) callM(routine *RoutineData, args []any) (any, error) {
 			if typ.pointer {
 				asterisk = "*"
 			}
-			panic(newYDBError(ydberr.MCallTypeMismatch, fmt.Sprintf("parameter %d is %s but %s%s is specified in the M-call table", i+1, reflect.TypeOf(val), asterisk, typ.typ)))
+			panic(newError(ydberr.MCallTypeMismatch, fmt.Sprintf("parameter %d is %s but %s%s is specified in the M-call table", i+1, reflect.TypeOf(val), asterisk, typ.typ)))
 		}
 		switch val := args[i].(type) {
 		case string:
@@ -609,7 +614,7 @@ func (conn *Conn) callM(routine *RoutineData, args []any) (any, error) {
 			typeAssert(val, reflect.Float64)
 			*(*C.ydb_double_t)(param) = C.ydb_double_t(*val)
 		default:
-			panic(newYDBError(ydberr.MCallTypeUnhandled, fmt.Sprintf("unhandled type (%s) in parameter %d", reflect.TypeOf(val), i+1)))
+			panic(newError(ydberr.MCallTypeUnhandled, fmt.Sprintf("unhandled type (%s) in parameter %d", reflect.TypeOf(val), i+1)))
 		}
 		conn.vpAddParam(uintptr(unsafe.Pointer(param)))
 		param = unsafe.Add(param, paramSize)
@@ -650,7 +655,7 @@ func (conn *Conn) callM(routine *RoutineData, args []any) (any, error) {
 			ptr := (*C.ydb_double_t)(param)
 			retval = float64(*ptr)
 		default:
-			panic(newYDBError(ydberr.MCallTypeUnhandled, fmt.Sprintf("unhandled type (%s) in return of return value; report bug in YDBGo", typ.typ)))
+			panic(newError(ydberr.MCallTypeUnhandled, fmt.Sprintf("unhandled type (%s) in return of return value; report bug in YDBGo", typ.typ)))
 		}
 		param = unsafe.Add(param, paramSize)
 	}
@@ -686,7 +691,7 @@ func (conn *Conn) callM(routine *RoutineData, args []any) (any, error) {
 				*val = float64(*ptr)
 			case string, int, uint, int32, uint32, int64, uint64, float32, float64:
 			default:
-				panic(newYDBError(ydberr.MCallTypeUnhandled, fmt.Sprintf("unhandled type (%s) in parameter %d; report bug in YDBGo", reflect.TypeOf(val), i+1)))
+				panic(newError(ydberr.MCallTypeUnhandled, fmt.Sprintf("unhandled type (%s) in parameter %d; report bug in YDBGo", reflect.TypeOf(val), i+1)))
 			}
 		}
 		param = unsafe.Add(param, paramSize)
