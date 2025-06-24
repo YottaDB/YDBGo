@@ -48,6 +48,7 @@ before_script:
     - cd ${TEST_VERSION}
     - go get -t
     - go test -v
+    # the following ls tests for the existence of the wildcard to prevent cp error an when no file exists
     - ls /tmp/ydbgo* &>/dev/null && cp -r /tmp/ydbgo* $CI_PROJECT_DIR/artifacts
     - ls m_routines  &>/dev/null && cp -r m_routines  $CI_PROJECT_DIR/artifacts
     - find $CI_PROJECT_DIR/artifacts

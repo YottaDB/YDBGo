@@ -1,15 +1,12 @@
 # YottaDB Go Wrapper v2
 
-[![Build Status](https://gitlab.com/YottaDB/Lang/YDBGo2/badges/master/build.svg)](https://gitlab.com/YottaDB/Lang/YDBGo2/commits/master)
-[![Go Report Card](https://goreportcard.com/badge/gitlab.com/YottaDB/Lang/YDBGo?style=flat-square)](https://goreportcard.com/report/gitlab.com/YottaDB/Lang/YDBGo2)
-[![Go Doc](https://img.shields.io/badge/godoc-reference-blue.svg?style=flat-square)](http://godoc.org/gitlab.com/YottaDB/Lang/YDBGo2)
-[![Coverage report](https://gitlab.com/YottaDB/Lang/YDBGo2/badges/master/coverage.svg?job=coverage)](https://gitlab.com/YottaDB/Lang/YDBGo2/-/jobs)
+[![Go Report Card](https://goreportcard.com/badge/gitlab.com/YottaDB/Lang/YDBGo?style=flat-square)](https://goreportcard.com/report/gitlab.com/YottaDB/Lang/YDBGo/v2) [![Go Doc](https://img.shields.io/badge/godoc-reference-blue.svg?style=flat-square)](http://godoc.org/gitlab.com/YottaDB/Lang/YDBGo/v2) [![Coverage report](https://gitlab.com/YottaDB/Lang/YDBGo/v2/badges/master/coverage.svg?job=coverage)](https://gitlab.com/YottaDB/Lang/YDBGo/v2/-/jobs)
 
 # Using YDBGo to write application
-YottaDB must be installed. See [Get Started](https://yottadb.com/product/get-started/) for instructions for installing YottaDB. YDBGo supports versions YottaDB r1.24 or later. If you wish to use an earlier version, set up `pkg-config` [below](#setup-pkg-config).
+YottaDB must be installed. See [Get Started](https://yottadb.com/product/get-started/) for instructions for installing YottaDB. YDBGo supports versions YottaDB r1.34 or later.
 
 1. A YottaDB database must be set up and the environment variables configured.
-   This can be easily done by sourcing `/path/to/yottadb/ydb_env_set`, e.g.:
+   This can be easily done by sourcing `/path/to/yottadb/ydb_env_set`. For example:
 
 ```sh
 source $(pkg-config --variable=prefix yottadb)/ydb_env_set
@@ -28,21 +25,23 @@ cd ydb-example
 go mod init example.com/yottadb-example
 ```
 
-4. Create a Go program (e.g. `ydb.go`) containing your main program with an import of `lang.yottadb.com/go/yottadb`, e.g.:
+4. Create a Go program (e.g. `ydb.go`) containing your main program with an import of `lang.yottadb.com/go/yottadb`, e.g. the [example script in the YDBGo documentation](https://pkg.go.dev/lang.yottadb.com/go/yottadb/v2/#pkg-overview).
 
 ```go
 package main
 
 import (
-	"lang.yottadb.com/go/yottadb2"
+	"lang.yottadb.com/go/v2/yottadb"
 )
 
 func main() {
-	// Set global node ^hello("world")="Sawadee (hello in Thai)"
-	err := yottadb.SetValE(yottadb.NOTTP, nil, "สวัสดี", "^hello", []string{"world"})
-	if err != nil {
-		panic(err)
-	}
+	defer yottadb.Shutdown(yottadb.InitPanic())
+	conn := yottadb.NewConn()
+
+	// Store unicode greeting into global node ^hello("world")
+	greeting := conn.Node("^hello", "world")
+	greeting.Set("สวัสดี") // Sawadee (hello in Thai)
+	fmt.Println(greeting.Get())
 }
 ```
 
@@ -58,17 +57,19 @@ func main() {
 9. `go install` will install the exe for you in $GOPATH/bin or `~/go` by default.
 
 # Developing this wrapper
-To develop the YottaDB Go wrapper itself you may wish to import your *local* version of the wrapper from a separate local client of the wrapper. To do this, clone the wrapper, then in a separate directory set up the client as above. Then use `go work` commands to point it to the wrapper on your local file system rather than the internet repository. Run the following commands in the client directory:
+To develop the YottaDB Go wrapper itself you may wish to import a a *local* version of the wrapper instead of the public wrapper on the internet. To do this, clone the wrapper, then in a separate directory create your application that uses the wrapper and use `go work` commands to point it to the wrapper on your local file system rather than the internet repository.
+
+To do so, run the following commands in the client app directory:
 
 ```sh
 go work init
-go work use /your/local/path/to/YDBGo2  # Set this path to your YDBGo clone
+go work use . /your/local/path/to/YDBGo/v2  # Set this path to your YDBGo clone
 git ignore go.work
 ```
 
 The `git ignore` line prevents you from committing this local change to the public who will not have your local wrapper clone.
 
-Now you can modify the YottaDB Go wrapper on your local file system, and it will be immediately used by your client application, even before you commit the wrapper changes.
+Now you can modify the YottaDB Go wrapper elsewhere on your local file system, and it will be immediately used by your client application, even before you commit the wrapper changes.
 
 ## Testing
 
@@ -80,8 +81,8 @@ To test this wrapper:
 
 Notes:
 
-* For example, some CPUs gradually warm up during benchmarking, making the first few tests unfairly faster. Benchmark results are a lot more accurate and fair if you install [`perflock`](https://github.com/aclements/perflock), which `make bench` will invoke automatically.
-* Perflock is apparently less effective on some CPUs. You can test whether it's working to produce consistent results by running  `make check` which will run each benchmark several times so that you can see whether you're experiencing warm-up effects.
+* Some CPUs gradually warm up during benchmarking, making the first few tests unfairly faster. Benchmark results are a lot more accurate and fair if you install [`perflock`](https://github.com/aclements/perflock), which `make bench` will then invoke it automatically.
+* Perflock is apparently less effective on some CPUs. You can test whether it's working to produce consistent results by running  `make check` which will run each benchmark several times so that you can see whether you're experiencing warm-up effects as the multiple tests run.
 
 ## Contributing
 
@@ -91,34 +92,6 @@ Last, if you plan to commit, you should set-up pre-commit hooks.
 ln -s ../../pre-commit .git/hooks
 go install honnef.co/go/tools/cmd/staticcheck@latest
 ```
-
-# Advanced Configuration
-
-## Setup `pkg-config`
-
-This package uses `pkg-config` to find `libyottadb.so`. The appropriate file is generated by YottaDB r1.24 and greater via `ydbinstall` (any other installation methods do not install the `yottadb.pc` file).
-
-If you need to manually generate the `yottadb.pc` file the contents should look something similar to:
-
-```sh
-prefix=/usr/local/lib/yottadb/r124
-
-exec_prefix=${prefix}
-includedir=${prefix}
-libdir=${exec_prefix}
-
-Name: YottaDB
-Description: YottaDB database library
-Version: r1.24
-Cflags: -I${includedir}
-Libs: -L${libdir} -lyottadb -Wl,-rpath,${libdir}
-```
-
-Change the prefix to the correct path for your environment.
-
-NOTE: you cannot use environment variables for the prefix path (e.g. `$ydb_dist`) it must be a fully qualified path.
-
-You can also override the path used by `pkg-config` to find `yottadb.pc` with the environment variable `PKG_CONFIG_PATH` and a path to where the `yottadb.pc` file resides.
 
 ## Docker Container
 
@@ -135,7 +108,6 @@ docker build . -t ydbgo
 ### Using the container to develop YDBGo
 ```sh
 docker run --rm -it -v ~/goprojects:/goprojects -v ~/work/gitlab/YDBGo:/YDBGo -v ${PWD}/data:/data -w /goprojects ydbgo bash
-. /opt/yottadb/current/ydb_env_set
 ```
 
 Then follow the instructions for usage and setting up for development above.

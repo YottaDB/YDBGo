@@ -44,6 +44,15 @@ var inInit sync.Mutex        // Mutex for access to init AND exit
 var wgSigInit sync.WaitGroup // Used to make sure signals are setup before Init() exits
 var initCount atomic.Int64   // Increment when Init() called and decrement when Shutdown() called; shutdown when it reaches 0
 
+// InitPanic calls [Init]() and panics on errors. It is purely to shorten example code.
+func InitPanic() *DB {
+	db, err := Init()
+	if err != nil {
+		panic(err)
+	}
+	return db
+}
+
 // Init initializes the YottaDB engine and set up signal handling.
 // Init may be called multiple times (e.g. by different goroutines) but [Shutdown]() must be called exactly once
 // for each time Init() was called. See [Shutdown] for more detail on the fallout from incorrect usage.

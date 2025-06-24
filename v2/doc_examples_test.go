@@ -24,19 +24,23 @@ import (
 
 // ExampleDoc tests the example given in the package doc at the top of doc.go
 func ExampleNewConn() {
-	db, err := yottadb.Init()
-	if err != nil {
-		panic(err)
-	}
-	defer yottadb.Shutdown(db)
+	defer yottadb.Shutdown(yottadb.InitPanic())
 	conn := yottadb.NewConn()
+
 	n := conn.Node("person", "name")
 	n.Child("first").Set("Joe")
 	n.Child("last").Set("Bloggs")
 	for x := range n.Children() {
-		fmt.Printf("%s = %s\n", x, x.Get())
+		fmt.Println(x.String(), "=", x.Get())
 	}
+
+	// Store unicode greeting into node ^hello("world")
+	greeting := conn.Node("^hello", "world")
+	greeting.Set("สวัสดี") // Sawadee (hello in Thai)
+	fmt.Println(greeting.Get(), n.Child("first").Get(), n.Child("last").Get())
+
 	// Output:
 	// person("name","first") = Joe
 	// person("name","last") = Bloggs
+	// สวัสดี Joe Bloggs
 }

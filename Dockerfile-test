@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2024-2025 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -15,10 +15,10 @@ FROM yottadb/yottadb-base:latest-master
 
 RUN apt-get update && apt-get install -y --no-install-recommends wget ca-certificates git g++ gcc libc6-dev make pkg-config && rm -rf /var/lib/apt/lists/*
 
-ENV ydb_dist /opt/yottadb/current
-ENV GOLANG_VERSION 1.24.0
-ENV GOPROXY https://proxy.golang.org/cached-only
-ENV PATH /usr/local/go/bin:$PATH
+ENV ydb_dist=/opt/yottadb/current
+ENV GOLANG_VERSION=1.24.0
+ENV GOPROXY=https://proxy.golang.org/cached-only
+ENV PATH=/usr/local/go/bin:$PATH
 
 RUN wget -O go.tgz -q https://golang.org/dl/go${GOLANG_VERSION}.linux-amd64.tar.gz
 RUN tar -C /usr/local -xzf go.tgz && rm go.tgz
