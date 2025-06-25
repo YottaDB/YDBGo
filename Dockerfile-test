@@ -29,3 +29,8 @@ WORKDIR /source
 ENV YDB_GO_SKIP_TIMED_TESTS="yes"
 RUN go get -t
 RUN go test -v
+
+ADD v2 /source/v2
+WORKDIR /source/v2
+RUN go get -t
+RUN go test -v

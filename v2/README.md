@@ -2,7 +2,10 @@
 
 [![Go Report Card](https://goreportcard.com/badge/gitlab.com/YottaDB/Lang/YDBGo?style=flat-square)](https://goreportcard.com/report/gitlab.com/YottaDB/Lang/YDBGo/v2) [![Go Doc](https://img.shields.io/badge/godoc-reference-blue.svg?style=flat-square)](http://godoc.org/gitlab.com/YottaDB/Lang/YDBGo/v2) [![Coverage report](https://gitlab.com/YottaDB/Lang/YDBGo/v2/badges/master/coverage.svg?job=coverage)](https://gitlab.com/YottaDB/Lang/YDBGo/v2/-/jobs)
 
-# Using YDBGo to write application
+Warning: YDBGo v2 is in alpha testing.
+
+# Quick Start
+
 YottaDB must be installed. See [Get Started](https://yottadb.com/product/get-started/) for instructions for installing YottaDB. YDBGo supports versions YottaDB r1.34 or later.
 
 1. A YottaDB database must be set up and the environment variables configured.
@@ -70,6 +73,24 @@ git ignore go.work
 The `git ignore` line prevents you from committing this local change to the public who will not have your local wrapper clone.
 
 Now you can modify the YottaDB Go wrapper elsewhere on your local file system, and it will be immediately used by your client application, even before you commit the wrapper changes.
+
+## Mixing YDBGo v1 and v2
+
+Applications that use v1 will continue to operate without change. Moreover, to aid migration of large applications from YDBGo v1 to v2, it is even possible to use v1 and v2 in one application. However, the the two versions cannot use each other's data types so this will only make sense where the old and new functionality is fairly modular. All signal handling will need to be migrated to v2 since v1 signal handlers will no longer be called.
+
+To use v1 and v2 in one application you will need to add a named import like this:
+
+```go
+import v1 "lang.yottadb.com/go/yottadb"
+```
+
+You must remove any calls to v1 `Init()` and `Exit()` and instead add the following line immediately after calling v2 `Init()`:
+
+```go
+v1.ForceInit()  // only available in v1.2.8
+```
+
+This will let v1 know that v2 has already done the initialization.
 
 ## Testing
 

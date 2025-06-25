@@ -5,7 +5,12 @@
 [![Go Doc](https://img.shields.io/badge/godoc-reference-blue.svg?style=flat-square)](http://godoc.org/gitlab.com/YottaDB/Lang/YDBGo)
 [![Coverage report](https://gitlab.com/YottaDB/Lang/YDBGo/badges/master/coverage.svg?job=coverage)](https://gitlab.com/YottaDB/Lang/YDBGo/-/jobs)
 
+# Deprecation Warning
+
+[YDBGo v2](pkg/lang.yottadb.com/go/yottadb/v2) is in alpha testing. YDBGo v1 will be deprecated once v2 has reached v2.0.2 production release, however v1 applications will continue to operate without change due to Go version management.
+
 # Usage (Writing a YDBGo Client application)
+
 YottaDB must be installed. See [Get Started](https://yottadb.com/product/get-started/) for instructions for installing YottaDB. YDBGo supports versions YottaDB r1.24 or later. If you wish to use an earlier version, see [pkg-config set-up](#setup-pkg-config) below.
 
 1. A YottaDB database must be set-up and the environment variables configured.

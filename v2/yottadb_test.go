@@ -169,15 +169,12 @@ func _testMain(m *testing.M) int {
 		testDir = createDatabase(testDir, logger)
 	}
 
-	// run init/exit for both v1 and v2 code so we can compare them
-	// Run v2 code last so that it sets signals to point to itself
-	v1.Init()
-	defer v1.Exit()
 	db, err := Init()
 	if err != nil {
 		panic(err)
 	}
 	defer Shutdown(db)
+	v1.ForceInit()  // Tell v1 that v2 has done the initialization
 
 	initRandstr()
 	ret := m.Run()

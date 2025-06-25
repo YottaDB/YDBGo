@@ -13,10 +13,9 @@
 /*
 Package yottadb is a Go wrapper for a YottaDB database - a mature, high performance, transactional NoSQL engine with proven speed and stability.
 
-Warning: YDBGo v2 is in alpha testing.
-
 The package requires minimum versions of Go 1.24 and YottaDB r1.34. It uses CGo to interface between this Go wrapper and the YottaDB engine written in C.
 Its use of the `Node` type to pin memory references to database subscript strings gives it optimal speed.
+To aid migration of YDBGo v1 to v2, it is possible to use [both in one application].
 
 # Example
 
@@ -53,6 +52,7 @@ Output:
 
 [YottaDB's data model]: https://docs.yottadb.com/MultiLangProgGuide/MultiLangProgGuide.html#concepts
 [Install YottaDB]: https://yottadb.com/product/get-started/
+[both in one application]: https://gitlab.com/YottaDB/Lang/YDBGo/-/blob/master/v2/README.md#mixing-ydbgo-v1-and-v2
 
 [ACID transactions]: https://en.wikipedia.org/wiki/ACID_(computer_science)
 [YottaDB transactions]: https://docs.yottadb.com/MultiLangProgGuide/MultiLangProgGuide.html#transaction-processing

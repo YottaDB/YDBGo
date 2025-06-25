@@ -17,7 +17,7 @@ Package yottadb provides a Go wrapper for YottaDB - a mature, high performance, 
 
 v2 docs are at [pkg/lang.yottadb.com/go/yottadb/v2].
 
-Deprecated: This doc is for the deprecated v1.
+Deprecated: v1 will be deprecated once v2 has reached v2.0.2 production release.
 
 # YottaDB Quick Start
 
