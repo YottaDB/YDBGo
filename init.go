@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2020-2022 YottaDB LLC and/or its subsidiaries.	//
+// Copyright (c) 2020-2025 YottaDB LLC and/or its subsidiaries.	//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -229,6 +229,7 @@ func shutdownSignalGoroutines() {
 // YDBWrapperPanic is a function called from C code. The C code routine address is passed to YottaDB via the ydb_main_lang_init()
 // call in the below initializeYottaDB() call and is called by YottaDB when it has completed processing a deferred fatal signal
 // and needs to exit in a "Go-ish" manner. The parameter determines the type of panic that gets raised.
+//
 //export YDBWrapperPanic
 func YDBWrapperPanic(sigNum C.int) {
 	var sig syscall.Signal
@@ -238,6 +239,13 @@ func YDBWrapperPanic(sigNum C.int) {
 	shutdownSignalGoroutines()                // Close the goroutines down with their signal notification channels
 	sig = syscall.Signal(sigNum)              // Convert numeric signal number to Signal type for use in panic() messagee
 	panic(fmt.Sprintf("YDB: Fatal signal %d (%v) occurred", sig, sig))
+}
+
+// ForceInit may be called to tell YDBGo that initialization has already occurred.
+// This is for use only by users who are mixing v1 and v2 in one application and have already done the initialization with YDBGo v2.
+// See v2 README.md for more information.
+func ForceInit() {
+	atomic.StoreUint32(&ydbInitialized, 1) // YottaDB wrapper is now initialized
 }
 
 // initializeYottaDB is a function to initialize the YottaDB engine. This is an atypical method of doing simple API
@@ -253,7 +261,7 @@ func initializeYottaDB() {
 	printEntry("initializeYottaDB()")
 	ydbInitMutex.Lock()
 	// Verify we need to be initialized
-	if 1 == ydbInitialized {
+	if 1 == atomic.LoadUint32(&ydbInitialized) {
 		ydbInitMutex.Unlock() // Already initialized - nothing to see here
 		return
 	}
