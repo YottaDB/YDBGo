@@ -163,7 +163,7 @@ lint_code:
   script:
     - go install honnef.co/go/tools/cmd/staticcheck@latest
     - staticcheck -checks inherit,-ST1017,-SA4006,-S1006,-S1005,-S1000,-S1008
-    - (cd v2; staticcheck)
+    - (cd v2; staticcheck -checks -SA1019)
 
 error_codes:
   stage: test

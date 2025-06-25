@@ -35,6 +35,9 @@ import (
 void *getfunc_ydb_cip_t(void) {
         return (void *)&ydb_cip_t;
 }
+
+#cgo nocallback ydb_ci_tab_switch_t
+#cgo nocallback ydb_ci_tab_open_t
 */
 import "C"
 

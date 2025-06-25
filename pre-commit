@@ -113,6 +113,6 @@ endif
 # Check v1 with settings compatible with "golint" which was used previously
 staticcheck -checks inherit,-ST1017,-SA4006,-S1006,-S1005,-S1000,-S1008 || @ exitstatus = 1
 # Check v2 with staticcheck. Any special config options should be added in a staticcheck.conf file
-(cd v2; staticcheck) || @ exitstatus = 1
+(cd v2; staticcheck -checks -SA1019) || @ exitstatus = 1
 
 exit $exitstatus

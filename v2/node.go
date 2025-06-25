@@ -29,6 +29,18 @@ import (
 
 /* #include "libyottadb.h"
 #include "yottadb.h"
+
+#cgo nocallback ydb_set_st
+#cgo nocallback ydb_get_st
+#cgo nocallback ydb_data_st
+#cgo nocallback ydb_delete_st
+#cgo nocallback ydb_incr_st
+#cgo nocallback ydb_lock_incr_st
+#cgo nocallback ydb_lock_decr_st
+#cgo nocallback ydb_subscript_previous_st
+#cgo nocallback ydb_subscript_next_st
+#cgo nocallback ydb_node_previous_st
+#cgo nocallback ydb_node_next_st
 */
 import "C"
 

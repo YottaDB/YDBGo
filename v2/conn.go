@@ -49,6 +49,10 @@ extern int tpCallbackWrapper(uint64_t tptoken, ydb_buffer_t *errstr, void *callb
 int tp_callback_wrapper(uint64_t tptoken, ydb_buffer_t *errstr, void *callback) {
   return tpCallbackWrapper(tptoken, errstr, callback);
 }
+
+#cgo nocallback ydb_zwr2str_st
+#cgo nocallback ydb_str2zwr_st
+#cgo nocallback ydb_delete_excl_st
 */
 import "C"
 
