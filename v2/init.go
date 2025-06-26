@@ -183,8 +183,8 @@ func initCheck() {
 // If Shutdown() is not called prior to process termination, steps must be taken to ensure database integrity as documented in [Database Integrity]
 // and unreleased locks may cause small subsequent delays (see [relevant LKE documentation]).
 //
-// Recommended way to call [Init]() is for your main routine to defer yottadb.Shutdown(yottadb.Init()) early in the main routine's initialization, and then
-// for the main routine to confirm that all goroutines have stopped or have completely finished accessing the database before returning.
+// It is recommended defer [Shutdown]() immediately after calling [Init]() in the main routine, and then for the
+// main routine to confirm that all goroutines have stopped or have completely finished accessing the database before exiting.
 //
 // Cautions:
 //   - If goroutines that access the database are spawned, it is the main routine's responsibility to ensure that all such goroutines have

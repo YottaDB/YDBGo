@@ -59,21 +59,6 @@ func main() {
 
 9. `go install` will install the exe for you in $GOPATH/bin or `~/go` by default.
 
-# Developing this wrapper
-To develop the YottaDB Go wrapper itself you may wish to import a a *local* version of the wrapper instead of the public wrapper on the internet. To do this, clone the wrapper, then in a separate directory create your application that uses the wrapper and use `go work` commands to point it to the wrapper on your local file system rather than the internet repository.
-
-To do so, run the following commands in the client app directory:
-
-```sh
-go work init
-go work use . /your/local/path/to/YDBGo/v2  # Set this path to your YDBGo clone
-git ignore go.work
-```
-
-The `git ignore` line prevents you from committing this local change to the public who will not have your local wrapper clone.
-
-Now you can modify the YottaDB Go wrapper elsewhere on your local file system, and it will be immediately used by your client application, even before you commit the wrapper changes.
-
 ## Mixing YDBGo v1 and v2
 
 Applications that use v1 will continue to operate without change. Moreover, to aid migration of large applications from YDBGo v1 to v2, it is even possible to use v1 and v2 in one application. However, the the two versions cannot use each other's data types so this will only make sense where the old and new functionality is fairly modular. All signal handling will need to be migrated to v2 since v1 signal handlers will no longer be called.
@@ -113,6 +98,20 @@ Last, if you plan to commit, you should set-up pre-commit hooks.
 ln -s ../../pre-commit .git/hooks
 go install honnef.co/go/tools/cmd/staticcheck@latest
 ```
+
+To develop the YottaDB Go wrapper itself you may wish to import a *local* version of the wrapper instead of the public wrapper on the internet. To do this, clone the wrapper, then in a separate directory create your application that uses the wrapper and use `go work` commands to point it to the wrapper on your local file system rather than the internet repository.
+
+To do so, run the following commands in the client app directory:
+
+```sh
+go work init
+go work use . /your/local/path/to/YDBGo/v2  # Set this path to your YDBGo clone
+git ignore go.work
+```
+
+The `git ignore` line prevents you from committing this local change to the public who will not have your local wrapper clone.
+
+Now you can modify the YottaDB Go wrapper elsewhere on your local file system, and it will be immediately used by your client application, even before you commit the wrapper changes.
 
 ## Docker Container
 
