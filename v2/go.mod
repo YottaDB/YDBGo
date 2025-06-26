@@ -4,7 +4,7 @@ go 1.24.0
 
 require (
 	github.com/stretchr/testify v1.8.2
-	lang.yottadb.com/go/yottadb v1.2.6
+	lang.yottadb.com/go/yottadb v1.2.8 // v1 import required for benchmarks which compare v1 against v2
 )
 
 require (
