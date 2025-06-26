@@ -23,7 +23,7 @@ import (
 
 func setPath(conn *Conn) {
 	zroutines := conn.Node("$ZROUTINES")
-	zroutines.Set("./examples " + zroutines.Get())
+	zroutines.Set("./test " + zroutines.Get())
 }
 
 func TestImport(t *testing.T) {
