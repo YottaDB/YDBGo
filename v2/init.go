@@ -44,8 +44,8 @@ var inInit sync.Mutex        // Mutex for access to init AND exit
 var wgSigInit sync.WaitGroup // Used to make sure signals are setup before Init() exits
 var initCount atomic.Int64   // Increment when Init() called and decrement when Shutdown() called; shutdown when it reaches 0
 
-// InitPanic calls [Init]() and panics on errors. It is purely to shorten example code.
-func InitPanic() *DB {
+// MustInit calls [Init]() and panics on errors. It is purely to shorten example code.
+func MustInit() *DB {
 	db, err := Init()
 	if err != nil {
 		panic(err)

@@ -24,7 +24,7 @@ To aid migration of YDBGo v1 to v2, it is possible to use [both in one applicati
 	import "lang.yottadb.com/go/yottadb/v2"
 
 	func main() {
-		defer yottadb.Shutdown(yottadb.InitPanic())
+		defer yottadb.Shutdown(yottadb.MustInit())
 		conn := yottadb.NewConn()
 
 		n := conn.Node("person", "name")

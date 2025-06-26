@@ -38,7 +38,7 @@ import (
 )
 
 func main() {
-	defer yottadb.Shutdown(yottadb.InitPanic())
+	defer yottadb.Shutdown(yottadb.MustInit())
 	conn := yottadb.NewConn()
 
 	// Store unicode greeting into global node ^hello("world")
