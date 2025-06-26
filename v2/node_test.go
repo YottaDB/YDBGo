@@ -216,11 +216,11 @@ func ExampleNode_Children() {
 }
 
 // Example of getting a mutable version of node
-func ExampleNode_mutate() {
+func ExampleNode_Mutate() {
 	conn := NewConn()
 	n := conn.Node("X", "1", "2", "3")
-	mutation1 := n.mutate("4")
-	mutation2 := n.mutate("text")
+	mutation1 := n.Mutate("4")
+	mutation2 := n.Mutate("text")
 	fmt.Println(n)
 	fmt.Println(mutation1)
 	fmt.Println(mutation2)

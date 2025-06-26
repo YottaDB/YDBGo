@@ -419,9 +419,16 @@ func (n *Node) Unlock() {
 	}
 }
 
-// mutate returns a mutable version of node n with the final subscript changed to the given value.
+// Mutate returns a mutable version of node n with the final subscript changed to the given value.
 //   - Only creates a clone of node if the supplied node is not already mutable or doesn't have enough space for the changed subscript.
-func (n *Node) mutate(value string) *Node {
+//
+// Since creating new nodes is expensive, this method may be used for a fast iterator. For example, to kill nodes var(0..1000000):
+//
+//	n := conn.Node("var", "").Mutate("")
+//	for i := range 1000000 {
+//	  n.Mutate(strconv.Itoa(i)).kill()
+//	}
+func (n *Node) Mutate(value string) *Node {
 	cnode := n.cnode // access C equivalents of Go types
 	retNode := n
 	lastbuf := bufferIndex(&cnode.buffers, int(cnode.len-1))
@@ -490,7 +497,7 @@ func (n *Node) _next(reverse bool) *Node {
 	// take a copy of the string so that we can release `space`
 	value := C.GoStringN(cconn.value.buf_addr, C.int(cconn.value.len_used))
 
-	return n.mutate(value)
+	return n.Mutate(value)
 }
 
 // Next returns a Node instance pointing to the next subscript at the same depth level.
@@ -532,7 +539,7 @@ func (n *Node) _children(reverse bool) iter.Seq[*Node] {
 	// node with enough spare subscript space to avoid Node.Next() having to immediately create a mutable node.
 	n = n.Child(preallocSubscript)
 	n.mutable = true
-	n = n.mutate("")
+	n = n.Mutate("")
 
 	return func(yield func(*Node) bool) {
 		for {
