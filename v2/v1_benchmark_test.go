@@ -25,11 +25,18 @@ import (
 	v2 "lang.yottadb.com/go/yottadb/v2"
 )
 
+// panicIf panics if err is not nil. For use in tests.
+func panicIf(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
+
 func BenchmarkV1Easy(b *testing.B) {
 	b.Run("Set", func(b *testing.B) {
 		for i := 0; b.Loop(); i++ {
 			err := yottadb.SetValE(yottadb.NOTTP, nil, v2.Randstr(), "var", []string{})
-			assert.Nil(b, err)
+			panicIf(err)
 		}
 	})
 }
@@ -42,7 +49,7 @@ func smplBenchmarkSet(b *testing.B) {
 	defer k.Free()
 	k.Subary.SetElemUsed(yottadb.NOTTP, nil, 0) // just varname; no subscripts
 	err := k.Varnm.SetValStr(yottadb.NOTTP, nil, "var")
-	assert.Nil(b, err)
+	panicIf(err)
 
 	// Set up buffer for value to store into `var`
 	var value yottadb.BufferT
@@ -52,9 +59,9 @@ func smplBenchmarkSet(b *testing.B) {
 	// Iterate the SET command to benchmark it
 	for b.Loop() {
 		err = value.SetValStr(yottadb.NOTTP, nil, v2.Randstr())
-		assert.Nil(b, err)
+		panicIf(err)
 		err = k.SetValST(yottadb.NOTTP, nil, &value)
-		assert.Nil(b, err)
+		panicIf(err)
 	}
 }
 
@@ -66,7 +73,7 @@ func smplBenchmarkGet(b *testing.B) {
 	defer k.Free()
 	k.Subary.SetElemUsed(yottadb.NOTTP, nil, 0) // just varname; no subscripts
 	err := k.Varnm.SetValStr(yottadb.NOTTP, nil, "var")
-	assert.Nil(b, err)
+	panicIf(err)
 
 	// Set up buffer for received value
 	var value yottadb.BufferT
@@ -76,9 +83,9 @@ func smplBenchmarkGet(b *testing.B) {
 	// Iterate the GET command to benchmark it
 	for b.Loop() {
 		err = k.ValST(yottadb.NOTTP, nil, &value)
-		assert.Nil(b, err)
+		panicIf(err)
 		_, err = value.ValStr(yottadb.NOTTP, nil)
-		assert.Nil(b, err)
+		panicIf(err)
 	}
 }
 
@@ -96,20 +103,20 @@ func smplBenchmarkSetVariantSubscripts(b *testing.B) {
 		k.Alloc(100, nSubs, 100)
 		// Store varname
 		err := k.Varnm.SetValStr(yottadb.NOTTP, nil, "var")
-		assert.Nil(b, err)
+		panicIf(err)
 		// Store each subscript
 		subs := k.Subary
 		for j := range nSubs {
 			sub := v2.Randstr()
 			err := subs.SetValStr(yottadb.NOTTP, nil, uint32(j), sub)
-			assert.Nil(b, err)
+			panicIf(err)
 		}
 		subs.SetElemUsed(yottadb.NOTTP, nil, nSubs)
 
 		err = value.SetValStr(yottadb.NOTTP, nil, v2.Randstr())
-		assert.Nil(b, err)
+		panicIf(err)
 		err = k.SetValST(yottadb.NOTTP, nil, &value)
-		assert.Nil(b, err)
+		panicIf(err)
 
 		k.Free()
 	}
@@ -130,20 +137,20 @@ func smplBenchmarkGetVariantSubscripts(b *testing.B) {
 		k.Alloc(100, nSubs, 100)
 		// Store varname
 		err := k.Varnm.SetValStr(yottadb.NOTTP, nil, "var")
-		assert.Nil(b, err)
+		panicIf(err)
 		// Store each subscript
 		subs := k.Subary
 		for j := range nSubs {
 			sub := v2.Randstr()
 			err := subs.SetValStr(yottadb.NOTTP, nil, uint32(j), sub)
-			assert.Nil(b, err)
+			panicIf(err)
 		}
 		subs.SetElemUsed(yottadb.NOTTP, nil, nSubs)
 
 		err = value.SetValStr(yottadb.NOTTP, nil, v2.Randstr())
-		assert.Nil(b, err)
+		panicIf(err)
 		err = k.SetValST(yottadb.NOTTP, nil, &value)
-		assert.Nil(b, err)
+		panicIf(err)
 
 		k.Free()
 	}
@@ -157,13 +164,13 @@ func smplBenchmarkGetVariantSubscripts(b *testing.B) {
 		k.Alloc(100, nSubs, 100)
 		// Store varname
 		err := k.Varnm.SetValStr(yottadb.NOTTP, nil, "var")
-		assert.Nil(b, err)
+		panicIf(err)
 		// Store each subscript
 		subs := k.Subary
 		for j := range nSubs {
 			sub := v2.Randstr()
 			err := subs.SetValStr(yottadb.NOTTP, nil, uint32(j), sub)
-			assert.Nil(b, err)
+			panicIf(err)
 		}
 		subs.SetElemUsed(yottadb.NOTTP, nil, nSubs)
 
@@ -171,7 +178,7 @@ func smplBenchmarkGetVariantSubscripts(b *testing.B) {
 		err = k.ValST(yottadb.NOTTP, nil, &value)
 		assert.Nil(b, err, "Database locals not properly set up for this test")
 		_, err = value.ValStr(yottadb.NOTTP, nil)
-		assert.Nil(b, err)
+		panicIf(err)
 
 		k.Free()
 	}
@@ -195,9 +202,9 @@ func smplBenchmarkStr2Zwr(b *testing.B) {
 	// Iterate the command to benchmark it
 	for b.Loop() {
 		err = in.Str2ZwrST(yottadb.NOTTP, nil, &out)
-		assert.Nil(b, err)
+		panicIf(err)
 		_, err = out.ValStr(yottadb.NOTTP, nil)
-		assert.Nil(b, err)
+		panicIf(err)
 	}
 }
 

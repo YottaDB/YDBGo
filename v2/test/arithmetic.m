@@ -15,7 +15,6 @@
 addVerbose(message,n1,n2,n3)
  set n1=n1+n2+n3
  set message=message_":"
- write message,n1,!
  quit message_n1
 
 add(n1,n2)
@@ -23,3 +22,6 @@ add(n1,n2)
 
 sub(n1,n2)
  quit n1-n2
+
+noop()
+ quit

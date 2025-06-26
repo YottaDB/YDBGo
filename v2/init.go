@@ -151,16 +151,21 @@ func Init() (*DB, error) {
 			MinYDBRelease, releaseMajorStr, releaseMinorStr))
 	}
 
+	// Populate ydbSignalMap -- must occur before starting signal handler goroutines below
+	for _, sig := range YDBSignals {
+		info := sigInfo{sig, nil, make(chan struct{}), atomic.Bool{}, atomic.Bool{}, NewConn()}
+		ydbSignalMap.Store(sig, &info)
+	}
+	ydbSignalMapFilled = true
 	// Start up a goroutine for each signal we want to be notified of. This is so that if one signal is in process,
 	// we can still catch a different signal and deliver it appropriately (probably to the same goroutine). For each signal,
 	// bump our wait group counter so we don't proceed until all of these goroutines are initialized.
 	// If you need to handle any more or fewer signals, alter YDBSignals at the top of this module.
 	for _, sig := range YDBSignals {
-		// Populate ydbSignalMap
-		info := sigInfo{sig, nil, make(chan struct{}), atomic.Bool{}, atomic.Bool{}, NewConn()}
-		ydbSignalMap.Store(sig, &info)
 		wgSigInit.Add(1) // Indicate this signal goroutine is not yet initialized
-		go handleSignal(&info)
+		value, _ := ydbSignalMap.Load(sig)
+		info := value.(*sigInfo)
+		go handleSignal(info)
 	}
 	// Now wait for the goroutine to initialize and get signals all set up. When that is done, we can return
 	wgSigInit.Wait()

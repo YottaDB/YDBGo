@@ -68,6 +68,7 @@ var YDBSignals = []os.Signal{
 // ydbSignalMap stores data for signals that the wrapper handles and passes to YottaDB.
 // It is populated by InitializeYottaDB()
 var ydbSignalMap sync.Map
+var ydbSignalMapFilled bool       // Set to True when we've populated it -- needn't be atomic since it is populated inside Init locks
 var ydbSigPanicCalled atomic.Bool // True when our exit is panic driven due to a signal
 
 // Shutdown globals
@@ -106,7 +107,11 @@ func syslogEntry(logMsg string) {
 
 // lookupYDBSignal returns a pointer to the sigInfo entry related to signal sig.
 func lookupYDBSignal(sig os.Signal) *sigInfo {
-	initCheck() // Make sure ydbSignalMap is populated
+	if !ydbSignalMapFilled {
+		// We cannot just call initCheck() because when Shutdown occurs it reverts back to un-initialized and fails.
+		// But lookupYDBSignals has to run even after Shutdown because it is called by signal handlers.
+		initCheck() // Produce appropriate error message
+	}
 	value, ok := ydbSignalMap.Load(sig)
 	if !ok {
 		panic(newError(ydberr.SignalUnsupported, fmt.Sprintf("The specified signal %d (%v) is not a YottaDB signal so is unsupported for signal notification", sig, sig)))

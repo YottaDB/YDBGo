@@ -1,0 +1,4 @@
+// YDBGo v1 format calltable for v1 benchmarks
+
+Add: ydb_string_t* add^arithmetic(I:ydb_string_t*, I:ydb_string_t*)
+Noop: void noop^arithmetic()

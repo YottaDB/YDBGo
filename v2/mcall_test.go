@@ -21,14 +21,8 @@ import (
 
 // ---- Tests
 
-func setPath(conn *Conn) {
-	zroutines := conn.Node("$ZROUTINES")
-	zroutines.Set("./test " + zroutines.Get())
-}
-
 func TestImport(t *testing.T) {
 	conn := SetupTest(t)
-	setPath(conn)
 	funcs, err := conn.Import("AddVerbose: string[1024] addVerbose^arithmetic(string, int64, int64)")
 	if err != nil {
 		panic(err)
@@ -46,9 +40,10 @@ func TestCallM(t *testing.T) {
 		Add: int64 add^arithmetic(int64, int64)
 		Sub: int64 sub^arithmetic(int64, int64)
 		AddFloat32: float64 add^arithmetic(float32, float32)
-		AddFloat: float64 add^arithmetic(float64, float64)`
+		AddFloat: float64 add^arithmetic(float64, float64)
+		Noop: noop^arithmetic()
+	`
 	conn := SetupTest(t)
-	setPath(conn)
 	s := "test"
 	n := 3
 	// Declare these in separate
@@ -86,4 +81,7 @@ func TestCallM(t *testing.T) {
 	assert.Equal(t, int64(-6), add(int64(5), int64(-11)).(int64))
 	sub := m2.Wrap("Sub")
 	assert.Equal(t, "-100", sub(int32(5), uint32(105)).(string))
+
+	// Test calling a noop function
+	assert.Nil(t, m.Call("Noop"))
 }

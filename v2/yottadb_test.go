@@ -62,6 +62,13 @@ func multi(v ...any) []any {
 	return v
 }
 
+// panicIf panics if err is not nil. For use in tests.
+func panicIf(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
+
 // lockExists return whether a lock exists using YottaDB's LKE utility.
 func lockExists(lockpath string) bool {
 	const debug = false // set true to print output of LKE command
@@ -141,6 +148,12 @@ func cleanupDatabase(logger *log.Logger, testDir string) {
 	os.RemoveAll(testDir)
 }
 
+func setPath() {
+	conn := NewConn()
+	zroutines := conn.Node("$ZROUTINES")
+	zroutines.Set("./test " + zroutines.Get())
+}
+
 // _testMain is factored out of TestMain to let us defer Init() properly
 // since os.Exit() must not be run in the same function as defer.
 func _testMain(m *testing.M) int {
@@ -174,9 +187,10 @@ func _testMain(m *testing.M) int {
 		panic(err)
 	}
 	defer Shutdown(db)
-	v1.ForceInit()  // Tell v1 that v2 has done the initialization
+	v1.ForceInit() // Tell v1 that v2 has done the initialization
 
 	initRandstr()
+	setPath()
 	ret := m.Run()
 
 	// Print result of BenchmarkDiff, if it was run

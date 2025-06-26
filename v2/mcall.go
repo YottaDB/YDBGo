@@ -176,7 +176,7 @@ var callingM sync.Mutex // Mutex for access to ydb_ci_tab_switch() so table does
 // Return typeSpec struct
 func parseType(typeStr string) (*typeSpec, error) {
 	typeStr = regexp.MustCompile(`\s*`).ReplaceAllString(typeStr, "") // remove spaces, e.g., between <type> and '*'
-	pattern := regexp.MustCompile(`(\*?)([\w_]+)(\*?)(.*)`)
+	pattern := regexp.MustCompile(`(\*?)([\w_]*)(\*?)(.*)`)
 	m := pattern.FindStringSubmatch(typeStr)
 	if m == nil {
 		return nil, errorf(ydberr.MCallTypeUnhandled, "does not match a YottaDB call-in table type specification")
@@ -249,8 +249,13 @@ func parsePrototype(line string) (*RoutineData, error) {
 		return nil, errorf(ydberr.MCallEntrypointInvalid, "entrypoint (%s) to call M must contain only alphanumeric and %%^@+ characters", entrypoint)
 	}
 
-	// Create list of types for return value and each parameter
-	typ, err := parseType("*" + retType) // treat it as if it were a pointer type since it has to receive back a value
+	// Create list of types for return value and then each parameter
+	_retType := retType
+	if _retType != "" {
+		// treat retType as if it were a pointer type since it has to receive back a value
+		_retType = "*" + _retType
+	}
+	typ, err := parseType(_retType)
 	if err != nil {
 		err.(*Error).Message = fmt.Sprintf("return type (%s) %s", retType, err)
 		return nil, err
@@ -419,7 +424,7 @@ func (conn *Conn) Import(table string) (*MFunctions, error) {
 	tbl.handle = *handle
 	if status != YDB_OK {
 		err := conn.lastError(status).(*Error)
-		return nil, newError(err.Code, fmt.Sprintf("%s while processing call-in table:\n%s", err, tbl.YDBTable), newError(ydberr.ImportOpen, ""))
+		return nil, newError(err.Code, fmt.Sprintf("%s while processing call-in table:\n%s\n", err, tbl.YDBTable), newError(ydberr.ImportOpen, ""))
 	}
 
 	mfunctions := MFunctions{&tbl, conn}
