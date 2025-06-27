@@ -34,7 +34,7 @@ go mod init example.com/yottadb-example
 package main
 
 import (
-	"lang.yottadb.com/go/v2/yottadb"
+	"lang.yottadb.com/go/yottadb/v2"
 )
 
 func main() {

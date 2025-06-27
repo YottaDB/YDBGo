@@ -68,8 +68,8 @@ func BenchmarkDiff(b *testing.B) {
 	})
 }
 
-// Benchmark setting a node repeatedly to new values each time.
-func BenchmarkNode(b *testing.B) {
+// Benchmark repeated creation of a node with a new varname each time.
+func BenchmarkNewNode(b *testing.B) {
 	tconn := SetupTest(b)
 	for b.Loop() {
 		tconn.Node(Randstr())
@@ -89,12 +89,13 @@ func BenchmarkSet(b *testing.B) {
 func BenchmarkGet(b *testing.B) {
 	tconn := SetupTest(b)
 	n := tconn.Node("var")
+	n.Set("12345678") // store something into it so we can Get() it back
 	for b.Loop() {
 		n.Get()
 	}
 }
 
-// Benchmark setting a node with randomly located node, where each node has 5 random subscripts.
+// Benchmark setting a randomly located node, where each node has 5 random subscripts.
 func BenchmarkSetVariantSubscripts(b *testing.B) {
 	tconn := SetupTest(b)
 	subs := make([]string, 5)
@@ -108,7 +109,7 @@ func BenchmarkSetVariantSubscripts(b *testing.B) {
 	}
 }
 
-// Benchmark getting a node with randomly located node, where each node has 5 random subscripts.
+// Benchmark getting a randomly located node, where each node has 5 random subscripts.
 func BenchmarkGetVariantSubscripts(b *testing.B) {
 	tconn := SetupTest(b)
 	subs := make([]string, 5)

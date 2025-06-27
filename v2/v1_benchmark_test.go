@@ -41,6 +41,18 @@ func BenchmarkV1Easy(b *testing.B) {
 	})
 }
 
+// Benchmark repeated creation of a key with a new varname each time.
+func smplBenchmarkNewKey(b *testing.B) {
+	for b.Loop() {
+		var k yottadb.KeyT
+		k.Alloc(32, 10, 100)                        // varname length 32, up to 10 subscripts, of up to 100 chars each
+		k.Subary.SetElemUsed(yottadb.NOTTP, nil, 0) // just varname; no subscripts
+		err := k.Varnm.SetValStr(yottadb.NOTTP, nil, v2.Randstr())
+		panicIf(err)
+		k.Free()
+	}
+}
+
 // Benchmark setting a node repeatedly to set new values each time
 func smplBenchmarkSet(b *testing.B) {
 	// Set up database key named `var`
@@ -75,10 +87,14 @@ func smplBenchmarkGet(b *testing.B) {
 	err := k.Varnm.SetValStr(yottadb.NOTTP, nil, "var")
 	panicIf(err)
 
-	// Set up buffer for received value
+	// Set up buffer for sent and received value
 	var value yottadb.BufferT
 	value.Alloc(100) // allow a value of up to this many chars
 	defer value.Free()
+	err = value.SetValStr(yottadb.NOTTP, nil, "12345678") // Store something into it so we can get it back
+	panicIf(err)
+	err = k.SetValST(yottadb.NOTTP, nil, &value)
+	panicIf(err)
 
 	// Iterate the GET command to benchmark it
 	for b.Loop() {
@@ -89,7 +105,10 @@ func smplBenchmarkGet(b *testing.B) {
 	}
 }
 
-// Benchmark setting a node with randomly located node, where each node has 5 random subscripts.
+// Benchmark setting a randomly located node, where each node has 5 random subscripts.
+// Since the benchmark always does 5-subscript nodes of known length, it could preallocate these
+// and speed up the benchmark. However, not pre-allocating them simulates a real application
+// which will create nodes with an arbitrary number of subscripts, each of arbitrary length.
 func smplBenchmarkSetVariantSubscripts(b *testing.B) {
 	// Set up buffer for value to store into `var`
 	var value yottadb.BufferT
@@ -122,7 +141,7 @@ func smplBenchmarkSetVariantSubscripts(b *testing.B) {
 	}
 }
 
-// Benchmark getting a node with randomly located node, where each node has 5 random subscripts.
+// Benchmark getting a randomly located node, where each node has 5 random subscripts.
 func smplBenchmarkGetVariantSubscripts(b *testing.B) {
 	// Set up buffer for value to store into `var`
 	var value yottadb.BufferT
@@ -209,6 +228,7 @@ func smplBenchmarkStr2Zwr(b *testing.B) {
 }
 
 func BenchmarkV1Simple(b *testing.B) {
+	b.Run("NewKey", smplBenchmarkNewKey)
 	b.Run("Set", smplBenchmarkSet)
 	b.Run("SetVariantSubscripts", smplBenchmarkSetVariantSubscripts)
 	b.Run("Get", smplBenchmarkGet)
