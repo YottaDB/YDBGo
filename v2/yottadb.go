@@ -41,7 +41,8 @@ const MinYDBRelease string = "r1.34"
 // on new content, either the third piece of the version will be bumped to an even value or the second piece of the
 // version will be bumped by 1 and the third piece of the version set to 0. On rare occasions, we may bump the first
 // piece of the version and zero the others when the changes are significant.
-const WrapperRelease string = "v2.0.1"
+// Also, the version numbers may be followed by a hyphen and text, e.g. "v2.0.2-alpha"
+const WrapperRelease string = "v2.0.2-alpha"
 
 // ---- Wait times
 
