@@ -148,7 +148,7 @@ coverage:
         path: cover/coverage.xml
 
 commit-verify:
-  image: ubuntu:22.04
+  image: ubuntu:24.04
   stage: test
   before_script:
     - apt-get update -qq && apt-get install -y -qq git wget gnupg
