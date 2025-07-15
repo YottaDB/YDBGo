@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"runtime"
 	"runtime/cgo"
+	"strconv"
 	"time"
 	"unsafe"
 
@@ -60,7 +61,8 @@ import "C"
 
 // Amount to overallocate string spaces for potential future use with larger strings.
 // This could be set to C.YDB_MAX_STR to avoid any reallocation, but that would make all new connections large.
-const overalloc = 1024
+// This must be at least large enough to store a number converted to a string (see setAnyValue)
+const overalloc = 1024 // Initial size (may be enlarged).
 
 // Conn represents a goroutine-specific 'connection' object for calling the YottaDB API.
 // You must use a different connection for each goroutine.
@@ -127,6 +129,39 @@ func (conn *Conn) setValue(val string) *C.ydb_buffer_t {
 	conn.ensureValueSize(len(val))
 	C.fill_buffer(&cconn.value, val)
 	return &cconn.value
+}
+
+// setAnyValue is the same as setValue but accepts any type.
+// It is equivalent to setValue(Sprint(val)) but faster because it only handles strings and numbers.
+//   - val may be a string, integer type, or float and is converted to a string using the appropriate strconv function.
+func (conn *Conn) setAnyValue(val any) {
+	var str string
+	switch n := val.(type) {
+	case string:
+		// ensure enough space is allocated (not needed for number cases
+		conn.setValue(n)
+		return
+	case int:
+		str = strconv.FormatInt(int64(n), 10)
+	case int32:
+		str = strconv.FormatInt(int64(n), 10)
+	case int64:
+		str = strconv.FormatInt(n, 10)
+	case uint:
+		str = strconv.FormatUint(uint64(n), 10)
+	case uint32:
+		str = strconv.FormatUint(uint64(n), 10)
+	case uint64:
+		str = strconv.FormatUint(n, 10)
+	case float32:
+		str = strconv.FormatFloat(float64(n), 'G', -1, 32)
+	case float64:
+		str = strconv.FormatFloat(n, 'G', -1, 64)
+	default:
+		panic(newError(ydberr.InvalidValueType, fmt.Sprintf("value (%s) must be a string or number", val)))
+	}
+	// The following is equivalent to setValue() but without the size check which is unnecessary since NewConn allocates at least overalloc size
+	C.fill_buffer(&conn.cconn.value, str)
 }
 
 func (conn *Conn) getValue() string {

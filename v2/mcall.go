@@ -545,6 +545,7 @@ func (conn *Conn) callM(routine *RoutineData, args []any) (any, error) {
 	for i, typ := range routine.Types[1:] {
 		pointer := false
 		// typeAssert() assistant function: check arg type against supplied type.
+		// This retains speed as it only uses reflect.TypeOf in the case of errors.
 		typeAssert := func(val any, kind reflect.Kind) {
 			if typ.kind == kind && typ.pointer == pointer {
 				return

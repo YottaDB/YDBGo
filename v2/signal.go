@@ -172,7 +172,7 @@ func SignalReset(signals ...os.Signal) {
 }
 
 // NotifyYDB calls the YottaDB signal handler for sig.
-// Return whether YottaDB returned a CALLINAFTEREXIT error.
+// Return as a boolean whether YottaDB returned error code ydberr.CALLINAFTERXIT.
 // If YottaDB deferred handling of the signal, return false; otherwise return true.
 // Panic on YottaDB errors.
 func NotifyYDB(sig os.Signal) bool {
@@ -206,8 +206,8 @@ func NotifyYDB(sig os.Signal) bool {
 		// Not an error, but the fact is logged
 		fmt.Fprintf(os.Stderr, "goroutine-sighandler: YottaDB deferred signal %d (%v)\n", sig, sig)
 		return false
-	case ydberr.CALLINAFTERXIT, -ydberr.CALLINAFTERXIT:
-		// If CALLINAFTERXIT (positive or negative version) we're done - exit goroutine
+	case ydberr.CALLINAFTERXIT:
+		// If CALLINAFTERXIT, we're done - exit goroutine
 		shutdownSignalGoroutine(info)
 	default: // Some sort of error occurred during signal handling
 		err := conn.lastError(rc)
@@ -216,10 +216,10 @@ func NotifyYDB(sig os.Signal) bool {
 	return true
 }
 
-// handleSignal is used as a goroutine to process all YottaDB-specific signals (listed in YDBSignals).
+// handleSignal is used as a goroutine for each YottaDB-specific signal (listed in YDBSignals).
 // It calls NotifyYDB() unless a user has requested notification of that signal using SignalNotify(),
 // in which case it will notify the user who must call NotifyYDB().
-// info specifies the signal to be processed.
+// info specifies the signal to be handled by this particular goroutine.
 func handleSignal(info *sigInfo) {
 	sig := info.signal
 
@@ -273,7 +273,7 @@ func handleSignal(info *sigInfo) {
 	ydbShutdownCheck <- struct{}{} // Notify shutdownSignalGoroutines that it needs to check if all channels closed now
 }
 
-// sutdownSignalGoroutine tells routine for signal sig to shutdown.
+// sutdownSignalGoroutine tells routine for signal (specified by info) to shutdown.
 // This is Non-blocking.
 func shutdownSignalGoroutine(info *sigInfo) {
 	// Perform non-blocking send
@@ -308,7 +308,7 @@ func shutdownSignalGoroutines() {
 		// Loop handling channel notifications as goroutines shutdown. If we are currently handling a fatal signal
 		// like a SIGQUIT, that channel is active but is busy so will not respond to a shutdown request. For this
 		// reason, we treat active goroutines the same as successfully shutdown goroutines so we don't delay
-		// shutdown. No need to wait for something that is likely to not occur (The YottaDB handlers for fatal signals
+		// shutdown. No need to wait for something that is not likely to occur (The YottaDB handlers for fatal signals
 		// drive a process-ending panic and never return).
 		for {
 			<-ydbShutdownCheck // A goroutine finished - check if all are shutdown or otherwise busy
@@ -352,7 +352,7 @@ func shutdownSignalGoroutines() {
 }
 
 // signalExitCallback is called from C by YottaDB to perform an exit when YottaDB gets a fatal signal.
-// Its purpose make sure defers get called before exit, which it does by calling panic.
+// Its purpose is to make sure defers get called before exit, which it does by calling panic.
 // This function is passed to YottaDB during init by ydb_main_lang_init().
 // YDB calls this exit handler after rundown (equivalent to ydb_exit()).
 // The sigNum parameter is reported in the panic message.

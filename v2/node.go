@@ -216,11 +216,11 @@ func (n *Node) String() string {
 }
 
 // Set applies val to the value of a database node.
-//   - The val may be a string, integer, or float because it is converted to a string using fmt.Sprint().
+//   - The val may be a string, integer type, or float and is converted to a string using the appropriate strconv function.
 func (n *Node) Set(val any) {
 	cnode := n.cnode // access C equivalents of Go types
 	cconn := cnode.conn
-	n.conn.setValue(fmt.Sprint(val))
+	n.conn.setAnyValue(val)
 	n.conn.prepAPI()
 	status := C.ydb_set_st(cconn.tptoken, &cconn.errstr, &cnode.buffers, cnode.len-1, bufferIndex(&cnode.buffers, 1), &cconn.value)
 	if status != YDB_OK {
@@ -351,13 +351,10 @@ func (n *Node) Incr(amount any) float64 {
 	cnode := n.cnode // access C equivalents of Go types
 	cconn := cnode.conn
 
-	str, ok := amount.(string)
-	if ok && str == "" {
+	n.conn.setAnyValue(amount)
+	if cconn.value.len_used == 0 {
 		panic(newError(ydberr.IncrementEmpty, `cannot increment by the empty string ""`))
 	}
-
-	numberString := fmt.Sprint(amount)
-	n.conn.setValue(numberString)
 
 	n.conn.prepAPI()
 	status := C.ydb_incr_st(cconn.tptoken, &cconn.errstr, &cnode.buffers, cnode.len-1, bufferIndex(&cnode.buffers, 1), &cconn.value, &cconn.value)

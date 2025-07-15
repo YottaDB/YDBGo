@@ -24,6 +24,7 @@ const (
 	Shutdown                     // Error during shutdown
 	ShutdownIncomplete           // Shutdown is incomplete
 	InvalidStringLength          // String is too long. Same as YottaDB INVSTRLEN but caught in YDBGo
+	InvalidValueType             // Value type is not a string or number
 	OutOfMemory                  // Not enough memory for attempted allocation
 	YDBMessageInvalid            // Failure decoding message prefixes from YottaDB
 	YDBMessageRecoveryFailure    // Failure calling ydb_message_t() to get a YottaDB message matching a code
