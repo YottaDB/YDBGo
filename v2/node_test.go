@@ -50,6 +50,14 @@ func TestCloneNode(t *testing.T) {
 	assert.NotEqual(t, n1.conn.cconn.tptoken, n2.conn.cconn.tptoken)
 }
 
+func TestMutateNode(t *testing.T) {
+	conn := SetupTest(t)
+	n := conn.Node("var1", "asdf")
+	n2 := n.Mutate("jkl")
+	n3 := n2.Child("qwerty")
+	assert.Equal(t, `var1("jkl","qwerty")`, n3.String())
+}
+
 func TestSetGet(t *testing.T) {
 	tconn := SetupTest(t)
 	n := tconn.Node("var")

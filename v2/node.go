@@ -100,6 +100,7 @@ func (conn *Conn) _Node(varname any, subscripts ...string) (n *Node) {
 	cnode := n.cnode
 	cnode.conn = conn.cconn // point to the C version of the conn
 	cnode.len = C.int(len(subscripts) + firstLen)
+	cnode.datasize = C.int(joiner.Len())
 
 	dataptr := unsafe.Pointer(bufferIndex(&cnode.buffers, len(subscripts)+firstLen))
 	if joiner.Len() > 0 {
