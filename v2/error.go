@@ -24,7 +24,6 @@ import (
 )
 
 // #include "libyottadb.h"
-//#cgo nocallback ydb_message_t
 import "C"
 
 // Error type holds YDBGo and YottaDB errors including a numeric error code.

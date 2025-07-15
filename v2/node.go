@@ -30,17 +30,8 @@ import (
 /* #include "libyottadb.h"
 #include "yottadb.h"
 
-#cgo nocallback ydb_set_st
-#cgo nocallback ydb_get_st
-#cgo nocallback ydb_data_st
-#cgo nocallback ydb_delete_st
-#cgo nocallback ydb_incr_st
-#cgo nocallback ydb_lock_incr_st
-#cgo nocallback ydb_lock_decr_st
-#cgo nocallback ydb_subscript_previous_st
-#cgo nocallback ydb_subscript_next_st
-#cgo nocallback ydb_node_previous_st
-#cgo nocallback ydb_node_next_st
+// It's tempting to apply `#cgo nocallback` directives to all ydb_* C functions (1% call speed increase - tested),
+// but this is wrong because ydb_* function can call the Go function signalExitCallback() when a signal occurs.
 */
 import "C"
 
