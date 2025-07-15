@@ -72,7 +72,7 @@ var ydbSignalMapFilled bool       // Set to True when we've populated it -- need
 var ydbSigPanicCalled atomic.Bool // True when our exit is panic driven due to a signal
 
 // Shutdown globals
-var ydbShutdownCheck = make(chan struct{}) // Channel used to check if all signal routines have been shutdown
+var ydbShutdownCheck = make(chan struct{}) // Flag that a channel has been shut down. Needs no buffering since we use blocking writes
 var shutdownSigGoroutines bool             // Flag that we have completed shutdownSignalGoroutines()
 var shutdownSigGoroutinesMutex sync.Mutex  // Serialize access to shutdownSignalGoroutines()
 
@@ -226,7 +226,7 @@ func handleSignal(info *sigInfo) {
 	// We only need one of each type of signal so buffer depth is 1, but let it queue one additional signal.
 	sigchan := make(chan os.Signal, 2)
 	// Create fresh channel for shutdown monitoring.
-	info.shutdownNow = make(chan struct{})
+	info.shutdownNow = make(chan struct{}, 1) // Need to buffer only 1 element since shutdownSignalGoroutine() is non-blocking
 	// Tell Go to pass this signal to our channel.
 	signal.Notify(sigchan, sig)
 	if dbgSigHandling {
@@ -273,7 +273,7 @@ func handleSignal(info *sigInfo) {
 	ydbShutdownCheck <- struct{}{} // Notify shutdownSignalGoroutines that it needs to check if all channels closed now
 }
 
-// sutdownSignalGoroutine tells routine for signal (specified by info) to shutdown.
+// shutdownSignalGoroutine tells the routine for the signal specified by info to shutdown.
 // This is Non-blocking.
 func shutdownSignalGoroutine(info *sigInfo) {
 	// Perform non-blocking send
@@ -303,7 +303,7 @@ func shutdownSignalGoroutines() {
 		shutdownSignalGoroutine(value.(*sigInfo))
 	}
 	// Wait for the signal goroutines to exit but with a timeout
-	doneChan := make(chan struct{})
+	doneChan := make(chan struct{}) // Zero-length is OK because we signal it by closing it.
 	go func() {
 		// Loop handling channel notifications as goroutines shutdown. If we are currently handling a fatal signal
 		// like a SIGQUIT, that channel is active but is busy so will not respond to a shutdown request. For this

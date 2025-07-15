@@ -153,7 +153,7 @@ func Init() (*DB, error) {
 
 	// Populate ydbSignalMap -- must occur before starting signal handler goroutines below
 	for _, sig := range YDBSignals {
-		info := sigInfo{sig, nil, make(chan struct{}), atomic.Bool{}, atomic.Bool{}, NewConn()}
+		info := sigInfo{sig, nil, make(chan struct{}, 1), atomic.Bool{}, atomic.Bool{}, NewConn()}
 		ydbSignalMap.Store(sig, &info)
 	}
 	ydbSignalMapFilled = true
@@ -225,7 +225,7 @@ func Shutdown(handle *DB) error {
 	// When we run ydb_exit(), set up a timer that will pop if ydb_exit() gets stuck in a deadlock or whatever. We could
 	// be running after some fatal error has occurred so things could potentially be fairly screwed up and ydb_exit() may
 	// not be able to get the lock. We'll give it the given amount of time to finish before we give up and just exit.
-	exitdone := make(chan struct{})
+	exitdone := make(chan struct{}, 1)
 	wgexit.Add(1)
 	go func() {
 		_ = C.ydb_exit()
