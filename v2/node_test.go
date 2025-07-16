@@ -50,6 +50,19 @@ func TestCloneNode(t *testing.T) {
 	assert.NotEqual(t, n1.conn.cconn.tptoken, n2.conn.cconn.tptoken)
 }
 
+func TestSubscript(t *testing.T) {
+	conn := SetupTest(t)
+	n := conn.Node("var1", "asdf", "jkl;")
+	assert.Equal(t, "var1", n.Subscript(0))
+	assert.Equal(t, "asdf", n.Subscript(1))
+	assert.Equal(t, "jkl;", n.Subscript(2))
+	assert.Equal(t, "jkl;", n.Subscript(-1))
+	assert.Equal(t, "asdf", n.Subscript(-2))
+	assert.Equal(t, "var1", n.Subscript(-3))
+	assert.Panics(t, func() { n.Subscript(3) })
+	assert.Panics(t, func() { n.Subscript(-4) })
+}
+
 func TestMutateNode(t *testing.T) {
 	conn := SetupTest(t)
 	n := conn.Node("var1", "asdf")
@@ -198,13 +211,20 @@ func ExampleNode_Next_varnames() {
 	// Y
 }
 
-// Example of getting next subscript
+// Example of getting all child nodes
 func ExampleNode_Children() {
 	conn := NewConn()
 	n := conn.Node("X", "1")
 	n.Child("2", "3").Set("123")
-	n.Child("2", "3", "7").Set("1237")
 	n.Child("2", "4").Set("124")
+	n.Child("2", "3", "person").Set("1237")
+
+	// Note that the following person fields will come out in alphabetical order below
+	n.Child("2", "3", "person", "address").Set("2 Rocklands Rd")
+	n.Child("2", "3", "person", "address", "postcode").Set("1234")
+	n.Child("2", "3", "person", "occupation").Set("engineer")
+	n.Child("2", "3", "person", "age").Set("42")
+	n.Child("2", "3", "person", "sex").Set("male")
 
 	n = conn.Node("X", "1", "2")
 	for x := range n.Children() {
@@ -215,12 +235,21 @@ func ExampleNode_Children() {
 	for x := range n.ChildrenBackward() {
 		fmt.Printf("%s=%s\n", x, Quote(x.Get()))
 	}
+
+	n = conn.Node("X", "1", "2", "3", "person")
+	fmt.Printf("Person fields: (")
+	for _, sub := range n.Children() {
+		fmt.Printf("%s ", sub)
+	}
+	fmt.Println(")")
+
 	// Output:
 	// X(1,2,3)=123
 	// X(1,2,4)=124
 	// Do the same in reverse:
 	// X(1,2,4)=124
 	// X(1,2,3)=123
+	// Person fields: (address age occupation sex )
 }
 
 // Example of getting a mutable version of node

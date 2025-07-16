@@ -172,6 +172,22 @@ func Quote(value string) string {
 	return "\"" + value + "\""
 }
 
+// Subscripts returns a string that holds the specified varname or subscript of the given node.
+// An index of zero returns the varname; higher numbers return the respective subscript.
+// A negative index returns a subscript counted from the end (the last is -1).
+// An out-of-range subscript panics.
+func (n *Node) Subscript(index int) string {
+	cnode := n.cnode // access C.node from Go node
+	if index < 0 {
+		index = int(cnode.len) + index
+	}
+	if index < 0 || index >= int(cnode.len) {
+		panic(errorf(ydberr.InvalidSubscriptIndex, "subscript %d out of bounds (0-%d)", index, cnode.len))
+	}
+	buf := bufferIndex(&cnode.buffers, index)
+	return C.GoStringN(buf.buf_addr, C.int(buf.len_used))
+}
+
 // Subscripts returns a slice of strings that represent the varname and subscript names of the given node.
 func (n *Node) Subscripts() []string {
 	cnode := n.cnode // access C.node from Go node
@@ -451,12 +467,13 @@ func (n *Node) IsMutable() bool {
 // When it is exceeded by subsequent Node.Next() iterations, the entire node must be cloned to achieve reallocation
 var preallocSubscript string = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 
-// _next returns a Node instance pointing to the next subscript at the same depth level.
+// _next returns the name of the next subscript at the same depth level as the given node.
 // This implements the logic for both Next() and Prev().
 //   - If the parameter reverse is true, fetch the next node in reverse order, i.e. Prev().
+//   - bool returns with false only if there are no more subscripts
 //
 // See further documentation at Next().
-func (n *Node) _next(reverse bool) *Node {
+func (n *Node) _next(reverse bool) (string, bool) {
 	cnode := n.cnode // access C equivalents of Go types
 	cconn := cnode.conn
 
@@ -477,16 +494,12 @@ func (n *Node) _next(reverse bool) *Node {
 	}
 
 	if status == ydberr.NODEEND {
-		return nil
+		return "", false
 	}
 	if status != YDB_OK {
 		panic(n.conn.lastError(status))
 	}
-
-	// take a copy of the string so that we can release `space`
-	value := C.GoStringN(cconn.value.buf_addr, C.int(cconn.value.len_used))
-
-	return n.Mutate(value)
+	return C.GoStringN(cconn.value.buf_addr, C.int(cconn.value.len_used)), true
 }
 
 // Next returns a Node instance pointing to the next subscript at the same depth level.
@@ -509,34 +522,43 @@ func (n *Node) _next(reverse bool) *Node {
 //
 // [$ORDER()]: https://docs.yottadb.com/ProgrammersGuide/functions.html#order
 func (n *Node) Next() *Node {
-	return n._next(false)
+	next, ok := n._next(false)
+	if !ok {
+		return nil
+	}
+	return n.Mutate(next)
 }
 
 // Prev is the same as Next but operates in the reverse order.
 // See [Node.Next]()
 func (n *Node) Prev() *Node {
-	return n._next(true)
+	next, ok := n._next(true)
+	if !ok {
+		return nil
+	}
+	return n.Mutate(next)
 }
 
 // _children returns an interator that can FOR-loop through all a node's single-depth child subscripts.
-// This implements the logic for both Iterate() and IterateBackward().
+// This implements the logic for both Children() and ChildrenBackward().
 //   - If the parameter reverse is true, iterate nodes in reverse order.
 //
 // See further documentation at Iterate().
-func (n *Node) _children(reverse bool) iter.Seq[*Node] {
+func (n *Node) _children(reverse bool) iter.Seq2[*Node, string] {
 	// The next 3 lines are functionally n := n.Child("") but result in faster subsequent code because they create a mutable
 	// node with enough spare subscript space to avoid Node.Next() having to immediately create a mutable node.
 	n = n.Child(preallocSubscript)
 	n.mutable = true
 	n = n.Mutate("")
 
-	return func(yield func(*Node) bool) {
+	return func(yield func(*Node, string) bool) {
 		for {
-			n = n._next(reverse)
-			if n == nil {
+			next, ok := n._next(reverse)
+			if !ok {
 				return
 			}
-			if !yield(n) {
+			n = n.Mutate(next)
+			if !yield(n, next) {
 				return
 			}
 		}
@@ -544,8 +566,11 @@ func (n *Node) _children(reverse bool) iter.Seq[*Node] {
 }
 
 // Children returns an interator over immediate child nodes for use in a FOR-loop.
-// This iterator is a wrapper for [Node.Next](). It yields a mutable node instance with final subscripts changed
-// to successive subscript names.
+// This iterator is a wrapper for [Node.Next](). It yields two values:
+//   - a mutable node instance with final subscripts changed to successive subscript names
+//   - the name of the child subscript (optionally assigned with a range statement)
+//
+// Notes:
 //   - Treats 'null subscripts' (i.e. empty strings) in the same way as M function [$ORDER()].
 //   - The order of returned nodes matches the collation order of the M database.
 //   - This function never adjusts the supplied node even if it is mutable (it always creates its own mutable copy).
@@ -556,13 +581,13 @@ func (n *Node) _children(reverse bool) iter.Seq[*Node] {
 //   - [Node.Tree]() for traversal of nodes in a way that descends into the entire tree.
 //
 // [$ORDER()]: https://docs.yottadb.com/ProgrammersGuide/functions.html#order
-func (n *Node) Children() iter.Seq[*Node] {
+func (n *Node) Children() iter.Seq2[*Node, string] {
 	return n._children(false)
 }
 
 // ChildrenBackward is the same as Children but operates in reverse order.
 // See [Node.Children]().
-func (n *Node) ChildrenBackward() iter.Seq[*Node] {
+func (n *Node) ChildrenBackward() iter.Seq2[*Node, string] {
 	return n._children(true)
 }
 

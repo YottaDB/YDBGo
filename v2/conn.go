@@ -105,7 +105,7 @@ func (conn *Conn) prepAPI() {
 // ensureValueSize reallocates value.buf_addr if necessary to fit a string of size.
 func (conn *Conn) ensureValueSize(cap int) {
 	if cap > C.YDB_MAX_STR {
-		panic(newError(ydberr.InvalidStringLength, fmt.Sprintf("Invalid string length %d: max %d", cap, C.YDB_MAX_STR)))
+		panic(errorf(ydberr.InvalidStringLength, "Invalid string length %d: max %d", cap, C.YDB_MAX_STR))
 	}
 	value := &conn.cconn.value
 	if cap > int(value.len_alloc) {
