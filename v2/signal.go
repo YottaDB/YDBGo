@@ -141,17 +141,16 @@ func validateYDBSignal(sig os.Signal) *sigInfo {
 // to allow YottaDB to process the signal. The user can revert behaviour to the YDBGo default
 // with [SignalReset](), after which YDBGo will once again call [NotifyYDB]().
 //   - Users may opt to use the standard library's [Signal.Notify]() instead of this function to be notified of signals, but
-//
-// this will notify them in parallel with YottaDB. However, they must not call Signal.Stop() (see below).
+//     this will notify them in parallel with YottaDB. However, they must not call Signal.Stop() (see below).
 //   - Do not call [Signal.Stop](), [Signal.Ignore]() or [Signal.Reset]() for any of the YottaDB-specific signals
-//
-// unless you understand that it will prevent [NotifyYDB]() from being called, and will affect YottaDB timers
-// or other functionality.
+//     unless you understand that it will prevent [NotifyYDB]() from being called, and will affect YottaDB timers
+//     or other functionality.
 //
 // YottaDB-specific signals are listed in the source in [YDBSignals].
 //
 // See [YottaDB signals].
-// [YottaDB signals information]: https://docs.yottadb.com/MultiLangProgGuide/programmingnotes.html#signals
+//
+// [YottaDB signals]: https://docs.yottadb.com/MultiLangProgGuide/programmingnotes.html#signals
 func SignalNotify(notifyChan chan os.Signal, signals ...os.Signal) {
 	// Although this routine itself does not interact with the YottaDB runtime, use of this routine has an expectation that
 	// the runtime is going to handle signals so let's make sure it is initialized.
@@ -214,6 +213,26 @@ func NotifyYDB(sig os.Signal) bool {
 		panic(newError(ydberr.SignalHandling, fmt.Sprintf("goroutine_sighandler: error from ydb_sig_dispatch() of signal %d (%v): %s", sig, sig, err), err))
 	}
 	return true
+}
+
+// QuitAfterFatalSignal may be deferred by goroutines to prevent goroutine errors after Ctrl-C is pressed.
+// When Ctrl-C is pressed the signal is (by default) passed to YottaDB which shuts down the database.
+// If goroutines are still running and access the database, they will panic with code ydberr.CALLINAFTERXIT.
+// To silence these many panics and have each goroutine simply exit gracefully, defer QuitAfterFatalSignal()
+// at the start of each goroutine. Then you will get just one panic from the Ctrl-C signal interrupt.
+//
+// This deferred function will hide such panics, whether caused by Ctrl-C or by prematurely calling yottadb.Shutdown.
+// To avoid hiding these errors, you may wish to make your own version of this function that logs them.
+//
+// See: [Shutdown], [SignalNotify]
+func QuitAfterFatalSignal() {
+	if err := recover(); err != nil {
+		if ErrorIs(err.(error), ydberr.CALLINAFTERXIT) {
+			runtime.Goexit() // Silently and gracefully exit the goroutine
+		} else {
+			panic(err)
+		}
+	}
 }
 
 // handleSignal is used as a goroutine for each YottaDB-specific signal (listed in YDBSignals).
