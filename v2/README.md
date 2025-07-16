@@ -2,9 +2,9 @@
 
 [![Go Report Card](https://goreportcard.com/badge/gitlab.com/YottaDB/Lang/YDBGo?style=flat-square)](https://goreportcard.com/report/gitlab.com/YottaDB/Lang/YDBGo/v2) [![Go Doc](https://img.shields.io/badge/godoc-reference-blue.svg?style=flat-square)](http://godoc.org/gitlab.com/YottaDB/Lang/YDBGo/v2) [![Coverage report](https://gitlab.com/YottaDB/Lang/YDBGo/v2/badges/master/coverage.svg?job=coverage)](https://gitlab.com/YottaDB/Lang/YDBGo/v2/-/jobs)
 
-Warning: YDBGo v2 is in alpha testing.
+Warning: YDBGo v2 is in alpha testing. Reference documentation is on the [Go packages website](https://pkg.go.dev/lang.yottadb.com/go/yottadb/v2).
 
-# Quick Start
+## Quick Start
 
 YottaDB must be installed. See [Get Started](https://yottadb.com/product/get-started/) for instructions for installing YottaDB. YDBGo supports versions YottaDB r1.34 or later.
 
