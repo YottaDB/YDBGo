@@ -56,17 +56,21 @@ foreach file ($filelist)
 		# Not a .go file. Cannot run gofmt on this file. Move on to next file in list.
 		continue
 	endif
-	gofmt -e -w $file
-	@ status1 = $status
-	if ($status1) then
-		@ exitstatus = 1
-		echo "GOFMT-E-FAIL : Command [gofmt -e -w $file] failed with status : $status1"
-	endif
-	# Check if there a changes that are unstaged (as opposed to staged and uncommitted)
+	# Check whether user did not stage this file for commital -- if not, don't touch it
 	git diff-files --exit-code --name-only -- $file >/dev/null
-	if ($status) then
-		git add $file
-		set fixlist = "  $file\n"
+	if (! $status) then
+		gofmt -e -w $file
+		@ status1 = $status
+		if ($status1) then
+			@ exitstatus = 1
+			echo "GOFMT-E-FAIL : Command [gofmt -e -w $file] failed with status : $status1"
+		endif
+		# Check if there a changes that are unstaged (as opposed to staged and uncommitted)
+		git diff-files --exit-code --name-only -- $file >/dev/null
+		if ($status) then
+			git add $file
+			set fixlist = "$fixlist  $file\n"
+		endif
 	endif
 end
 if ("" != "$fixlist") then
