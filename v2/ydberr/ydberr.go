@@ -36,7 +36,6 @@ const (
 	CallbackWrongGoroutine       // Callback invoked from the wrong goroutine
 	Variadic                     // Programmer error in Variadic call
 	IncrementEmpty               // Cannot increment by the empty string
-	IncrementReturnInvalid       // ydb_incr_st return a non-floating-point string
 	MCallNotFound                // M-call table does not contain the specified M routine
 	MCallNil                     // Tried to call a nil M routine
 	MCallWrongNumberOfParameters // Wrong number of parameters pass to M routine call

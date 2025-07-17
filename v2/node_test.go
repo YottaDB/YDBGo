@@ -155,21 +155,18 @@ func TestClear(t *testing.T) {
 func TestIncr(t *testing.T) {
 	tconn := SetupTest(t)
 	n := tconn.Node("var")
-	assert.Equal(t, 1.0, n.Incr(1))
+	assert.Equal(t, "1", n.Incr(1))
 	assert.Equal(t, "1", n.Get())
-	assert.Equal(t, 3.0, n.Incr(2))
-	assert.Equal(t, 4.5, n.Incr(1.5))
-	assert.Equal(t, 0.0, n.Incr(-4.5))
-	assert.Equal(t, -4.5, n.Incr(-4.5))
+	assert.Equal(t, "3", n.Incr(2))
+	assert.Equal(t, "4.5", n.Incr(1.5))
+	assert.Equal(t, "0", n.Incr(-4.5))
+	assert.Equal(t, "-4.5", n.Incr(-4.5))
+	assert.Equal(t, "-4.5", n.Incr(0))
+	assert.Panics(t, func() { n.Incr("") })
 
 	n.Set("0")
-	assert.Equal(t, 1.0, n.Incr("1"))
-	assert.Equal(t, "1", n.Get())
-	assert.Equal(t, 3.0, n.Incr("2"))
-	assert.Equal(t, 4.5, n.Incr("1.5"))
-	assert.Equal(t, 0.0, n.Incr("-4.5"))
-	assert.Equal(t, -4.5, n.Incr("-4.5"))
-	assert.Equal(t, -3.5, n.Incr("1abcdefg"))
+	assert.Equal(t, "1", n.Incr("1"))
+	assert.Equal(t, "2", n.Incr("1abcdefg"))
 }
 
 // Example of getting next subscript

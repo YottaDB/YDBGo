@@ -353,9 +353,10 @@ func (n *Node) Clear() {
 
 // Incr atomically increments the value of database node by amount.
 //   - The amount may be an integer, float or string representation of the same.
-//   - Convert the value of the node to a number first by discarding any trailing non-digits and returning zero if it is still not a number.
-//   - Return the new value of the node.
-func (n *Node) Incr(amount any) float64 {
+//   - YottaDB first converts the value of the node to a number by discarding any trailing non-digits and returning zero if it is still not a number.
+//     Then it adds amount to the node, all atomically.
+//   - Return the new value of the node as a string
+func (n *Node) Incr(amount any) string {
 	cnode := n.cnode // access C equivalents of Go types
 	cconn := cnode.conn
 
@@ -371,11 +372,7 @@ func (n *Node) Incr(amount any) float64 {
 	}
 
 	valuestring := C.GoStringN(cconn.value.buf_addr, C.int(cconn.value.len_used))
-	value, err := strconv.ParseFloat(valuestring, 64)
-	if err != nil {
-		panic(newError(ydberr.IncrementReturnInvalid, fmt.Sprintf("ydb_incr_st returned an invalid floating point number (%s): %s", valuestring, err)))
-	}
-	return value
+	return valuestring
 }
 
 // Lock attempts to acquire or increment the count a lock matching this node, waiting up to timeout for availability.
