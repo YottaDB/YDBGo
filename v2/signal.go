@@ -227,6 +227,9 @@ func NotifyYDB(sig os.Signal) bool {
 // See: [Shutdown], [SignalNotify]
 func QuitAfterFatalSignal() {
 	if err := recover(); err != nil {
+		if err, ok := err.(error); !ok {
+			panic(err)
+		}
 		if ErrorIs(err.(error), ydberr.CALLINAFTERXIT) {
 			runtime.Goexit() // Silently and gracefully exit the goroutine
 		} else {
