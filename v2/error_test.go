@@ -24,5 +24,7 @@ func TestRecoverMessage(t *testing.T) {
 	conn := SetupTest(t)
 	assert.Equal(t, "%SYSTEM-E-ENO123, No medium found", conn.recoverMessage(123))
 	assert.Equal(t, "%SYSTEM-E-ENO123, No medium found", conn.recoverMessage(-123))
-	assert.PanicsWithError(t, "%YDB-E-UNKNOWNSYSERR, [2147483646] does not correspond to a known YottaDB error code", func() { conn.recoverMessage(-2147483646) })
+	assert.Equal(t, "YDB_TP_RESTART", conn.recoverMessage(YDB_TP_RESTART))
+	expected := "%YDB-E-UNKNOWNSYSERR, [1048576 (0x100000) returned by ydb_* C API] does not correspond to a known YottaDB error code"
+	assert.PanicsWithError(t, expected, func() { conn.recoverMessage(0x100000) })
 }

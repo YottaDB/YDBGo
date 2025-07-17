@@ -109,11 +109,17 @@ func (conn *Conn) lastError(code C.int) error {
 	if code == C.YDB_OK {
 		return nil
 	}
-	// Take a copy of errstr as a Go String
-	// (len_used should never be greater than len_alloc since all errors should fit into errstr, but just in case, take the min)
+	// The next two cases duplicate code in recoverMessage but are performance-critical so are checked here:
+	if code == YDB_TP_RESTART {
+		return newError(int(code), "YDB_TP_RESTART")
+	}
+	if code == YDB_TP_ROLLBACK {
+		return newError(int(code), "YDB_TP_ROLLBACK")
+	}
 	msg := conn.getErrorString()
 	if msg == "" { // See if msg is still empty (we set it to empty before calling the API in conn.prepAPI()
-		// This code gets run, for example, if ydb_exit() is called before a YDB function is invoked.
+		// This code gets run, for example, if ydb_exit() is called before a YDB function is invoked
+		// causing the YDB function to exit without filling conn.cconn.errstr
 		return newError(int(code), conn.recoverMessage(code))
 	}
 
@@ -152,8 +158,20 @@ func (conn *Conn) lastCode() C.int {
 // recoverMessage tries to get the error message (albeit without argument substitution) from the supplied status code in cases where the message has been lost.
 func (conn *Conn) recoverMessage(status C.int) string {
 	cconn := conn.cconn
-	// Check for a couple of special cases first.
+	// Check special cases first.
 	switch status {
+	// Identify certain return codes that are not identified by ydb_message_t().
+	// I have only observed YDB_TP_RESTART being returned, but include the others just in case.
+	case YDB_TP_RESTART:
+		return "YDB_TP_RESTART"
+	case YDB_TP_ROLLBACK:
+		return "YDB_TP_ROLLBACK"
+	case YDB_NOTOK:
+		return "YDB_NOTOK"
+	case YDB_LOCK_TIMEOUT:
+		return "YDB_LOCK_TIMEOUT"
+	case YDB_DEFER_HANDLER:
+		return "YDB_DEFER_HANDLER"
 	case ydberr.THREADEDAPINOTALLOWED:
 		// This error will prevent ydb_message_t() from working below, so instead return a hard-coded error message.
 		return "%YDB-E-THREADEDAPINOTALLOWED, Process cannot switch to using threaded Simple API while already using Simple API"
@@ -164,10 +182,10 @@ func (conn *Conn) recoverMessage(status C.int) string {
 	// note: ydb_message_t() only looks at the absolute value of status so no need to negate it
 	rc := C.ydb_message_t(cconn.tptoken, nil, status, &cconn.errstr)
 	if rc != YDB_OK {
-		err := conn.lastError(rc)
 		if rc == ydberr.UNKNOWNSYSERR {
-			panic(errorf(int(rc), "%%YDB-E-UNKNOWNSYSERR, [%d] does not correspond to a known YottaDB error code", -status))
+			panic(errorf(int(rc), "%%YDB-E-UNKNOWNSYSERR, [%d (0x%x) returned by ydb_* C API] does not correspond to a known YottaDB error code", status, status))
 		}
+		err := conn.lastError(rc)
 		panic(newError(ydberr.YDBMessageRecoveryFailure, fmt.Sprintf("error %d when trying to recover error message for error %d using ydb_message_t()", int(rc), int(-status)), err))
 	}
 	return conn.getErrorString()

@@ -271,10 +271,7 @@ func (n *Node) Lookup() (string, bool) {
 		return "", false
 	}
 	if status != YDB_OK {
-		if status == ydberr.INVVARNAME {
-			panic(errorf(ydberr.INVVARNAME, "%s:\nSubscript(0)='%#v'; node=%#v", n.conn.lastError(status), n.Subscript(0), n.String()))
-		}
-		//		panic(n.conn.lastError(status))
+		panic(n.conn.lastError(status))
 	}
 	// take a copy of the string so that we can release `space`
 	value := C.GoStringN(cconn.value.buf_addr, C.int(cconn.value.len_used))
@@ -614,7 +611,7 @@ func (n *Node) _treeNext(reverse bool) *Node {
 			status = C.ydb_node_next_st(cconn.tptoken, &cconn.errstr, &cnode.buffers, cnode.len-1, bufferIndex(&cnode.buffers, 1), &retSubs, bufferIndex(&retNode.cnode.buffers, 1))
 		}
 		if status == ydberr.INSUFFSUBS {
-			if debug {
+			if debugMode {
 				fmt.Printf("INSUFFSUBS: %d (need %d)\n", retNode.cnode.len-1, retSubs)
 			}
 			extraStrings := make([]string, retSubs-(retNode.cnode.len-1))
@@ -626,7 +623,7 @@ func (n *Node) _treeNext(reverse bool) *Node {
 			continue
 		}
 		if status == ydberr.INVSTRLEN {
-			if debug {
+			if debugMode {
 				fmt.Printf("INVSTRLEN subscript %d\n", retSubs)
 			}
 			buf := bufferIndex(&retNode.cnode.buffers, int(retSubs+1)) // +1 because cnode counts the varname as a subscript and ydb_node_next_st() does not

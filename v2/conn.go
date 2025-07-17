@@ -306,9 +306,30 @@ type tpInfo struct {
 // [$trestart]: https://docs.yottadb.com/ProgrammersGuide/isv.html#trestart
 // [$tlevel]: https://docs.yottadb.com/ProgrammersGuide/isv.html#tlevel
 func (conn *Conn) Transaction(transID string, localsToRestore []string, callback func() int) bool {
+	recoveredCallback := func() (retval int) {
+		// defer a function that recovers from RESTART and ROLLBACK panics and returns them to YDB transaction processor instead
+		defer func() {
+			if err := recover(); err != nil {
+				err, ok := err.(*Error)
+				if !ok {
+					panic(err)
+				}
+				code := err.Code
+				if code == YDB_TP_RESTART || code == YDB_TP_ROLLBACK {
+					retval = code
+					return
+				}
+				panic(err)
+			}
+		}()
+		return callback()
+	}
+
 	cconn := conn.cconn
-	info := tpInfo{conn, callback}
-	handle := C.uintptr_t(cgo.NewHandle(info))
+	info := tpInfo{conn, recoveredCallback}
+	handle := cgo.NewHandle(info)
+	defer handle.Delete()
+
 	var status C.int
 	if len(localsToRestore) == 0 {
 		conn.prepAPI()

@@ -69,7 +69,7 @@ var (
 
 // ---- Debug settings
 
-var debug bool                    // false by default -- can be enabled by test/debugging code to turn things on
+var debugMode bool                // false by default -- can be enabled by test/debugging code to turn things on
 const dbgPrintEPHdrs bool = false // Print entry point headers when routine is entered
 const dbgSigHandling bool = false // Print extra signal processing info when true
 

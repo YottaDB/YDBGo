@@ -402,7 +402,7 @@ func (conn *Conn) Import(table string) (*MFunctions, error) {
 	if err != nil {
 		return nil, errorf(ydberr.ImportTemp, "could not open temporary call-in table file '%s': %s", f.Name(), err)
 	}
-	if !debug {
+	if !debugMode {
 		defer os.Remove(f.Name())
 	}
 	_, err = f.WriteString(tbl.YDBTable)

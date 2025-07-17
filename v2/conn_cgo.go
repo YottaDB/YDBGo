@@ -38,6 +38,5 @@ func tpCallbackWrapper(tptoken C.uint64_t, errstr *C.ydb_buffer_t, handle unsafe
 	}
 	retval := info.callback()
 	cconn.tptoken = saveToken
-	h.Delete()
 	return C.int(retval)
 }

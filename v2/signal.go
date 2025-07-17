@@ -215,6 +215,12 @@ func NotifyYDB(sig os.Signal) bool {
 	return true
 }
 
+// FatalSignalPanic returns whether the currently unwinding panic was caused by a fatal signal like Ctrl-C.
+// May be used in a deferred function like [QuitAfterFatalSignal] to check whether a fatal signal caused the current exit procedure.
+func SignalWasFatal() bool {
+	return ydbSigPanicCalled.Load()
+}
+
 // QuitAfterFatalSignal may be deferred by goroutines to prevent goroutine errors after Ctrl-C is pressed.
 // When Ctrl-C is pressed the signal is (by default) passed to YottaDB which shuts down the database.
 // If goroutines are still running and access the database, they will panic with code ydberr.CALLINAFTERXIT.
@@ -224,7 +230,7 @@ func NotifyYDB(sig os.Signal) bool {
 // This deferred function will hide such panics, whether caused by Ctrl-C or by prematurely calling yottadb.Shutdown.
 // To avoid hiding these errors, you may wish to make your own version of this function that logs them.
 //
-// See: [Shutdown], [SignalNotify]
+// See: [Shutdown], [SignalNotify], [SignalWasFatal]
 func QuitAfterFatalSignal() {
 	if err := recover(); err != nil {
 		if err, ok := err.(error); !ok {

@@ -90,6 +90,7 @@ func Init() (*DB, error) {
 	printEntry("YottaDB Init()")
 
 	conn := NewConn()
+	ydbSigPanicCalled.Store(false) // Since running ydb_main_lang_init, ydb_exit() has not been called by a signal
 	status := C.ydb_main_lang_init(C.YDB_MAIN_LANG_GO, C.ydb_signal_exit_callback)
 	if status != YDB_OK {
 		dberror := newError(int(status), conn.recoverMessage(status))
@@ -140,7 +141,7 @@ func Init() (*DB, error) {
 	// Verify we are running with the minimum YottaDB version or later
 	runningYDBRelease, err := strconv.ParseFloat(releaseMajorStr+"."+releaseMinorStr, 64)
 	if err != nil {
-		panic(newError(ydberr.Init, "programmer error", err)) // shouldn't happen due to check above
+		panic(newError(ydberr.Init, "programmer error; contact YottaDB support", err)) // shouldn't happen due to check above
 	}
 	minYDBRelease, err := strconv.ParseFloat(MinYDBRelease[1:], 64)
 	if err != nil {
@@ -261,10 +262,10 @@ func Shutdown(handle *DB) error {
 		if dbgSigHandling {
 			fmt.Fprintln(os.Stderr, "Shutdown(): Wait for ydb_exit() expired")
 		}
-		errstr = "YottaDB database rundown may have been bypassed due to timeout - run MUPIP JOURNAL ROLLBACK BACKWARD / MUPIP JOURNAL RECOVER BACKWARD / MUPIP RUNDOWN"
 		if !ydbSigPanicCalled.Load() {
 			// If we panic'd due to a signal, we definitely have run the exit handler as it runs before the panic is
 			// driven so we can bypass this message in that case.
+			errstr = "YottaDB database rundown may have been bypassed due to timeout - run MUPIP JOURNAL ROLLBACK BACKWARD / MUPIP JOURNAL RECOVER BACKWARD / MUPIP RUNDOWN"
 			syslogEntry(errstr)
 		}
 	}
