@@ -101,7 +101,7 @@ func (m *MFunctions) WrapErr(rname string) func(args ...any) (any, error) {
 func (m *MFunctions) getRoutine(name string) *RoutineData {
 	routine, ok := m.Table.Routines[name]
 	if !ok {
-		panic(newError(ydberr.MCallNotFound, fmt.Sprintf("M routine '%s' not found in M-call table", name)))
+		panic(errorf(ydberr.MCallNotFound, "M routine '%s' not found in M-call table", name))
 	}
 	return routine
 }
@@ -452,12 +452,12 @@ func (conn *Conn) paramAlloc() unsafe.Pointer {
 // Return value is nil if the routine is not defined to return anything.
 func (conn *Conn) callM(routine *RoutineData, args []any) (any, error) {
 	if routine == nil {
-		panic(newError(ydberr.MCallNil, "routine data passed to Conn.CallM() must not be nil"))
+		panic(errorf(ydberr.MCallNil, "routine data passed to Conn.CallM() must not be nil"))
 	}
 	cconn := conn.cconn
 
 	if len(args) != len(routine.Types)-1 {
-		panic(newError(ydberr.MCallWrongNumberOfParameters, fmt.Sprintf("%d parameters supplied whereas the M-call table specifies %d", len(args), len(routine.Types)-1)))
+		panic(errorf(ydberr.MCallWrongNumberOfParameters, "%d parameters supplied whereas the M-call table specifies %d", len(args), len(routine.Types)-1))
 	}
 	printEntry("CallTable.CallM()")
 	// If we haven't already fetched the call description from YDB, do that now.
@@ -551,7 +551,7 @@ func (conn *Conn) callM(routine *RoutineData, args []any) (any, error) {
 			if typ.pointer {
 				asterisk = "*"
 			}
-			panic(newError(ydberr.MCallTypeMismatch, fmt.Sprintf("parameter %d is %s but %s%s is specified in the M-call table", i+1, reflect.TypeOf(val), asterisk, typ.typ)))
+			panic(errorf(ydberr.MCallTypeMismatch, "parameter %d is %s but %s%s is specified in the M-call table", i+1, reflect.TypeOf(val), asterisk, typ.typ))
 		}
 		switch val := args[i].(type) {
 		case string:
@@ -620,7 +620,7 @@ func (conn *Conn) callM(routine *RoutineData, args []any) (any, error) {
 			typeAssert(val, reflect.Float64)
 			*(*C.ydb_double_t)(param) = C.ydb_double_t(*val)
 		default:
-			panic(newError(ydberr.MCallTypeUnhandled, fmt.Sprintf("unhandled type (%s) in parameter %d", reflect.TypeOf(val), i+1)))
+			panic(errorf(ydberr.MCallTypeUnhandled, "unhandled type (%s) in parameter %d", reflect.TypeOf(val), i+1))
 		}
 		conn.vpAddParam(uintptr(unsafe.Pointer(param)))
 		param = unsafe.Add(param, paramSize)
@@ -661,7 +661,7 @@ func (conn *Conn) callM(routine *RoutineData, args []any) (any, error) {
 			ptr := (*C.ydb_double_t)(param)
 			retval = float64(*ptr)
 		default:
-			panic(newError(ydberr.MCallTypeUnhandled, fmt.Sprintf("unhandled type (%s) in return of return value; report bug in YDBGo", typ.typ)))
+			panic(errorf(ydberr.MCallTypeUnhandled, "unhandled type (%s) in return of return value; report bug in YDBGo", typ.typ))
 		}
 		param = unsafe.Add(param, paramSize)
 	}
@@ -697,7 +697,7 @@ func (conn *Conn) callM(routine *RoutineData, args []any) (any, error) {
 				*val = float64(*ptr)
 			case string, int, uint, int32, uint32, int64, uint64, float32, float64:
 			default:
-				panic(newError(ydberr.MCallTypeUnhandled, fmt.Sprintf("unhandled type (%s) in parameter %d; report bug in YDBGo", reflect.TypeOf(val), i+1)))
+				panic(errorf(ydberr.MCallTypeUnhandled, "unhandled type (%s) in parameter %d; report bug in YDBGo", reflect.TypeOf(val), i+1))
 			}
 		}
 		param = unsafe.Add(param, paramSize)

@@ -271,7 +271,10 @@ func (n *Node) Lookup() (string, bool) {
 		return "", false
 	}
 	if status != YDB_OK {
-		panic(n.conn.lastError(status))
+		if status == ydberr.INVVARNAME {
+			panic(errorf(ydberr.INVVARNAME, "%s:\nSubscript(0)='%#v'; node=%#v", n.conn.lastError(status), n.Subscript(0), n.String()))
+		}
+		//		panic(n.conn.lastError(status))
 	}
 	// take a copy of the string so that we can release `space`
 	value := C.GoStringN(cconn.value.buf_addr, C.int(cconn.value.len_used))
@@ -362,7 +365,7 @@ func (n *Node) Incr(amount any) string {
 
 	n.conn.setAnyValue(amount)
 	if cconn.value.len_used == 0 {
-		panic(newError(ydberr.IncrementEmpty, `cannot increment by the empty string ""`))
+		panic(errorf(ydberr.IncrementEmpty, `cannot increment by the empty string ""`))
 	}
 
 	n.conn.prepAPI()

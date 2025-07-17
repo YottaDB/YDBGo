@@ -93,15 +93,15 @@ func printEntry(funcName string) {
 func syslogEntry(logMsg string) {
 	syslogr, err := syslog.New(syslog.LOG_INFO+syslog.LOG_USER, "[YottaDB-Go-Wrapper]")
 	if err != nil {
-		panic(newError(ydberr.Syslog, fmt.Sprintf("syslog.New() failed unexpectedly with error: %s", err)))
+		panic(errorf(ydberr.Syslog, "syslog.New() failed unexpectedly with error: %s", err))
 	}
 	err = syslogr.Info(logMsg)
 	if err != nil {
-		panic(newError(ydberr.Syslog, fmt.Sprintf("syslogr.Info() failed unexpectedly with error: %s", err)))
+		panic(errorf(ydberr.Syslog, "syslogr.Info() failed unexpectedly with error: %s", err))
 	}
 	err = syslogr.Close()
 	if err != nil {
-		panic(newError(ydberr.Syslog, fmt.Sprintf("syslogr.Close() failed unexpectedly with error: %s", err)))
+		panic(errorf(ydberr.Syslog, "syslogr.Close() failed unexpectedly with error: %s", err))
 	}
 }
 
@@ -114,7 +114,7 @@ func lookupYDBSignal(sig os.Signal) *sigInfo {
 	}
 	value, ok := ydbSignalMap.Load(sig)
 	if !ok {
-		panic(newError(ydberr.SignalUnsupported, fmt.Sprintf("The specified signal %d (%v) is not a YottaDB signal so is unsupported for signal notification", sig, sig)))
+		panic(errorf(ydberr.SignalUnsupported, "The specified signal %d (%v) is not a YottaDB signal so is unsupported for signal notification", sig, sig))
 	}
 	info := value.(*sigInfo)
 	return info
@@ -131,7 +131,7 @@ func validateYDBSignal(sig os.Signal) *sigInfo {
 
 	info := lookupYDBSignal(sig)
 	if sig == syscall.SIGTSTP || sig == syscall.SIGTTIN || sig == syscall.SIGTTOU {
-		panic(newError(ydberr.SignalUnsupported, fmt.Sprintf("handling signal %d (%v) hangs, so handling it is not supported", sig, sig)))
+		panic(errorf(ydberr.SignalUnsupported, "handling signal %d (%v) hangs, so handling it is not supported", sig, sig))
 	}
 	return info
 }
@@ -177,7 +177,7 @@ func SignalReset(signals ...os.Signal) {
 func NotifyYDB(sig os.Signal) bool {
 	value, ok := ydbSignalMap.Load(sig)
 	if !ok {
-		panic(newError(ydberr.SignalUnsupported, fmt.Sprintf("goroutine-sighandler: called NotifyYDB with a non-YottaDB signal %d (%v)", sig, sig)))
+		panic(errorf(ydberr.SignalUnsupported, "goroutine-sighandler: called NotifyYDB with a non-YottaDB signal %d (%v)", sig, sig))
 	}
 	info := value.(*sigInfo)
 	conn := info.conn
@@ -210,7 +210,7 @@ func NotifyYDB(sig os.Signal) bool {
 		shutdownSignalGoroutine(info)
 	default: // Some sort of error occurred during signal handling
 		err := conn.lastError(rc)
-		panic(newError(ydberr.SignalHandling, fmt.Sprintf("goroutine_sighandler: error from ydb_sig_dispatch() of signal %d (%v): %s", sig, sig, err), err))
+		panic(newError(ydberr.SignalHandling, fmt.Sprintf("goroutine_sighandler: error from ydb_sig_dispatch() of signal %d (%v)", sig, sig), err))
 	}
 	return true
 }
@@ -385,5 +385,5 @@ func signalExitCallback(sigNum C.int) {
 	ydbSigPanicCalled.Store(true) // Need "atomic" usage to avoid read/write DATA RACE issues
 	shutdownSignalGoroutines()    // Close the goroutines down with their signal notification channels
 	sig := syscall.Signal(sigNum) // Convert numeric signal number to Signal type for use in panic() message
-	panic(newError(ydberr.SignalFatal, fmt.Sprintf("Fatal signal %d (%v) occurred", sig, sig)))
+	panic(errorf(ydberr.SignalFatal, "Fatal signal %d (%v) occurred", sig, sig))
 }

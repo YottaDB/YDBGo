@@ -10,46 +10,19 @@
 //
 //////////////////////////////////////////////////////////////////
 
-package yottadb_test
+package yottadb
 
 import (
-	"errors"
-	"fmt"
+	"testing"
 
-	"lang.yottadb.com/go/yottadb/v2"
-	"lang.yottadb.com/go/yottadb/v2/ydberr"
+	assert "github.com/stretchr/testify/require"
 )
 
-// Example checking whether error is a particular YottaDB error.
-func ExampleErrorIs() {
-	err := &yottadb.Error{Code: ydberr.INVSTRLEN, Message: "string too long"}
+// ---- Tests
 
-	fmt.Println("Error is INVSTRLEN:", yottadb.ErrorIs(err, ydberr.INVSTRLEN))
-	fmt.Println(" or using longform:", errors.Is(err, &yottadb.Error{Code: ydberr.INVSTRLEN}))
-
-	wrapped := fmt.Errorf("wrapped: %w", err)
-	fmt.Println("Wrapped error is still INVSTRLEN:", yottadb.ErrorIs(wrapped, ydberr.INVSTRLEN))
-
-	fmt.Println()
-	fmt.Println("Or you can Grab the error with Error.As():")
-	var e *yottadb.Error
-	fmt.Println("Error is type yottadb.Error:", errors.As(err, &e))
-	if errors.As(err, &e) {
-		fmt.Println("  and the error is:", e)
-	}
-
-	err2 := fmt.Errorf("string too long")
-	fmt.Println("Error is type yottadb.Error:", errors.As(err2, &e))
-	if errors.As(err2, &e) {
-		fmt.Println("Error is type yottadb.Error:", e)
-	}
-	// Output:
-	// Error is INVSTRLEN: true
-	//  or using longform: true
-	// Wrapped error is still INVSTRLEN: true
-	//
-	// Or you can Grab the error with Error.As():
-	// Error is type yottadb.Error: true
-	//   and the error is: string too long
-	// Error is type yottadb.Error: false
+func TestRecoverMessage(t *testing.T) {
+	conn := SetupTest(t)
+	assert.Equal(t, "%SYSTEM-E-ENO123, No medium found", conn.recoverMessage(123))
+	assert.Equal(t, "%SYSTEM-E-ENO123, No medium found", conn.recoverMessage(-123))
+	assert.PanicsWithError(t, "%YDB-E-UNKNOWNSYSERR, [2147483646] does not correspond to a known YottaDB error code", func() { conn.recoverMessage(-2147483646) })
 }

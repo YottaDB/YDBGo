@@ -15,7 +15,6 @@
 package yottadb
 
 import (
-	"fmt"
 	"runtime"
 	"runtime/cgo"
 	"strconv"
@@ -112,7 +111,7 @@ func (conn *Conn) ensureValueSize(cap int) {
 		cap += overalloc // allocate some extra for potential future use
 		addr := (*C.char)(C.realloc(unsafe.Pointer(value.buf_addr), C.size_t(cap)))
 		if addr == nil {
-			panic(newError(ydberr.OutOfMemory, fmt.Sprintf("out of memory when allocating %d bytes for string data transfer to YottaDB", cap)))
+			panic(errorf(ydberr.OutOfMemory, "out of memory when allocating %d bytes for string data transfer to YottaDB", cap))
 		}
 		value.buf_addr = addr
 		value.len_alloc = C.uint(cap)
@@ -154,7 +153,7 @@ func (conn *Conn) setAnyValue(val any) {
 	case float64:
 		str = strconv.FormatFloat(n, 'G', -1, 64)
 	default:
-		panic(newError(ydberr.InvalidValueType, fmt.Sprintf("value (%s) must be a string or number", val)))
+		panic(errorf(ydberr.InvalidValueType, "value (%s) must be a string or number", val))
 	}
 	// The following is equivalent to setValue() but without the size check which is unnecessary since NewConn allocates at least overalloc size
 	C.fill_buffer(&conn.cconn.value, str)

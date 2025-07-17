@@ -78,11 +78,14 @@ func ErrorIs(err error, code int) bool {
 }
 
 // newError returns error code and message as a [yottadb.Error] error type.
-// Any errors supplied in wrapErrors are wrapped in the returned error.
+// Any errors supplied in wrapErrors are wrapped in the returned error and their messages appended (after a colon) to the given message.
 // For YDBGo error strategy see [yottadb.Error]
 func newError(code int, message string, wrapErrors ...error) error {
 	for _, err := range wrapErrors {
-		message = message + ": " + err.Error()
+		newMessage := err.Error()
+		if newMessage != "" {
+			message = message + ": " + newMessage
+		}
 	}
 	return &Error{Code: code, Message: message, chain: wrapErrors}
 }
@@ -118,7 +121,7 @@ func (conn *Conn) lastError(code C.int) error {
 	index := strings.Index(msg, pattern)
 	if index == -1 {
 		// If msg is improperly formatted, return it verbatim as an error with code YDBMessageInvalid (this should never happen with messages from YottaDB)
-		return newError(ydberr.YDBMessageInvalid, fmt.Sprintf("could not parse YottaDB error message: %s", msg))
+		return errorf(ydberr.YDBMessageInvalid, "could not parse YottaDB error message: %s", msg)
 	}
 	text := msg[index+len(pattern):]
 	return newError(int(code), text)
@@ -136,12 +139,12 @@ func (conn *Conn) lastCode() C.int {
 	index := strings.Index(msg, ",")
 	if index == -1 {
 		// If msg is improperly formatted, panic it verbatim with an YDBMessageInvalid code (this should never happen with messages from YottaDB)
-		panic(newError(ydberr.YDBMessageInvalid, fmt.Sprintf("could not parse YottaDB error message: %s", msg)))
+		panic(errorf(ydberr.YDBMessageInvalid, "could not parse YottaDB error message: %s", msg))
 	}
 	code, err := strconv.ParseInt(msg[:index], 10, 64)
 	if err != nil {
 		// If msg is improperly formatted, panic it verbatim with an YDBMessageInvalid code (this should never happen with messages from YottaDB)
-		panic(newError(ydberr.YDBMessageInvalid, fmt.Sprintf("%s: %s", err, msg), err))
+		panic(errorf(ydberr.YDBMessageInvalid, "%s: %s", err, msg))
 	}
 	return C.int(-code)
 }
@@ -158,10 +161,14 @@ func (conn *Conn) recoverMessage(status C.int) string {
 		// The engine is shut down so calling ydb_message_t will fail if we attempt it so just hard-code this error return value.
 		return "%YDB-E-CALLINAFTERXIT, After a ydb_exit(), a process cannot create a valid YottaDB context"
 	}
-	rc := C.ydb_message_t(cconn.tptoken, nil, -status, &cconn.errstr)
+	// note: ydb_message_t() only looks at the absolute value of status so no need to negate it
+	rc := C.ydb_message_t(cconn.tptoken, nil, status, &cconn.errstr)
 	if rc != YDB_OK {
 		err := conn.lastError(rc)
-		panic(newError(ydberr.YDBMessageRecoveryFailure, fmt.Sprintf("error %d when trying to recover error message for error %d using ydb_message_t(): %s", int(rc), int(-status), err), err))
+		if rc == ydberr.UNKNOWNSYSERR {
+			panic(errorf(int(rc), "%%YDB-E-UNKNOWNSYSERR, [%d] does not correspond to a known YottaDB error code", -status))
+		}
+		panic(newError(ydberr.YDBMessageRecoveryFailure, fmt.Sprintf("error %d when trying to recover error message for error %d using ydb_message_t()", int(rc), int(-status)), err))
 	}
 	return conn.getErrorString()
 }
