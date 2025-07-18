@@ -76,8 +76,14 @@ func (conn *Conn) _Node(varname any, subscripts ...string) (n *Node) {
 	switch val := varname.(type) {
 	case *Node:
 		node1 = val
-		first = C.GoStringN(node1.cnode.buffers.buf_addr, node1.cnode.datasize)
-		firstLen = int(node1.cnode.len)
+		cnode := node1.cnode
+		firstLen = int(cnode.len)
+		firstStringAddr := cnode.buffers.buf_addr
+		lastbuf := bufferIndex(&cnode.buffers, firstLen-1)
+		// Calculate data size of all strings in node to copy = address of last string - address of first string + length of last string
+		datasize := C.uint(uintptr(unsafe.Pointer(lastbuf.buf_addr))) - C.uint(uintptr(unsafe.Pointer(firstStringAddr)))
+		datasize += lastbuf.len_used
+		first = C.GoStringN(firstStringAddr, C.int(datasize))
 	default:
 		first = val.(string)
 		firstLen = 1
@@ -88,8 +94,7 @@ func (conn *Conn) _Node(varname any, subscripts ...string) (n *Node) {
 	}
 
 	size := C.sizeof_node + C.sizeof_ydb_buffer_t*(firstLen-1+len(subscripts)) + joiner.Len()
-	var goNode Node
-	n = &goNode
+	n = &Node{}
 	n.cnode = (*C.node)(calloc(C.size_t(size))) // must use our calloc, not malloc: see calloc doc
 	// Queue the cleanup function to free it
 	runtime.AddCleanup(n, func(cnode *C.node) {
@@ -100,7 +105,6 @@ func (conn *Conn) _Node(varname any, subscripts ...string) (n *Node) {
 	cnode := n.cnode
 	cnode.conn = conn.cconn // point to the C version of the conn
 	cnode.len = C.int(len(subscripts) + firstLen)
-	cnode.datasize = C.int(joiner.Len())
 
 	dataptr := unsafe.Pointer(bufferIndex(&cnode.buffers, len(subscripts)+firstLen))
 	if joiner.Len() > 0 {
@@ -108,23 +112,27 @@ func (conn *Conn) _Node(varname any, subscripts ...string) (n *Node) {
 		C.memcpy(dataptr, unsafe.Pointer(&joiner.Bytes()[0]), C.size_t(joiner.Len()))
 	}
 
+	// Function to each buffer to dataptr++ as I loop through strings
+	setbuf := func(buf *C.ydb_buffer_t, length C.uint) {
+		buf.buf_addr = (*C.char)(dataptr)
+		buf.len_used, buf.len_alloc = length, length
+		dataptr = unsafe.Add(dataptr, length)
+	}
+
 	// Now fill in ydb_buffer_t pointers
 	if node1 != nil {
-		// Copy node1.buffers to node.buffers
-		C.memcpy(unsafe.Pointer(&cnode.buffers), unsafe.Pointer(&node1.cnode.buffers), C.size_t(node1.cnode.len)*C.sizeof_ydb_buffer_t)
-		dataptr = unsafe.Add(dataptr, len(first))
+		// First set buffers for all strings copied from parent node
+		for i := range firstLen {
+			buf := bufferIndex(&cnode.buffers, i)
+			setbuf(buf, bufferIndex(&node1.cnode.buffers, i).len_used)
+		}
 	} else {
-		s := first
 		buf := bufferIndex(&cnode.buffers, 0)
-		buf.buf_addr = (*C.char)(dataptr)
-		buf.len_used, buf.len_alloc = C.uint(len(s)), C.uint(len(s))
-		dataptr = unsafe.Add(dataptr, len(s))
+		setbuf(buf, C.uint(len(first)))
 	}
 	for i, s := range subscripts {
 		buf := bufferIndex(&cnode.buffers, i+firstLen)
-		buf.buf_addr = (*C.char)(dataptr)
-		buf.len_used, buf.len_alloc = C.uint(len(s)), C.uint(len(s))
-		dataptr = unsafe.Add(dataptr, len(s))
+		setbuf(buf, C.uint(len(s)))
 	}
 	return n
 }
@@ -440,12 +448,9 @@ func (n *Node) Mutate(value string) *Node {
 		strs[len(strs)-1] = value + preallocSubscript
 		retNode = n.conn.Node(strs[0], strs[1:]...)
 		retNode.mutable = true
-		// Shrink last buffer down to size of value leaving preallocSubscript space above it for future mutations
-		retNode.cnode.datasize -= C.int(len(preallocSubscript))
 		lastbuf := bufferIndex(&retNode.cnode.buffers, len(strs)-1)
 		lastbuf.len_used = C.uint(len(value))
 	} else {
-		retNode.cnode.datasize -= C.int(lastbuf.len_used) - C.int(len(value))
 		C.memcpy(unsafe.Pointer(lastbuf.buf_addr), unsafe.Pointer(unsafe.StringData(value)), C.size_t(len(value)))
 		lastbuf.len_used = C.uint(len(value))
 	}

@@ -30,8 +30,6 @@ typedef struct conn {
 typedef struct node {
 	conn *conn;
 	int len;			// number of buffers[] allocated to store subscripts/strings
-	int datasize;			// length of string `data` field (all strings and subscripts concatenated)
-					// note: datasize can shrink in mutable nodes to alter the final subscript
 	ydb_buffer_t buffers;		// first of an array of buffers (typically varname)
 	ydb_buffer_t buffersn[];	// rest of array
 	// char *data;			// stored after `buffers` (however large they are), which point into this data

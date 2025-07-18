@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"unsafe"
 
 	assert "github.com/stretchr/testify/require"
 )
@@ -48,6 +49,37 @@ func TestCloneNode(t *testing.T) {
 	assert.Contains(t, err.Error(), ": var1")
 	// Check that a changed tptoken in n2's conn doesn't affect n1's conn
 	assert.NotEqual(t, n1.conn.cconn.tptoken, n2.conn.cconn.tptoken)
+}
+
+func (n *Node) checkBuffers(t *testing.T) {
+	cnode := n.cnode
+	lastbuf := bufferIndex(&cnode.buffers, int(cnode.len-1))
+	start := int(uintptr(unsafe.Pointer(&cnode.buffers)))
+	end := int(uintptr(unsafe.Pointer(bufferIndex(&cnode.buffers, int(cnode.len)))))
+	for _, s := range n.Subscripts() {
+		end += len(s)
+	}
+	end += int(lastbuf.len_alloc) - int(lastbuf.len_used) // Adjust for last string being overallocated
+	for i := range int(cnode.len) {
+		buf := bufferIndex(&cnode.buffers, i)
+		assert.GreaterOrEqualf(t, int(uintptr(unsafe.Pointer(buf))), start, "%s subscript %d buffer is located before memory allocation", n, i)
+		assert.LessOrEqualf(t, int(uintptr(unsafe.Pointer(buf))), end, "%s subscript %d buffer is located after allocation", n, i)
+		assert.GreaterOrEqualf(t, int(uintptr((unsafe.Pointer(buf.buf_addr)))), start, "%s subscript %d string is located before allocation", n, i)
+		assert.LessOrEqualf(t, int(uintptr(unsafe.Add(unsafe.Pointer(buf.buf_addr), int(buf.len_used)))), end, "%s subscript %d string ends after allocation end", n, i)
+		assert.LessOrEqualf(t, int(uintptr(unsafe.Add(unsafe.Pointer(buf.buf_addr), int(buf.len_alloc)))), end, "%s subscript %d string space ends after allocation end", n, i)
+	}
+}
+
+func TestChild(t *testing.T) {
+	conn := SetupTest(t)
+	n1 := conn.Node("var", "abc")
+	n2 := n1.Mutate("def")
+	n3 := n2.Child("ghi", "jkl")
+	n4 := n3.Mutate("mno")
+	n1.checkBuffers(t)
+	n2.checkBuffers(t)
+	n3.checkBuffers(t)
+	n4.checkBuffers(t)
 }
 
 func TestSubscript(t *testing.T) {
