@@ -68,11 +68,8 @@ type Conn struct {
 	cconn *C.conn
 }
 
-// NewConn creates a new database connection.
-// Each goroutine must have its own connection.
-func NewConn() *Conn {
-	initCheck()
-
+// _newConn is a subset of NewConn without initCheck and value space -- used by signals.init()
+func _newConn() *Conn {
 	var conn Conn
 	conn.cconn = (*C.conn)(calloc(C.sizeof_conn)) // must use our calloc, not malloc: see calloc doc
 	conn.cconn.tptoken = C.YDB_NOTTP
@@ -80,10 +77,6 @@ func NewConn() *Conn {
 	conn.cconn.errstr.buf_addr = (*C.char)(C.malloc(C.YDB_MAX_ERRORMSG))
 	conn.cconn.errstr.len_alloc = C.YDB_MAX_ERRORMSG
 	conn.cconn.errstr.len_used = 0
-	// Create initial space for value used by various API call/return
-	conn.cconn.value.buf_addr = (*C.char)(C.malloc(overalloc))
-	conn.cconn.value.len_alloc = C.uint(overalloc)
-	conn.cconn.value.len_used = 0
 
 	runtime.AddCleanup(&conn, func(cn *C.conn) {
 		C.free(unsafe.Pointer(cn.value.buf_addr))
@@ -93,6 +86,18 @@ func NewConn() *Conn {
 		C.free(unsafe.Pointer(cn))
 	}, conn.cconn)
 	return &conn
+}
+
+// NewConn creates a new database connection.
+// Each goroutine must have its own connection.
+func NewConn() *Conn {
+	initCheck()
+	conn := _newConn()
+	// Create initial space for value used by various API call/return
+	conn.cconn.value.buf_addr = (*C.char)(C.malloc(overalloc))
+	conn.cconn.value.len_alloc = C.uint(overalloc)
+	conn.cconn.value.len_used = 0
+	return conn
 }
 
 // prepAPI initializes anything necessary before C API calls.

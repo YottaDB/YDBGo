@@ -89,7 +89,7 @@ func Init() (*DB, error) {
 	// YDB calls the exit handler after rundown (equivalent to ydb_exit()).
 	printEntry("YottaDB Init()")
 
-	conn := NewConn()
+	conn := NewConn()              // temporary conn used purely during Init() to fetch version info from YDB
 	ydbSigPanicCalled.Store(false) // Since running ydb_main_lang_init, ydb_exit() has not been called by a signal
 	status := C.ydb_main_lang_init(C.YDB_MAIN_LANG_GO, C.ydb_signal_exit_callback)
 	if status != YDB_OK {
@@ -152,12 +152,6 @@ func Init() (*DB, error) {
 			MinYDBRelease, releaseMajorStr, releaseMinorStr)
 	}
 
-	// Populate ydbSignalMap -- must occur before starting signal handler goroutines below
-	for _, sig := range YDBSignals {
-		info := sigInfo{sig, nil, make(chan struct{}, 1), atomic.Bool{}, atomic.Bool{}, NewConn()}
-		ydbSignalMap.Store(sig, &info)
-	}
-	ydbSignalMapFilled = true
 	// Start up a goroutine for each signal we want to be notified of. This is so that if one signal is in process,
 	// we can still catch a different signal and deliver it appropriately (probably to the same goroutine). For each signal,
 	// bump our wait group counter so we don't proceed until all of these goroutines are initialized.

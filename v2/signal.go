@@ -32,15 +32,11 @@ import (
 // extern void *ydb_signal_exit_callback(void);
 import "C"
 
-// sigInfo holds info for each signal that YDBGo handles and defers to YottaDB.
-type sigInfo struct {
-	signal       os.Signal      // signal number for this entry
-	notifyChan   chan os.Signal // user-supplied channel notify of incoming signal
-	shutdownNow  chan struct{}  // Channel used to shutdown signal handling goroutine
-	shutdownDone atomic.Bool    // indicate that goroutine shutdown is complete
-	servicing    atomic.Bool    // indicate signal handler is active
-	conn         *Conn          // just acts as a place to store errstr for use by this signal's NotifyYDB()
-}
+// Shutdown globals
+var ydbSigPanicCalled atomic.Bool          // True when our exit is panic driven due to a signal
+var ydbShutdownCheck = make(chan struct{}) // Flag that a channel has been shut down. Needs no buffering since we use blocking writes
+var shutdownSigGoroutines bool             // Flag that we have completed shutdownSignalGoroutines()
+var shutdownSigGoroutinesMutex sync.Mutex  // Serialize access to shutdownSignalGoroutines()
 
 // YDBSignals lists all the signals that YottaDB requires to be notified of.
 var YDBSignals = []os.Signal{
@@ -65,16 +61,24 @@ var YDBSignals = []os.Signal{
 	syscall.SIGUSR1,
 }
 
-// ydbSignalMap stores data for signals that the wrapper handles and passes to YottaDB.
-// It is populated by InitializeYottaDB()
-var ydbSignalMap sync.Map
-var ydbSignalMapFilled bool       // Set to True when we've populated it -- needn't be atomic since it is populated inside Init locks
-var ydbSigPanicCalled atomic.Bool // True when our exit is panic driven due to a signal
+// sigInfo holds info for each signal that YDBGo handles and defers to YottaDB.
+type sigInfo struct {
+	signal       os.Signal      // signal number for this entry
+	notifyChan   chan os.Signal // user-supplied channel notify of incoming signal
+	shutdownNow  chan struct{}  // Channel used to shutdown signal handling goroutine
+	shutdownDone atomic.Bool    // indicate that goroutine shutdown is complete
+	servicing    atomic.Bool    // indicate signal handler is active
+	_conn        *Conn          // not a full Conn; just acts as a place to store errstr for use by this signal's NotifyYDB()
+}
 
-// Shutdown globals
-var ydbShutdownCheck = make(chan struct{}) // Flag that a channel has been shut down. Needs no buffering since we use blocking writes
-var shutdownSigGoroutines bool             // Flag that we have completed shutdownSignalGoroutines()
-var shutdownSigGoroutinesMutex sync.Mutex  // Serialize access to shutdownSignalGoroutines()
+// init populates ydbSignalMap -- must occur before starting signal handler goroutines in Init()
+var ydbSignalMap sync.Map // stores data for signals that the wrapper handles and passes to YottaDB.
+func init() {
+	for _, sig := range YDBSignals {
+		info := sigInfo{sig, nil, make(chan struct{}, 1), atomic.Bool{}, atomic.Bool{}, _newConn()}
+		ydbSignalMap.Store(sig, &info)
+	}
+}
 
 // printEntry is a function to print the entry point of the function, when entered, if the printEPHdrs flag is enabled.
 func printEntry(funcName string) {
@@ -107,11 +111,6 @@ func syslogEntry(logMsg string) {
 
 // lookupYDBSignal returns a pointer to the sigInfo entry related to signal sig.
 func lookupYDBSignal(sig os.Signal) *sigInfo {
-	if !ydbSignalMapFilled {
-		// We cannot just call initCheck() because when Shutdown occurs it reverts back to un-initialized and fails.
-		// But lookupYDBSignals has to run even after Shutdown because it is called by signal handlers.
-		initCheck() // Produce appropriate error message
-	}
 	value, ok := ydbSignalMap.Load(sig)
 	if !ok {
 		panic(errorf(ydberr.SignalUnsupported, "The specified signal %d (%v) is not a YottaDB signal so is unsupported for signal notification", sig, sig))
@@ -180,7 +179,7 @@ func NotifyYDB(sig os.Signal) bool {
 		panic(errorf(ydberr.SignalUnsupported, "goroutine-sighandler: called NotifyYDB with a non-YottaDB signal %d (%v)", sig, sig))
 	}
 	info := value.(*sigInfo)
-	conn := info.conn
+	_conn := info._conn
 
 	// Flag that YDB is servicing this signal
 	info.servicing.Store(true)
@@ -195,7 +194,7 @@ func NotifyYDB(sig os.Signal) bool {
 	// this routine the tptoken at the time the signal actually occurs is unknown. The ydb_sig_dispatch()
 	// routine itself does not need the tptoken nor does anything it calls but we do still need an
 	// error buffer in case an error occurs that we need to return.
-	rc := C.ydb_sig_dispatch(&conn.cconn.errstr, signum)
+	rc := C.ydb_sig_dispatch(&_conn.cconn.errstr, signum)
 	// Handle errors so user doesn't have to
 	switch rc {
 	case YDB_OK:
@@ -209,7 +208,7 @@ func NotifyYDB(sig os.Signal) bool {
 		// If CALLINAFTERXIT, we're done - exit goroutine
 		shutdownSignalGoroutine(info)
 	default: // Some sort of error occurred during signal handling
-		err := conn.lastError(rc)
+		err := _conn.lastError(rc)
 		panic(newError(ydberr.SignalHandling, fmt.Sprintf("goroutine_sighandler: error from ydb_sig_dispatch() of signal %d (%v)", sig, sig), err))
 	}
 	return true
