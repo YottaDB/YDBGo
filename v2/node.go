@@ -232,7 +232,7 @@ func (n *Node) String() string {
 }
 
 // Set applies val to the value of a database node.
-//   - The val may be a string, integer type, or float and is converted to a string using the appropriate strconv function.
+//   - The val may be a string, []byte slice, integer type, or float; numeric types are converted to a string using the appropriate strconv function.
 func (n *Node) Set(val any) {
 	cnode := n.cnode // access C equivalents of Go types
 	cconn := cnode.conn
@@ -245,26 +245,65 @@ func (n *Node) Set(val any) {
 }
 
 // Get fetches and returns the value of a database node or defaultValue[0] if the node's variable name does not exist.
-//   - If the node's variable name (M local or M global) exists but the subscript has no value, Get() will return the empty string.
+//   - Note that the default only works on undefined variables, not on empty *subscripted* variables.
+//     If the node's variable name (M local or M global) exists but the subscripted node has no value, Get() will return the empty string.
 //     If you need to distinguish between an empty string and a value-less node you must use [Node.HasValue]()
 //   - Since a default is supplied, the only possible errors are panic-worthy, so this calls panic on them.
 func (n *Node) Get(defaultValue ...string) string {
-	val, ok := n.Lookup()
+	ok := n._Lookup()
 	if !ok {
 		if len(defaultValue) == 0 {
 			return ""
 		}
 		return defaultValue[0]
 	}
-	return val
+	cconn := n.cnode.conn
+	// copy cconn.value into a Go type so that cconn.value can be re-used for another ydb call
+	return C.GoStringN(cconn.value.buf_addr, C.int(cconn.value.len_used))
+}
+
+// GetBytes is the same as [Get] except that it accepts and returns []byte slices rather than strings.
+func (n *Node) GetBytes(defaultValue ...[]byte) []byte {
+	ok := n._Lookup()
+	if !ok {
+		if len(defaultValue) == 0 {
+			return []byte{}
+		}
+		return defaultValue[0]
+	}
+	cconn := n.cnode.conn
+	// copy cconn.value into a Go type so that cconn.value can be re-used for another ydb call
+	return C.GoBytes(unsafe.Pointer(cconn.value.buf_addr), C.int(cconn.value.len_used))
 }
 
 // Lookup returns the value of a database node and true, or if the variable name could not be found, returns the empty string and false.
-//   - If the node's variable name (M local or M global) exists but the subscript has no value, Get() will return the empty string and true.
+//   - If the node's variable name (M local or M global) exists but the subscripted node has no value, Lookup() will return the empty string and true.
 //     If you need to distinguish between an empty string and a value-less node you must use [Node.HasValue]()
 //   - bool false is returned on errors GVUNDEF (undefined M global), LVUNDEF (undefined M local), or INVSVN (invalid Special Variable Name).
-//   - You may use [Node.Get]() to replace undefined variable errors with a default value.
+//   - You may use [Node.Get]() to return a default value when an undefined variable is accessed.
 func (n *Node) Lookup() (string, bool) {
+	ok := n._Lookup()
+	if !ok {
+		return "", false
+	}
+	cconn := n.cnode.conn
+	// copy cconn.value into a Go type so that cconn.value can be re-used for another ydb call
+	return C.GoStringN(cconn.value.buf_addr, C.int(cconn.value.len_used)), true
+}
+
+// LookupBytes is the same as [Lookup] except that it returns the value as a []byte slice rather than a string.
+func (n *Node) LookupBytes() ([]byte, bool) {
+	ok := n._Lookup()
+	if !ok {
+		return []byte{}, false
+	}
+	cconn := n.cnode.conn
+	// copy cconn.value into a Go type so that cconn.value can be re-used for another ydb call
+	return C.GoBytes(unsafe.Pointer(cconn.value.buf_addr), C.int(cconn.value.len_used)), true
+}
+
+// _Lookup returns the value of a database node in n.cconn.value and returns whether the variable name could be found.
+func (n *Node) _Lookup() bool {
 	cnode := n.cnode // access C equivalents of Go types
 	cconn := cnode.conn
 	n.conn.prepAPI()
@@ -276,14 +315,12 @@ func (n *Node) Lookup() (string, bool) {
 		status = C.ydb_get_st(cconn.tptoken, &cconn.errstr, &cnode.buffers, cnode.len-1, bufferIndex(&cnode.buffers, 1), &cconn.value)
 	}
 	if status == ydberr.GVUNDEF || status == ydberr.LVUNDEF || status == ydberr.INVSVN {
-		return "", false
+		return false
 	}
 	if status != YDB_OK {
 		panic(n.conn.lastError(status))
 	}
-	// take a copy of the string so that we can release `space`
-	value := C.GoStringN(cconn.value.buf_addr, C.int(cconn.value.len_used))
-	return value, true
+	return true
 }
 
 // data returns whether the database node has a value or subnodes as follows:

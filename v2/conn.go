@@ -40,6 +40,14 @@ int fill_buffer(ydb_buffer_t *buf, _GoString_ val) {
 	return len <= buf->len_alloc;
 }
 
+// Fill ydb_buffer_t from a Go []byte slice.
+// Returns 1 on success or 0 if the string had to be truncated
+int fill_buffer_bytes(ydb_buffer_t *buf, char *data, int len) {
+	buf->len_used = len <= buf->len_alloc? len: buf->len_alloc;
+	memcpy(buf->buf_addr, data, buf->len_used);
+	return len <= buf->len_alloc;
+}
+
 // C routine to get address of ydb_lock_st() since CGo doesn't let you take the address of a variadic parameter-list function.
 void *getfunc_ydb_lock_st(void) {
         return (void *)&ydb_lock_st;
@@ -131,15 +139,26 @@ func (conn *Conn) setValue(val string) *C.ydb_buffer_t {
 	return &cconn.value
 }
 
+// setValueBytes stores val into the ydb_buffer of Conn.cconn.value.
+func (conn *Conn) setValueBytes(val []byte) *C.ydb_buffer_t {
+	cconn := conn.cconn
+	conn.ensureValueSize(len(val))
+	C.fill_buffer_bytes(&cconn.value, (*C.char)(unsafe.Pointer(unsafe.SliceData(val))), C.int(len(val)))
+	return &cconn.value
+}
+
 // setAnyValue is the same as setValue but accepts any type.
 // It is equivalent to setValue(Sprint(val)) but faster because it only handles strings and numbers.
-//   - val may be a string, integer type, or float and is converted to a string using the appropriate strconv function.
+//   - val may be a string, []byte slice, integer type, or float; numeric types are converted to a string using the appropriate strconv function.
 func (conn *Conn) setAnyValue(val any) {
 	var str string
 	switch n := val.(type) {
 	case string:
 		// ensure enough space is allocated (not needed for number cases
 		conn.setValue(n)
+		return
+	case []byte:
+		conn.setValueBytes(n)
 		return
 	case int:
 		str = strconv.FormatInt(int64(n), 10)
