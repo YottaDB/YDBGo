@@ -212,11 +212,14 @@ func (conn *Conn) setAnyValue(val any) {
 	}
 	// The following is equivalent to setValue() but without the size check which is unnecessary since NewConn allocates at least overalloc size
 	C.fill_buffer(&conn.cconn.value, str)
+	runtime.KeepAlive(conn) // ensure conn sticks around until we've finished copying data into it's C allocation
 }
 
 func (conn *Conn) getValue() string {
 	cconn := conn.cconn
-	return C.GoStringN(cconn.value.buf_addr, C.int(cconn.value.len_used))
+	r := C.GoStringN(cconn.value.buf_addr, C.int(cconn.value.len_used))
+	runtime.KeepAlive(conn) // ensure conn sticks around until we've finished copying data from it's C allocation
+	return r
 }
 
 // Zwr2Str takes the given ZWRITE-formatted string and converts it to return as a normal ASCII string.
@@ -320,6 +323,7 @@ func (conn *Conn) KillLocalsExcept(exclusions ...string) {
 		namelist := conn._Node(names[0], names[1:])
 		conn.prepAPI()
 		status = C.ydb_delete_excl_st(cconn.tptoken, &cconn.errstr, C.int(len(names)), &namelist.cnode.buffers)
+		runtime.KeepAlive(namelist) // ensure namelist sticks around until we've finished copying data from it's C allocation
 	}
 	if status != YDB_OK {
 		panic(conn.lastError(status))
@@ -358,6 +362,7 @@ func (conn *Conn) Lock(timeout time.Duration, nodes ...*Node) bool {
 	// vplist now contains the parameter list we want to send to ydb_lock_st(). But CGo doesn't permit us
 	// to call or even create a function pointer to ydb_lock_st(). So get it with getfunc_ydb_lock_st().
 	status := conn.vpCall(C.getfunc_ydb_lock_st()) // call ydb_lock_st()
+	runtime.KeepAlive(nodes)                       // ensure nodes sticks around until we've finished copying data from their C allocations
 	if status != YDB_OK && status != C.YDB_LOCK_TIMEOUT {
 		panic(conn.lastError(status))
 	}
@@ -431,6 +436,7 @@ func (conn *Conn) Transaction(transID string, localsToRestore []string, callback
 		conn.prepAPI()
 		status = C.ydb_tp_st(cconn.tptoken, &cconn.errstr, C.ydb_tpfnptr_t(C.tp_callback_wrapper), unsafe.Pointer(&handle),
 			(*C.char)(unsafe.Pointer(unsafe.StringData(transID))), C.int(len(names)), &namelist.cnode.buffers)
+		runtime.KeepAlive(namelist) // ensure namelist sticks around until we've finished copying data from it's C allocation
 	}
 	if status == YDB_TP_ROLLBACK {
 		return false

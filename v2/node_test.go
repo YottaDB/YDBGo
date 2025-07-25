@@ -119,10 +119,10 @@ func TestSetGet(t *testing.T) {
 	assert.Equal(t, "value", n.Get())
 	assert.Equal(t, "value", n.Get("default"))
 
-	n.Set([]byte("bytes"))
-	assert.Equal(t, "bytes", n.Get())
-	assert.Equal(t, "bytes", n.Get("default"))
-	assert.Equal(t, []byte("bytes"), n.GetBytes([]byte("default")))
+	n.Set([]byte("Hello"))
+	assert.Equal(t, "Hello", n.Get())
+	assert.Equal(t, "Hello", n.Get("defaultvalue"))
+	assert.Equal(t, []byte("Hello"), n.GetBytes([]byte("defaultvalue")))
 
 	// Test Set to a number
 	n.Set(5)

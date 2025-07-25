@@ -702,5 +702,6 @@ func (conn *Conn) callM(routine *RoutineData, args []any) (any, error) {
 		}
 		param = unsafe.Add(param, paramSize)
 	}
+	runtime.KeepAlive(conn) // ensure conn sticks around until we've finished copying data from it's C paramblock
 	return retval, nil
 }

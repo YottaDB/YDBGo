@@ -138,6 +138,7 @@ func (conn *Conn) _Node(varname any, subscripts []any) (n *Node) {
 			buf := bufferIndex(&cnode.buffers, i)
 			setbuf(buf, bufferIndex(&node1.cnode.buffers, i).len_used)
 		}
+		runtime.KeepAlive(node1) // ensure node1 sticks around until we've finished copying data from it's C allocation
 	} else {
 		buf := bufferIndex(&cnode.buffers, 0)
 		setbuf(buf, C.uint(len(first)))
@@ -193,7 +194,9 @@ func (n *Node) Subscript(index int) string {
 		panic(errorf(ydberr.InvalidSubscriptIndex, "subscript %d out of bounds (0-%d)", index, cnode.len))
 	}
 	buf := bufferIndex(&cnode.buffers, index)
-	return C.GoStringN(buf.buf_addr, C.int(buf.len_used))
+	r := C.GoStringN(buf.buf_addr, C.int(buf.len_used))
+	runtime.KeepAlive(n) // ensure n sticks around until we've finished copying data from it's C allocation
+	return r
 }
 
 // Subscripts returns a slice of strings that represent the varname and subscript names of the given node.
@@ -205,6 +208,7 @@ func (n *Node) Subscripts() []string {
 		s := C.GoStringN(buf.buf_addr, C.int(buf.len_used))
 		strings[i] = s
 	}
+	runtime.KeepAlive(n) // ensure n sticks around until we've finished copying data from it's C allocation
 	return strings
 }
 
@@ -229,6 +233,7 @@ func (n *Node) String() string {
 			bld.WriteString(",")
 		}
 	}
+	runtime.KeepAlive(n) // ensure n sticks around until we've finished copying data from it's C allocation
 	return bld.String()
 }
 
@@ -308,7 +313,9 @@ func (n *Node) Get(defaultValue ...string) string {
 	}
 	cconn := n.cnode.conn
 	// copy cconn.value into a Go type so that cconn.value can be re-used for another ydb call
-	return C.GoStringN(cconn.value.buf_addr, C.int(cconn.value.len_used))
+	r := C.GoStringN(cconn.value.buf_addr, C.int(cconn.value.len_used))
+	runtime.KeepAlive(n) // ensure n sticks around until we've finished copying data from it's C allocation
+	return r
 }
 
 // GetBytes is the same as [Node.Get] except that it accepts and returns []byte slices rather than strings.
@@ -322,7 +329,9 @@ func (n *Node) GetBytes(defaultValue ...[]byte) []byte {
 	}
 	cconn := n.cnode.conn
 	// copy cconn.value into a Go type so that cconn.value can be re-used for another ydb call
-	return C.GoBytes(unsafe.Pointer(cconn.value.buf_addr), C.int(cconn.value.len_used))
+	r := C.GoBytes(unsafe.Pointer(cconn.value.buf_addr), C.int(cconn.value.len_used))
+	runtime.KeepAlive(n) // ensure n sticks around until we've finished copying data from it's C allocation
+	return r
 }
 
 // Lookup returns the value of a database node and true, or if the variable name could not be found, returns the empty string and false.
@@ -337,7 +346,9 @@ func (n *Node) Lookup() (string, bool) {
 	}
 	cconn := n.cnode.conn
 	// copy cconn.value into a Go type so that cconn.value can be re-used for another ydb call
-	return C.GoStringN(cconn.value.buf_addr, C.int(cconn.value.len_used)), true
+	r := C.GoStringN(cconn.value.buf_addr, C.int(cconn.value.len_used))
+	runtime.KeepAlive(n) // ensure n sticks around until we've finished copying data from it's C allocation
+	return r, true
 }
 
 // LookupBytes is the same as [Node.Lookup] except that it returns the value as a []byte slice rather than a string.
@@ -348,7 +359,9 @@ func (n *Node) LookupBytes() ([]byte, bool) {
 	}
 	cconn := n.cnode.conn
 	// copy cconn.value into a Go type so that cconn.value can be re-used for another ydb call
-	return C.GoBytes(unsafe.Pointer(cconn.value.buf_addr), C.int(cconn.value.len_used)), true
+	r := C.GoBytes(unsafe.Pointer(cconn.value.buf_addr), C.int(cconn.value.len_used))
+	runtime.KeepAlive(n) // ensure n sticks around until we've finished copying data from it's C allocation
+	return r, true
 }
 
 // _Lookup returns the value of a database node in n.cconn.value and returns whether the variable name could be found.
@@ -466,6 +479,7 @@ func (n *Node) Incr(amount any) string {
 	}
 
 	valuestring := C.GoStringN(cconn.value.buf_addr, C.int(cconn.value.len_used))
+	runtime.KeepAlive(n) // ensure n sticks around until we've finished copying data from it's C allocation
 	return valuestring
 }
 
@@ -541,6 +555,7 @@ func (n *Node) Mutate(val any) *Node {
 		C.memcpy(unsafe.Pointer(lastbuf.buf_addr), unsafe.Pointer(unsafe.StringData(value)), C.size_t(len(value)))
 		lastbuf.len_used = C.uint(len(value))
 	}
+	runtime.KeepAlive(n) // ensure n sticks around until we've finished copying data into it's C allocation
 	return retNode
 }
 
@@ -588,7 +603,9 @@ func (n *Node) _next(reverse bool) (string, bool) {
 	if status != YDB_OK {
 		panic(n.conn.lastError(status))
 	}
-	return C.GoStringN(cconn.value.buf_addr, C.int(cconn.value.len_used)), true
+	r := C.GoStringN(cconn.value.buf_addr, C.int(cconn.value.len_used))
+	runtime.KeepAlive(n) // ensure n sticks around until we've finished copying data from it's C allocation
+	return r, true
 }
 
 // Next returns a Node instance pointing to the next subscript at the same depth level.

@@ -17,6 +17,7 @@ package yottadb
 import (
 	"errors"
 	"fmt"
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -101,7 +102,9 @@ func errorf(code int, format string, args ...any) error {
 func (conn *Conn) getErrorString() string {
 	// len_used should never be greater than len_alloc since all errors should fit into errstr, but just in case, take the min
 	errstr := conn.cconn.errstr
-	return C.GoStringN(errstr.buf_addr, C.int(min(errstr.len_used, errstr.len_alloc)))
+	r := C.GoStringN(errstr.buf_addr, C.int(min(errstr.len_used, errstr.len_alloc)))
+	runtime.KeepAlive(conn) // ensure conn sticks around until we've finished copying data from it's C allocation
+	return r
 }
 
 // lastError returns, given error code, the ydb error message stored by the previous YottaDB call as an error type or nil if there was no error.

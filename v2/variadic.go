@@ -41,6 +41,7 @@ func (conn *Conn) vpCall(vpfunc unsafe.Pointer) C.int {
 	conn.prepAPI()
 	retval := C.ydb_call_variadic_plist_func((C.ydb_vplist_func)(vpfunc), cconn.vplist)
 	cconn.vplist.n = 0
+	runtime.KeepAlive(conn) // ensure conn sticks around until we've finished copying data from it's C allocation
 	return retval
 }
 
@@ -122,6 +123,7 @@ func (conn *Conn) vpDump(w io.Writer) {
 		elemptr := unsafe.Add(argbase, i*int(unsafe.Sizeof(vplist)))
 		fmt.Fprintf(w, "   Elem %d (%p) Value: %d (0x%x)\n", i, elemptr, *((*uintptr)(elemptr)), *((*uintptr)(elemptr)))
 	}
+	runtime.KeepAlive(conn) // ensure conn sticks around until we've finished copying data from it's C allocation
 }
 
 // isLittleEndian is a function to determine endianness.
