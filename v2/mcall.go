@@ -75,7 +75,7 @@ func (m *MFunctions) CallErr(rname string, args ...any) (any, error) {
 }
 
 // Wrap returns a function that calls an M routine rname that returns any.
-// This can avoid type assertion and speed up calling M routines by avoiding the name lookup each invocation.
+// This can speed up calling M routines by avoiding the name lookup each invocation.
 // This version creates functions that panic: compare [MFunctions.WrapErr] that returns errors instead.
 func (m *MFunctions) Wrap(rname string) func(args ...any) any {
 	routine := m.getRoutine(rname)
@@ -88,8 +88,51 @@ func (m *MFunctions) Wrap(rname string) func(args ...any) any {
 	}
 }
 
+// WrapRetInt produces a Go convenience function that wraps an M routine that returns int.
+// This can avoid messy type assertion and speed up calling M routines by avoiding the name lookup each invocation.
+// Rather than int64 it returns int as the default type in Go so that regular arithmetic can be done on the result without casting.
+// This version creates functions that panic: compare [MFunctions.WrapErr] that returns errors instead.
+func (m *MFunctions) WrapRetInt(rname string) func(args ...any) int {
+	routine := m.getRoutine(rname)
+	return func(args ...any) int {
+		ret, err := m.Conn.callM(routine, args)
+		if err != nil {
+			panic(err)
+		}
+		return ret.(int)
+	}
+}
+
+// WrapRetString produces a Go convenience function that wraps an M routine that returns string.
+// This can avoid messy type assertion and speed up calling M routines by avoiding the name lookup each invocation.
+// This version creates functions that panic: compare [MFunctions.WrapErr] that returns errors instead.
+func (m *MFunctions) WrapRetString(rname string) func(args ...any) string {
+	routine := m.getRoutine(rname)
+	return func(args ...any) string {
+		ret, err := m.Conn.callM(routine, args)
+		if err != nil {
+			panic(err)
+		}
+		return ret.(string)
+	}
+}
+
+// WrapRetFloat produces a Go convenience function that wraps an M routine that returns float64.
+// This can avoid messy type assertion and speed up calling M routines by avoiding the name lookup each invocation.
+// This version creates functions that panic: compare [MFunctions.WrapErr] that returns errors instead.
+func (m *MFunctions) WrapRetFloat(rname string) func(args ...any) float64 {
+	routine := m.getRoutine(rname)
+	return func(args ...any) float64 {
+		ret, err := m.Conn.callM(routine, args)
+		if err != nil {
+			panic(err)
+		}
+		return ret.(float64)
+	}
+}
+
 // WrapErr returns a function that calls an M routine rname that returns any.
-// This can avoid type assertion and speed up calling M routines by avoiding the name lookup each invocation.
+// This can speed up calling M routines by avoiding the name lookup each invocation.
 // This version creates functions that return errors: compare [MFunctions.Wrap] that panics instead.
 func (m *MFunctions) WrapErr(rname string) func(args ...any) (any, error) {
 	routine := m.getRoutine(rname)
@@ -129,6 +172,7 @@ var typeMapper map[string]typeInfo = map[string]typeInfo{
 var returnTypes map[string]struct{} = map[string]struct{}{
 	"":        struct{}{},
 	"string":  struct{}{},
+	"int":     struct{}{},
 	"int64":   struct{}{},
 	"float64": struct{}{},
 }
@@ -258,7 +302,7 @@ func parsePrototype(line string) (*RoutineData, error) {
 		return nil, err
 	}
 	if _, ok := returnTypes[typ.typ]; !ok {
-		return nil, errorf(ydberr.MCallTypeUnknown, "invalid return type %s (must be string, int64, or float64)", retType)
+		return nil, errorf(ydberr.MCallTypeUnknown, "invalid return type %s (must be string, int, int64, or float64)", retType)
 	}
 	if strings.Contains(retType, "*") {
 		return nil, errorf(ydberr.MCallTypeMismatch, "return type (%s) must not be a pointer type", retType)
@@ -322,7 +366,7 @@ func parsePrototype(line string) (*RoutineData, error) {
 // Elements of that line are defined as follows:
 //   - Go_name may be any go string.
 //   - M_entrypoint is any valid [M entry reference].
-//   - ret_type may be omitted if an M return value is not supplied. Otherwise it must be *string, *int64, *float64 or omitted (for void return)
+//   - ret_type may be omitted if an M return value is not supplied. Otherwise it must be *string, *int, *int64, *float64 or omitted (for void return)
 //   - any spaces adjacent to commas, asterisk and square brackets (,*[]) are ignored.
 //
 // Zero or more parameter type specifications are allowed and must be a Go type specifier: string, int, uint, int32, uint32, int64, uint64, float32, float64,
@@ -654,6 +698,9 @@ func (conn *Conn) callM(routine *RoutineData, args []any) (any, error) {
 		switch typ.kind {
 		case reflect.String:
 			retval = fetchStr()
+		case reflect.Int:
+			ptr := (*C.ydb_long_t)(param)
+			retval = int(*ptr)
 		case reflect.Int64:
 			ptr := (*C.ydb_int64_t)(param)
 			retval = int64(*ptr)

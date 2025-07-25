@@ -41,7 +41,7 @@ func ExampleNode_Subscripts() {
 	// [var sub1 sub2]
 }
 
-// Example of converting a ZWRITE-formatted string to a Go string
+// Example of converting a ZWRITE-formatted string to a Go string:
 func ExampleConn_Zwr2Str() {
 	conn := yottadb.NewConn()
 	str, err := conn.Zwr2Str(`"X"_$C(0)_"ABC"`)
@@ -52,7 +52,7 @@ func ExampleConn_Zwr2Str() {
 	// Output: "X\x00ABC"
 }
 
-// Example of converting a Go string to a ZWRITE-formatted string
+// Example of converting a Go string to a ZWRITE-formatted string:
 func ExampleConn_Str2Zwr() {
 	conn := yottadb.NewConn()
 	str, err := conn.Str2Zwr("X\x00ABC")
@@ -63,7 +63,7 @@ func ExampleConn_Str2Zwr() {
 	// Output: "X"_$C(0)_"ABC"
 }
 
-// Example of viewing a Node instance as a string.
+// Example of viewing a Node instance as a string:
 func ExampleNode_String() {
 	conn := yottadb.NewConn()
 	n := conn.Node("var", "sub1", "sub2")

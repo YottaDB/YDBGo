@@ -63,6 +63,7 @@ var YDBSignals = []os.Signal{
 
 // sigInfo holds info for each signal that YDBGo handles and defers to YottaDB.
 type sigInfo struct {
+	updating     sync.Mutex     // Indicate this struct is being modified
 	signal       os.Signal      // signal number for this entry
 	notifyChan   chan os.Signal // user-supplied channel notify of incoming signal
 	shutdownNow  chan struct{}  // Channel used to shutdown signal handling goroutine
@@ -75,7 +76,7 @@ type sigInfo struct {
 var ydbSignalMap sync.Map // stores data for signals that the wrapper handles and passes to YottaDB.
 func init() {
 	for _, sig := range YDBSignals {
-		info := sigInfo{sig, nil, make(chan struct{}, 1), atomic.Bool{}, atomic.Bool{}, _newConn()}
+		info := sigInfo{sync.Mutex{}, sig, nil, make(chan struct{}, 1), atomic.Bool{}, atomic.Bool{}, _newConn()}
 		ydbSignalMap.Store(sig, &info)
 	}
 }
@@ -156,7 +157,9 @@ func SignalNotify(notifyChan chan os.Signal, signals ...os.Signal) {
 	initCheck()
 	for _, sig := range signals {
 		info := validateYDBSignal(sig)
+		info.updating.Lock()
 		info.notifyChan = notifyChan
+		info.updating.Unlock()
 	}
 }
 
@@ -165,7 +168,9 @@ func SignalNotify(notifyChan chan os.Signal, signals ...os.Signal) {
 func SignalReset(signals ...os.Signal) {
 	for _, sig := range signals {
 		info := lookupYDBSignal(sig)
+		info.updating.Lock()
 		info.notifyChan = nil
+		info.updating.Unlock()
 	}
 }
 
@@ -277,14 +282,17 @@ func handleSignal(info *sigInfo) {
 		info := lookupYDBSignal(sig)
 		// Note that for fatal signals, the YDB handler probably won't return as it will (usually) exit,
 		// but some fatal signals can be deferred under the right conditions (holding crit, interrupts-disabled-state, etc).
-		if info.notifyChan != nil {
+		info.updating.Lock()
+		notifyChan := info.notifyChan
+		info.updating.Unlock()
+		if notifyChan != nil {
 			// Notify user code via the supplied channel
 			if dbgSigHandling {
 				fmt.Fprintf(os.Stderr, "goroutine-sighandler: notifying user-specified channel of signal %d (%v)\n", sig, sig)
 			}
 			// Send to channel without blocking (same as Signal.Notify)
 			select {
-			case info.notifyChan <- sig: // notify channel of signal, sending it a function to use to notify YDB
+			case notifyChan <- sig: // notify channel of signal, sending it a function to use to notify YDB
 			default:
 			}
 		} else {

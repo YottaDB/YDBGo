@@ -46,7 +46,7 @@ func TestCallM(t *testing.T) {
 	conn := SetupTest(t)
 	s := "test"
 	n := 3
-	// Declare these in separate
+	// Declare these in separate imports
 	m, err := conn.Import(table)
 	if err != nil {
 		panic(err)

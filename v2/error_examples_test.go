@@ -20,7 +20,7 @@ import (
 	"lang.yottadb.com/go/yottadb/v2/ydberr"
 )
 
-// Example checking whether error is a particular YottaDB error.
+// Example checking whether error is a particular YottaDB error:
 func ExampleErrorIs() {
 	err := &yottadb.Error{Code: ydberr.INVSTRLEN, Message: "string too long"}
 
