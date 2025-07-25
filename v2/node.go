@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"iter"
 	"runtime"
-	"strconv"
 	"strings"
 	"time"
 	"unsafe"
@@ -167,19 +166,6 @@ func (n *Node) Clone() (clone *Node) {
 	return n.conn._Node(n)
 }
 
-// Quote adds quotes around string for display purposes if it cannot be represented as a number as YottaDB would display it.
-//   - The input value is treated as a string if it cannot be converted, unchanged, to and from float64
-//     using [strconv.ParseFloat](value, 64) and [strconv.FormatFloat](number, 'f', -1, 64)
-//   - This is exported so that the user can validate against the same conversion that is used by the YDBGo.
-func Quote(value string) string {
-	num, err := strconv.ParseFloat(value, 64)
-	// Treat as number only if it can be converted back to the same number -- in which case M would treat it as a number
-	if err == nil && value == strconv.FormatFloat(num, 'f', -1, 64) {
-		return value
-	}
-	return "\"" + value + "\""
-}
-
 // Subscripts returns a string that holds the specified varname or subscript of the given node.
 // An index of zero returns the varname; higher numbers return the respective subscript.
 // A negative index returns a subscript counted from the end (the last is -1).
@@ -209,7 +195,8 @@ func (n *Node) Subscripts() []string {
 }
 
 // String returns a string representation of this database node in typical YottaDB format: `varname("sub1")("sub2")`.
-//   - Output subscripts and values as unquoted numbers if they convert to float64 and back without change.
+//   - Output subscripts as unquoted numbers if they convert to float64 and back without change (using [Node.Quote]).
+//   - Output strings in YottaDB ZWRITE format
 func (n *Node) String() string {
 	var bld strings.Builder
 	subs := n.Subscripts()
@@ -221,12 +208,60 @@ func (n *Node) String() string {
 		if i == 1 {
 			bld.WriteString("(")
 		}
-		bld.WriteString(Quote(s))
+		bld.WriteString(n.conn.Quote(s))
 		if i == len(subs)-1 {
 			bld.WriteString(")")
 		} else {
 			bld.WriteString(",")
 		}
+	}
+	return bld.String()
+}
+
+// GoString makes print("%#v") dump the node and its contents with [Node.Dump](30, 80).
+// For example the output format of Node("person",42).GoString() might look like this:
+//
+//	person(42)=1234
+//	person(42)("age")="49"
+//	person(42)("height")("centimeters")=190.5
+//	person(42)("height")("inches")=1234
+//	person(42)("name")="Joe Bloggs"
+func (n *Node) GoString() string {
+	return n.Dump(30, 80)
+}
+
+// Dump returns a string representation of this database node and subtrees with their contents in YottaDB ZWRITE format.
+// Output subscripts and values as unquoted numbers if they convert to float64 and back without change (using [Node.Quote]).
+// Output strings in YottaDB ZWRITE format.
+// See [Node.GoString] for an example of the output format.
+// Two optional integers may be supplied to specify maximums where both default to -1:
+//   - first specifies the maximum number of lines to output, where -1 means infinite. If lines are truncated, the output ends with "\n...\n".
+//   - second specifies the maximum number of characters at which to truncate values prior to output where -1 means infinite.
+//     Truncated values are output with suffix "..." after any ending quotes. Note that conversion to ZWRITE format may expand this.
+func (n *Node) Dump(args ...int) string {
+	var bld strings.Builder
+	if len(args) > 2 {
+		panic(errorf(ydberr.TooManyParameters, "%d parameters supplied to Dump() which only takes 2", len(args)))
+	}
+	args = append(args, -1, -1) // defaults
+	maxLines, maxString := args[0], args[1]
+	i := 0
+	for node := range n.Tree() {
+		i++
+		if maxLines != -1 && i > maxLines {
+			bld.WriteString("...\n")
+			break
+		}
+		bld.WriteString(node.String())
+		bld.WriteString("=")
+		val := node.Get("<Variable '" + node.Subscript(0) + "' deleted while iterating it>")
+		if maxString != -1 && len(val) > maxString {
+			bld.WriteString(node.conn.Quote(val[:maxString]))
+			bld.WriteString("...")
+		} else {
+			bld.WriteString(node.conn.Quote(val))
+		}
+		bld.WriteString("\n")
 	}
 	return bld.String()
 }
@@ -262,7 +297,7 @@ func (n *Node) Get(defaultValue ...string) string {
 	return C.GoStringN(cconn.value.buf_addr, C.int(cconn.value.len_used))
 }
 
-// GetBytes is the same as [Get] except that it accepts and returns []byte slices rather than strings.
+// GetBytes is the same as [Node.Get] except that it accepts and returns []byte slices rather than strings.
 func (n *Node) GetBytes(defaultValue ...[]byte) []byte {
 	ok := n._Lookup()
 	if !ok {
@@ -291,7 +326,7 @@ func (n *Node) Lookup() (string, bool) {
 	return C.GoStringN(cconn.value.buf_addr, C.int(cconn.value.len_used)), true
 }
 
-// LookupBytes is the same as [Lookup] except that it returns the value as a []byte slice rather than a string.
+// LookupBytes is the same as [Node.Lookup] except that it returns the value as a []byte slice rather than a string.
 func (n *Node) LookupBytes() ([]byte, bool) {
 	ok := n._Lookup()
 	if !ok {

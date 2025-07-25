@@ -220,7 +220,7 @@ func ExampleNode_Next() {
 	x := conn.Node("X", "1", "2", "")
 	x = x.Next()
 	for x != nil {
-		fmt.Printf("%s=%s\n", x, Quote(x.Get()))
+		fmt.Printf("%s=%s\n", x, x.Get())
 		x = x.Next()
 	}
 	// Output:
@@ -265,12 +265,12 @@ func ExampleNode_Children() {
 
 	n = conn.Node("X", "1", "2")
 	for x := range n.Children() {
-		fmt.Printf("%s=%s\n", x, Quote(x.Get()))
+		fmt.Printf("%s=%s\n", x, x.Get())
 	}
 
 	fmt.Println("Do the same in reverse:")
 	for x := range n.ChildrenBackward() {
-		fmt.Printf("%s=%s\n", x, Quote(x.Get()))
+		fmt.Printf("%s=%s\n", x, x.Get())
 	}
 
 	n = conn.Node("X", "1", "2", "3", "person")
@@ -305,27 +305,73 @@ func ExampleNode_Mutate() {
 }
 
 // Example of traversing a database tree
+func ExampleNode_GoString() {
+	conn := NewConn()
+	n := conn.Node("tree", "1")
+	n.Child("2", "3").Set("123")
+	n.Child("2", "3", "7").Set("Hello!")
+	n.Child("2", "4").Set("124")
+
+	fmt.Printf("Dump is:\n%#v", n)
+
+	// Output:
+	// Dump is:
+	// tree(1,2,3)=123
+	// tree(1,2,3,7)="Hello!"
+	// tree(1,2,4)=124
+}
+
+// Example of traversing a database tree
+func ExampleNode_Dump() {
+	conn := NewConn()
+	n := conn.Node("tree", "1")
+	n.Child("6").Set("16")
+	n.Child("2", "3").Set("123")
+	n.Child("2", "3", "7").Set("Hello!")
+	n.Child("2", "4").Set("124")
+	n.Child("2", "5", "9").Set("1259")
+	nb := conn.Node("tree", "B")
+	nb.Child("1").Set("AB")
+
+	fmt.Println(n.Dump())
+
+	n.Child("2", "3").Set("~ A\x00\x7f" + strings.Repeat("A", 1000))
+	fmt.Print(n.Dump(2, 8))
+
+	// Output:
+	// tree(1,2,3)=123
+	// tree(1,2,3,7)="Hello!"
+	// tree(1,2,4)=124
+	// tree(1,2,5,9)=1259
+	// tree(1,6)=16
+	//
+	// tree(1,2,3)="~ A"_$C(0,127)_"AAA"...
+	// tree(1,2,3,7)="Hello!"
+	// ...
+}
+
+// Example of traversing a database tree
 func ExampleNode_TreeNext() {
 	conn := NewConn()
-	n1 := conn.Node("tree", "1")
-	n1.Child("2", "3").Set("123")
-	n1.Child("2", "3", "7").Set("1237")
-	n1.Child("2", "4").Set("124")
-	n1.Child("2", "5", "9").Set("1259")
-	n1.Child("6").Set("16")
+	n := conn.Node("tree", "1")
+	n.Child("2", "3").Set("123")
+	n.Child("2", "3", "7").Set("1237")
+	n.Child("2", "4").Set("124")
+	n.Child("2", "5", "9").Set("Hello!")
+	n.Child("6").Set("16")
 	nb := conn.Node("tree", "B")
 	nb.Child("1").Set("AB")
 
 	x := conn.Node("tree").TreeNext()
 	for x != nil {
-		fmt.Printf("%s=%s\n", x, Quote(x.Get()))
+		fmt.Printf("%s=%s\n", x, conn.Quote(x.Get()))
 		x = x.TreeNext()
 	}
 
 	fmt.Println("Re-start half way through and go in reverse order:")
 	x = conn.Node("tree", "1", "2", "4")
 	for x != nil {
-		fmt.Printf("%s=%s\n", x, Quote(x.Get()))
+		fmt.Printf("%s=%s\n", x, conn.Quote(x.Get()))
 		x = x.TreePrev()
 	}
 
@@ -333,7 +379,7 @@ func ExampleNode_TreeNext() {
 	// tree(1,2,3)=123
 	// tree(1,2,3,7)=1237
 	// tree(1,2,4)=124
-	// tree(1,2,5,9)=1259
+	// tree(1,2,5,9)="Hello!"
 	// tree(1,6)=16
 	// tree("B",1)="AB"
 	// Re-start half way through and go in reverse order:
@@ -345,17 +391,17 @@ func ExampleNode_TreeNext() {
 // Example of traversing a database tree
 func ExampleNode_Tree() {
 	conn := NewConn()
-	n1 := conn.Node("tree", "1")
-	n1.Child("2", "3").Set("123")
-	n1.Child("2", "3", "7").Set("1237")
-	n1.Child("2", "4").Set("124")
-	n1.Child("2", "5", "9").Set("1259")
-	n1.Child("6").Set("16")
+	n := conn.Node("tree", "1")
+	n.Child("2", "3").Set("123")
+	n.Child("2", "3", "7").Set("1237")
+	n.Child("2", "4").Set("124")
+	n.Child("2", "5", "9").Set("1259")
+	n.Child("6").Set("16")
 	nb := conn.Node("tree", "B")
 	nb.Child("1").Set("AB")
 
-	for x := range n1.Child("2").Tree() {
-		fmt.Printf("%s=%s\n", x, Quote(x.Get()))
+	for x := range n.Child("2").Tree() {
+		fmt.Printf("%s=%s\n", x, conn.Quote(x.Get()))
 	}
 
 	// Output:
@@ -371,9 +417,9 @@ func TestTreeNext(t *testing.T) {
 
 	// Ensure TreeNext will work even if it has to allocate new subscript memory up to the size of YDB_MAX_STR
 	bigstring := strings.Repeat("A", YDB_MAX_STR)
-	n1 := tconn.Node("X", bigstring)
-	n1.Child("2", "3").Set("Big23")
-	n1.Child("5", bigstring).Set("Big5Big")
+	n := tconn.Node("X", bigstring)
+	n.Child("2", "3").Set("Big23")
+	n.Child("5", bigstring).Set("Big5Big")
 
 	x := tconn.Node("X")
 	output := ""
@@ -382,7 +428,7 @@ func TestTreeNext(t *testing.T) {
 		if x == nil {
 			break
 		}
-		output += fmt.Sprintf("%s=%s ", x, Quote(x.Get()))
+		output += fmt.Sprintf("%s=%s ", x, x.Get())
 	}
-	assert.Equal(t, `X("`+bigstring+`",2,3)="Big23" X("`+bigstring+`",5,"`+bigstring+`")="Big5Big" `, output)
+	assert.Equal(t, `X("`+bigstring+`",2,3)=Big23 X("`+bigstring+`",5,"`+bigstring+`")=Big5Big `, output)
 }

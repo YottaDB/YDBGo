@@ -242,6 +242,38 @@ func (conn *Conn) Str2Zwr(str string) (string, error) {
 	return conn.getValue(), nil
 }
 
+// Check whether an entire string is printable ASCII to avoid unnecessarily calling YDB Str2Zwr().
+func printableASCII(s string) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] < ' ' || s[i] > '~' {
+			return false
+		}
+	}
+	return true
+}
+
+// Quote adds quotes around strings but not around numbers (just as YottaDB would display them).
+//   - The input value is treated as a string if it cannot be converted, unchanged, to and from float64
+//     using [strconv.ParseFloat](value, 64) and [strconv.FormatFloat](number, 'f', -1, 64)
+//   - If the string contains unprintable ASCII characters it is converted to YottaDB ZWRITE format using [Conn.Str2Zwr].
+//   - This is exported so that the user can validate against the same conversion that is used by YDBGo.
+func (conn *Conn) Quote(value string) string {
+	num, err := strconv.ParseFloat(value, 64)
+	// Treat as number only if it can be converted back to the same number -- in which case M would treat it as a number
+	if err == nil && value == strconv.FormatFloat(num, 'f', -1, 64) {
+		return value
+	}
+	if printableASCII(value) {
+		return "\"" + value + "\""
+	} else {
+		zwr, err := conn.Str2Zwr(value)
+		if err != nil {
+			panic(err)
+		}
+		return zwr
+	}
+}
+
 // KillLocalsExcept kills all M 'locals' except for the ones listed by name in exclusions.
 //   - To kill a specific variable use [Node.Kill]()
 func (conn *Conn) KillLocalsExcept(exclusions ...string) {
