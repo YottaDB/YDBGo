@@ -61,10 +61,21 @@ type Node struct {
 	mutable bool  // Whether the node may be altered for fast iteration
 }
 
+// Convert []string to []any.
+// Used to pass string arrays to Node
+func stringArrayToAnyArray(strings []string) []any {
+	array := make([]any, len(strings))
+	for i, s := range strings {
+		array[i] = s
+	}
+	return array
+}
+
 // _Node creates a `Node` type instance that represents a database node with methods that access YottaDB.
 //   - The strings and array are stored in C-allocated space to give Node methods fast access to YottaDB API functions.
-//     varname may be a string or, if it is another node, that node's path strings will be prepended to `subscripts`.
-func (conn *Conn) _Node(varname any, subscripts ...string) (n *Node) {
+//   - The varname and subscripts may be of type string, []byte slice, or an integer or float type; numeric types are converted to a string using the appropriate strconv function.
+//   - The varname may also be another node, in which case that node's subscript strings will be prepended to `subscripts` to build the new node.
+func (conn *Conn) _Node(varname any, subscripts []any) (n *Node) {
 	// Note: benchmarking shows that the use of any slows down node creation almost immeasurably (< 0.1%)
 	// Concatenate strings the fastest Go way.
 	// This involves creating an extra copy of subscripts but is probably faster than one C.memcpy call per subscript
@@ -72,6 +83,7 @@ func (conn *Conn) _Node(varname any, subscripts ...string) (n *Node) {
 	var first string // first string stored in joiner
 	var firstLen int // number of subscripts in first string
 	var node1 *Node  // if varname is a node, store it in here
+	subs := make([]string, len(subscripts))
 	switch val := varname.(type) {
 	case *Node:
 		node1 = val
@@ -84,12 +96,13 @@ func (conn *Conn) _Node(varname any, subscripts ...string) (n *Node) {
 		datasize += lastbuf.len_used
 		first = C.GoStringN(firstStringAddr, C.int(datasize))
 	default:
-		first = val.(string)
+		first = anyToString(val)
 		firstLen = 1
 	}
 	joiner.WriteString(first)
-	for _, s := range subscripts {
-		joiner.WriteString(s)
+	for i, s := range subscripts {
+		subs[i] = anyToString(s)
+		joiner.WriteString(subs[i])
 	}
 
 	size := C.sizeof_node + C.sizeof_ydb_buffer_t*(firstLen-1+len(subscripts)) + joiner.Len()
@@ -129,7 +142,7 @@ func (conn *Conn) _Node(varname any, subscripts ...string) (n *Node) {
 		buf := bufferIndex(&cnode.buffers, 0)
 		setbuf(buf, C.uint(len(first)))
 	}
-	for i, s := range subscripts {
+	for i, s := range subs {
 		buf := bufferIndex(&cnode.buffers, i+firstLen)
 		setbuf(buf, C.uint(len(s)))
 	}
@@ -138,8 +151,9 @@ func (conn *Conn) _Node(varname any, subscripts ...string) (n *Node) {
 
 // Node method creates a `Node` type instance that represents a database node with methods that access YottaDB.
 //   - The strings and array are stored in C-allocated space to give Node methods fast access to YottaDB API functions.
-func (conn *Conn) Node(varname string, subscripts ...string) (n *Node) {
-	return conn._Node(varname, subscripts...)
+//   - The varname and subscripts may be of type string, []byte slice, or an integer or float type; numeric types are converted to a string using the appropriate strconv function.
+func (conn *Conn) Node(varname string, subscripts ...any) (n *Node) {
+	return conn._Node(varname, subscripts)
 }
 
 // CloneNode creates a copy of node associated with conn (in case node was created using a different conn).
@@ -149,13 +163,13 @@ func (conn *Conn) Node(varname string, subscripts ...string) (n *Node) {
 // This does the same as n.Clone() except that it can switch to new conn.
 // Only immutable nodes are returned.
 func (conn *Conn) CloneNode(n *Node) *Node {
-	return conn._Node(n)
+	return conn._Node(n, nil)
 }
 
 // Child creates a child node of parent that represents parent with subscripts appended.
 //   - [Node.Clone]() without parameters is equivalent to [Node.Child]() without parameters.
-func (n *Node) Child(subscripts ...string) (child *Node) {
-	return n.conn._Node(n, subscripts...)
+func (n *Node) Child(subscripts ...any) (child *Node) {
+	return n.conn._Node(n, subscripts)
 }
 
 // Clone creates an immutable copy of node.
@@ -163,7 +177,7 @@ func (n *Node) Child(subscripts ...string) (child *Node) {
 //
 // See [Node.IsMutable]() for notes on mutability.
 func (n *Node) Clone() (clone *Node) {
-	return n.conn._Node(n)
+	return n.conn._Node(n, nil)
 }
 
 // Subscripts returns a string that holds the specified varname or subscript of the given node.
@@ -267,7 +281,7 @@ func (n *Node) Dump(args ...int) string {
 }
 
 // Set applies val to the value of a database node.
-//   - The val may be a string, []byte slice, integer type, or float; numeric types are converted to a string using the appropriate strconv function.
+//   - The val may be a string, []byte slice, or an integer or float type; numeric types are converted to a string using the appropriate strconv function.
 func (n *Node) Set(val any) {
 	cnode := n.cnode // access C equivalents of Go types
 	cconn := cnode.conn
@@ -510,15 +524,16 @@ func (n *Node) Unlock() {
 //	for i := range 1000000 {
 //	  n.Mutate(strconv.Itoa(i)).kill()
 //	}
-func (n *Node) Mutate(value string) *Node {
+func (n *Node) Mutate(val any) *Node {
+	value := anyToString(val)
 	cnode := n.cnode // access C equivalents of Go types
 	retNode := n
 	lastbuf := bufferIndex(&cnode.buffers, int(cnode.len-1))
 	if !n.IsMutable() || int(lastbuf.len_alloc) < len(value) {
-		strs := n.Subscripts()
+		strs := stringArrayToAnyArray(n.Subscripts())
 		// Overallocate by appending preallocSubscript to value
 		strs[len(strs)-1] = value + preallocSubscript
-		retNode = n.conn.Node(strs[0], strs[1:]...)
+		retNode = n.conn._Node(strs[0], strs[1:])
 		retNode.mutable = true
 		lastbuf := bufferIndex(&retNode.cnode.buffers, len(strs)-1)
 		lastbuf.len_used = C.uint(len(value))
@@ -691,7 +706,7 @@ func (n *Node) _treeNext(reverse bool) *Node {
 			if debugMode {
 				fmt.Printf("INSUFFSUBS: %d (need %d)\n", retNode.cnode.len-1, retSubs)
 			}
-			extraStrings := make([]string, retSubs-(retNode.cnode.len-1))
+			extraStrings := make([]any, retSubs-(retNode.cnode.len-1))
 			// Pre-fill node subscripts
 			for i := range extraStrings {
 				extraStrings[i] = preallocSubscript
@@ -723,8 +738,8 @@ func (n *Node) _treeNext(reverse bool) *Node {
 	retNode.cnode.len = C.int(retSubs + 1) // +1 because cnode counts the varname as a subscript and ydb_node_next_st() does not
 	// if we malloced anything, make sure we take a copy of it before defer runs to free the mallocs on return
 	if malloced {
-		strings := retNode.Subscripts()
-		retNode = n.conn.Node(strings[0], strings[1:]...)
+		strings := stringArrayToAnyArray(retNode.Subscripts())
+		retNode = n.conn._Node(strings[0], strings[1:])
 	}
 	return retNode
 }

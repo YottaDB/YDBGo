@@ -147,9 +147,40 @@ func (conn *Conn) setValueBytes(val []byte) *C.ydb_buffer_t {
 	return &cconn.value
 }
 
-// setAnyValue is the same as setValue but accepts any type.
-// It is equivalent to setValue(Sprint(val)) but faster because it only handles strings and numbers.
+// anyToString converts a number, []byte slices, or string to a string, like Sprint(val) but faster.
 //   - val may be a string, []byte slice, integer type, or float; numeric types are converted to a string using the appropriate strconv function.
+func anyToString(val any) string {
+	switch n := val.(type) {
+	case string:
+		return n
+	case []byte:
+		return string(n)
+	case int:
+		return strconv.FormatInt(int64(n), 10)
+	case int32:
+		return strconv.FormatInt(int64(n), 10)
+	case int64:
+		return strconv.FormatInt(n, 10)
+	case uint:
+		return strconv.FormatUint(uint64(n), 10)
+	case uint32:
+		return strconv.FormatUint(uint64(n), 10)
+	case uint64:
+		return strconv.FormatUint(n, 10)
+	case float32:
+		return strconv.FormatFloat(float64(n), 'G', -1, 32)
+	case float64:
+		return strconv.FormatFloat(n, 'G', -1, 64)
+	default:
+		panic(errorf(ydberr.InvalidValueType, "subscript (%v) must be a string, number, or []byte slice", val))
+	}
+}
+
+// setAnyValue is the same as setValue but accepts any type.
+// It is akin to setValue(Sprint(val)) but faster.
+//   - val may be a string, []byte slice, integer type, or float; numeric types are converted to a string using the appropriate strconv function.
+//
+// This function could use [anyToString] but it is faster when it doesn't because it can store []byte arrays directly into YDB buffer without conversion.
 func (conn *Conn) setAnyValue(val any) {
 	var str string
 	switch n := val.(type) {
@@ -177,7 +208,7 @@ func (conn *Conn) setAnyValue(val any) {
 	case float64:
 		str = strconv.FormatFloat(n, 'G', -1, 64)
 	default:
-		panic(errorf(ydberr.InvalidValueType, "value (%s) must be a string or number", val))
+		panic(errorf(ydberr.InvalidValueType, "value (%v) must be a string, number, or []byte slice", val))
 	}
 	// The following is equivalent to setValue() but without the size check which is unnecessary since NewConn allocates at least overalloc size
 	C.fill_buffer(&conn.cconn.value, str)
@@ -279,14 +310,16 @@ func (conn *Conn) Quote(value string) string {
 func (conn *Conn) KillLocalsExcept(exclusions ...string) {
 	var status C.int
 	cconn := conn.cconn
-	if len(exclusions) == 0 {
+
+	names := stringArrayToAnyArray(exclusions)
+	if len(names) == 0 {
 		conn.prepAPI()
 		status = C.ydb_delete_excl_st(cconn.tptoken, &cconn.errstr, 0, nil)
 	} else {
 		// use a Node type just as a handy way to store exclusions strings as a ydb_buffer_t array
-		namelist := conn.Node(exclusions[0], exclusions[1:]...)
+		namelist := conn._Node(names[0], names[1:])
 		conn.prepAPI()
-		status = C.ydb_delete_excl_st(cconn.tptoken, &cconn.errstr, C.int(len(exclusions)), &namelist.cnode.buffers)
+		status = C.ydb_delete_excl_st(cconn.tptoken, &cconn.errstr, C.int(len(names)), &namelist.cnode.buffers)
 	}
 	if status != YDB_OK {
 		panic(conn.lastError(status))
@@ -386,17 +419,18 @@ func (conn *Conn) Transaction(transID string, localsToRestore []string, callback
 	handle := cgo.NewHandle(info)
 	defer handle.Delete()
 
+	names := stringArrayToAnyArray(localsToRestore)
 	var status C.int
-	if len(localsToRestore) == 0 {
+	if len(names) == 0 {
 		conn.prepAPI()
 		status = C.ydb_tp_st(cconn.tptoken, &cconn.errstr, C.ydb_tpfnptr_t(C.tp_callback_wrapper), unsafe.Pointer(&handle),
 			(*C.char)(unsafe.Pointer(unsafe.StringData(transID))), 0, nil)
 	} else {
-		// use a Node type just as a handy way to store exclusions strings as a ydb_buffer_t array
-		namelist := conn.Node(localsToRestore[0], localsToRestore[1:]...)
+		// use a Node type just as a handy way to vars to restore as a ydb_buffer_t array
+		namelist := conn._Node(names[0], names[1:])
 		conn.prepAPI()
 		status = C.ydb_tp_st(cconn.tptoken, &cconn.errstr, C.ydb_tpfnptr_t(C.tp_callback_wrapper), unsafe.Pointer(&handle),
-			(*C.char)(unsafe.Pointer(unsafe.StringData(transID))), C.int(len(localsToRestore)), &namelist.cnode.buffers)
+			(*C.char)(unsafe.Pointer(unsafe.StringData(transID))), C.int(len(names)), &namelist.cnode.buffers)
 	}
 	if status == YDB_TP_ROLLBACK {
 		return false

@@ -67,7 +67,7 @@ func ExampleConn_Str2Zwr() {
 func ExampleNode_String() {
 	conn := yottadb.NewConn()
 	n := conn.Node("var", "sub1", "sub2")
-	numsubs := conn.Node("var2", "1", "2")
+	numsubs := conn.Node("var2", 1, 2)
 	fmt.Println(n)
 	fmt.Println(numsubs)
 	// Output:

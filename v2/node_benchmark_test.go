@@ -89,7 +89,7 @@ func BenchmarkSet(b *testing.B) {
 func BenchmarkGet(b *testing.B) {
 	tconn := SetupTest(b)
 	n := tconn.Node("var")
-	n.Set("12345678") // store something into it so we can Get() it back
+	n.Set(12345678) // store something into it so we can Get() it back
 	for b.Loop() {
 		n.Get()
 	}
@@ -98,7 +98,7 @@ func BenchmarkGet(b *testing.B) {
 // Benchmark setting a randomly located node, where each node has 5 random subscripts.
 func BenchmarkSetVariantSubscripts(b *testing.B) {
 	tconn := SetupTest(b)
-	subs := make([]string, 5)
+	subs := make([]any, 5)
 	RandstrReset() // access the same nodes to be subsequently fetched by matching Get() benchmark
 	for b.Loop() {
 		for j := range subs {
@@ -112,7 +112,7 @@ func BenchmarkSetVariantSubscripts(b *testing.B) {
 // Benchmark getting a randomly located node, where each node has 5 random subscripts.
 func BenchmarkGetVariantSubscripts(b *testing.B) {
 	tconn := SetupTest(b)
-	subs := make([]string, 5)
+	subs := make([]any, 5)
 
 	// set up database locals to Get shortly
 	RandstrReset() // access the same nodes to be subsequently fetched by matching Get() benchmark

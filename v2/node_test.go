@@ -212,12 +212,12 @@ func TestIncr(t *testing.T) {
 // Example of getting next subscript
 func ExampleNode_Next() {
 	conn := NewConn()
-	n := conn.Node("X", "1")
-	n.Child("2", "3").Set("123")
-	n.Child("2", "3", "7").Set("1237")
-	n.Child("2", "4").Set("124")
+	n := conn.Node("X", 1)
+	n.Child(2, "3").Set("123")
+	n.Child(2, 3, 7).Set(1237)
+	n.Child(2, 4).Set(124)
 
-	x := conn.Node("X", "1", "2", "")
+	x := conn.Node("X", 1, "2", "")
 	x = x.Next()
 	for x != nil {
 		fmt.Printf("%s=%s\n", x, x.Get())
@@ -231,9 +231,9 @@ func ExampleNode_Next() {
 // Example of listing all local database variable names
 func ExampleNode_Next_varnames() {
 	conn := NewConn()
-	conn.Node("X", "1").Set("X1")
-	conn.Node("X", "1", "2").Set("X12")
-	conn.Node("Y", "2").Set("Y2")
+	conn.Node("X", 1).Set("X1")
+	conn.Node("X", 1, 2).Set("X12")
+	conn.Node("Y", 2).Set("Y2")
 
 	fmt.Println("Display all top-level database variable names, starting after '%' (which is the first possible name in sort order)")
 	x := conn.Node("%")
@@ -251,19 +251,19 @@ func ExampleNode_Next_varnames() {
 // Example of getting all child nodes
 func ExampleNode_Children() {
 	conn := NewConn()
-	n := conn.Node("X", "1")
-	n.Child("2", "3").Set("123")
-	n.Child("2", "4").Set("124")
-	n.Child("2", "3", "person").Set("1237")
+	n := conn.Node("X", 1)
+	n.Child(2, 3).Set(123)
+	n.Child(2, 4).Set(124)
+	n.Child(2, 3, "person").Set(1237)
 
 	// Note that the following person fields will come out in alphabetical order below
-	n.Child("2", "3", "person", "address").Set("2 Rocklands Rd")
-	n.Child("2", "3", "person", "address", "postcode").Set("1234")
-	n.Child("2", "3", "person", "occupation").Set("engineer")
-	n.Child("2", "3", "person", "age").Set("42")
-	n.Child("2", "3", "person", "sex").Set("male")
+	n.Child(2, 3, "person", "address").Set("2 Rocklands Rd")
+	n.Child(2, 3, "person", "address", "postcode").Set(1234)
+	n.Child(2, 3, "person", "occupation").Set("engineer")
+	n.Child(2, 3, "person", "age").Set(42)
+	n.Child(2, 3, "person", "sex").Set("male")
 
-	n = conn.Node("X", "1", "2")
+	n = conn.Node("X", 1, 2)
 	for x := range n.Children() {
 		fmt.Printf("%s=%s\n", x, x.Get())
 	}
@@ -273,7 +273,7 @@ func ExampleNode_Children() {
 		fmt.Printf("%s=%s\n", x, x.Get())
 	}
 
-	n = conn.Node("X", "1", "2", "3", "person")
+	n = conn.Node("X", 1, 2, 3, "person")
 	fmt.Printf("Person fields: (")
 	for _, sub := range n.Children() {
 		fmt.Printf("%s ", sub)
@@ -292,8 +292,8 @@ func ExampleNode_Children() {
 // Example of getting a mutable version of node
 func ExampleNode_Mutate() {
 	conn := NewConn()
-	n := conn.Node("X", "1", "2", "3")
-	mutation1 := n.Mutate("4")
+	n := conn.Node("X", 1, 2, 3)
+	mutation1 := n.Mutate(4)
 	mutation2 := n.Mutate("text")
 	fmt.Println(n)
 	fmt.Println(mutation1)
@@ -307,10 +307,10 @@ func ExampleNode_Mutate() {
 // Example of traversing a database tree
 func ExampleNode_GoString() {
 	conn := NewConn()
-	n := conn.Node("tree", "1")
-	n.Child("2", "3").Set("123")
-	n.Child("2", "3", "7").Set("Hello!")
-	n.Child("2", "4").Set("124")
+	n := conn.Node("tree", 1)
+	n.Child(2, 3).Set(123)
+	n.Child(2, 3, 7).Set("Hello!")
+	n.Child(2, 4).Set(124)
 
 	fmt.Printf("Dump is:\n%#v", n)
 
@@ -324,18 +324,18 @@ func ExampleNode_GoString() {
 // Example of traversing a database tree
 func ExampleNode_Dump() {
 	conn := NewConn()
-	n := conn.Node("tree", "1")
-	n.Child("6").Set("16")
-	n.Child("2", "3").Set("123")
-	n.Child("2", "3", "7").Set("Hello!")
-	n.Child("2", "4").Set("124")
-	n.Child("2", "5", "9").Set("1259")
+	n := conn.Node("tree", 1)
+	n.Child(6).Set(16)
+	n.Child(2, 3).Set(123)
+	n.Child(2, 3, 7).Set("Hello!")
+	n.Child(2, 4).Set(124)
+	n.Child(2, 5, 9).Set(1259)
 	nb := conn.Node("tree", "B")
-	nb.Child("1").Set("AB")
+	nb.Child(1).Set("AB")
 
 	fmt.Println(n.Dump())
 
-	n.Child("2", "3").Set("~ A\x00\x7f" + strings.Repeat("A", 1000))
+	n.Child(2, 3).Set("~ A\x00\x7f" + strings.Repeat("A", 1000))
 	fmt.Print(n.Dump(2, 8))
 
 	// Output:
@@ -353,14 +353,14 @@ func ExampleNode_Dump() {
 // Example of traversing a database tree
 func ExampleNode_TreeNext() {
 	conn := NewConn()
-	n := conn.Node("tree", "1")
-	n.Child("2", "3").Set("123")
-	n.Child("2", "3", "7").Set("1237")
-	n.Child("2", "4").Set("124")
-	n.Child("2", "5", "9").Set("Hello!")
-	n.Child("6").Set("16")
+	n := conn.Node("tree", 1)
+	n.Child(2, 3).Set(123)
+	n.Child(2, 3, 7).Set(1237)
+	n.Child(2, 4).Set(124)
+	n.Child(2, 5, 9).Set("Hello!")
+	n.Child(6).Set(16)
 	nb := conn.Node("tree", "B")
-	nb.Child("1").Set("AB")
+	nb.Child(1).Set("AB")
 
 	x := conn.Node("tree").TreeNext()
 	for x != nil {
@@ -369,7 +369,7 @@ func ExampleNode_TreeNext() {
 	}
 
 	fmt.Println("Re-start half way through and go in reverse order:")
-	x = conn.Node("tree", "1", "2", "4")
+	x = conn.Node("tree", 1, 2, 4)
 	for x != nil {
 		fmt.Printf("%s=%s\n", x, conn.Quote(x.Get()))
 		x = x.TreePrev()
@@ -391,16 +391,16 @@ func ExampleNode_TreeNext() {
 // Example of traversing a database tree
 func ExampleNode_Tree() {
 	conn := NewConn()
-	n := conn.Node("tree", "1")
-	n.Child("2", "3").Set("123")
-	n.Child("2", "3", "7").Set("1237")
-	n.Child("2", "4").Set("124")
-	n.Child("2", "5", "9").Set("1259")
-	n.Child("6").Set("16")
+	n := conn.Node("tree", 1)
+	n.Child(2, 3).Set(123)
+	n.Child(2, 3, 7).Set(1237)
+	n.Child(2, 4).Set(124)
+	n.Child(2, 5, 9).Set(1259)
+	n.Child(6).Set(16)
 	nb := conn.Node("tree", "B")
-	nb.Child("1").Set("AB")
+	nb.Child(1).Set("AB")
 
-	for x := range n.Child("2").Tree() {
+	for x := range n.Child(2).Tree() {
 		fmt.Printf("%s=%s\n", x, conn.Quote(x.Get()))
 	}
 
@@ -418,8 +418,8 @@ func TestTreeNext(t *testing.T) {
 	// Ensure TreeNext will work even if it has to allocate new subscript memory up to the size of YDB_MAX_STR
 	bigstring := strings.Repeat("A", YDB_MAX_STR)
 	n := tconn.Node("X", bigstring)
-	n.Child("2", "3").Set("Big23")
-	n.Child("5", bigstring).Set("Big5Big")
+	n.Child(2, 3).Set("Big23")
+	n.Child(5, bigstring).Set("Big5Big")
 
 	x := tconn.Node("X")
 	output := ""
