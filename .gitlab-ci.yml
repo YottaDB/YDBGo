@@ -17,125 +17,94 @@ stages:
   - deploy
 
 variables:
-  # Note: If GOLANG_VERSION below is bumped up in the future, changes would be needed to at least the following files
-  #     YDBGo   repo : Dockerfile
-  # There might be more files to change in the future.
-  # Search for "GOLANG_VERSION" name in all YDB repos to find places that need change.
+  # Note: If GOLANG_VERSION below is bumped up in the future, you may also wish to consider bumping ./Dockerfile
+  #       so that any developer using the Dockerfile has the same version.
+  #       However, note that the actual Go versions tested against are specified in TEST_GO_VERSIONS below.
   GOLANG_VERSION: 1.24.0
   # Set version to run coverage test for; set it to . to test v1
   TEST_VERSION: .
 
-before_script:
-  - apt-get update && apt-get install -y --no-install-recommends wget ca-certificates git g++ gcc libc6-dev make pkg-config && rm -rf /var/lib/apt/lists/*
-  - export GOPROXY=https://proxy.golang.org/cached-only
-  - export GOPATH=/go
-  - export GOBIN=${GOPATH}/bin
-  - export PATH=${GOBIN}:/usr/local/go/bin:$PATH
-  - wget -O go.tgz -q https://golang.org/dl/go${GOLANG_VERSION}.linux-amd64.tar.gz
-  - tar -C /usr/local -xzf go.tgz
-  - rm go.tgz
-  - go version
-  - export ydb_dist=/opt/yottadb/current
-  - mkdir -p $CI_PROJECT_DIR/artifacts
+before_script: |-
+  apt-get update && apt-get install -y --no-install-recommends wget ca-certificates git g++ gcc libc6-dev make pkg-config && rm -rf /var/lib/apt/lists/*
+  export GOPROXY=https://proxy.golang.org/cached-only
+  export GOPATH=/go
+  export GOBIN=${GOPATH}/bin
+  export PATH=${GOBIN}:/usr/local/go/bin:$PATH
+  wget -O go.tgz -q https://golang.org/dl/go${GOLANG_VERSION}.linux-amd64.tar.gz
+  tar -C /usr/local -xzf go.tgz
+  rm go.tgz
+  go version
+  export ydb_dist=/opt/yottadb/current
+  mkdir -p $CI_PROJECT_DIR/artifacts
 
 
 # ~~~ Unit tests
 
 .unit_tests:
   stage: test
-  script:
-    - export YDB_GO_SKIP_TIMED_TESTS="yes"
-    - cd ${TEST_VERSION}
-    - go get -t
-    - go test -v
-    # the following ls tests for the existence of the wildcard to prevent cp error an when no file exists
-    - ls /tmp/ydbgo* &>/dev/null && cp -r /tmp/ydbgo* $CI_PROJECT_DIR/artifacts
-    - ls m_routines  &>/dev/null && cp -r m_routines  $CI_PROJECT_DIR/artifacts
-    - find $CI_PROJECT_DIR/artifacts
+  script: |-
+    export YDB_GO_SKIP_TIMED_TESTS="yes"
+    cd ${TEST_VERSION}
+    go get -t
+    versions=$(echo -e "${TEST_GO_VERSIONS// /\\n}" | sort --version-sort --unique) # remove duplicates
+    for ver in $TEST_GO_VERSIONS; do
+      [ "$ver" == "latest" ] && ver=$(wget -qO - https://go.dev/VERSION?m=text | head -n1 | cut -c3-)
+      go install golang.org/dl/go$ver@latest
+      go$ver download
+      go$ver test -v
+      # the following ls tests for the existence of the wildcard to prevent cp error when no file exists
+      mkdir -p $CI_PROJECT_DIR/artifacts/go$ver
+      ls /tmp/ydbgo* &>/dev/null && cp -r /tmp/ydbgo* $CI_PROJECT_DIR/artifacts/go$ver
+      ls m_routines  &>/dev/null && cp -r m_routines  $CI_PROJECT_DIR/artifacts/go$ver
+      find $CI_PROJECT_DIR/artifacts/go$ver
+    done
   artifacts:
     paths:
       - artifacts
     expire_in: 7 days
-#
-# In general, test the latest point release of each major version
-#
-v2_unit_tests1.24.0:
+
+v2_unit_tests:
   extends: .unit_tests
   variables:
-    GOLANG_VERSION: "1.24.0"
     TEST_VERSION: v2
+    # Test against the latest point release of Go in each major version since the version of Go specified in go.mod up to latest
+    TEST_GO_VERSIONS: "1.24.0 latest"
 
-unit_tests1.23.6:
+unit_tests:
   extends: .unit_tests
   variables:
-    GOLANG_VERSION: "1.24.0"
-    # Only test YDBGo v1 against this Go version
     TEST_VERSION: .
-
-unit_tests1.22.12:
-  extends: .unit_tests
-  variables:
-    GOLANG_VERSION: "1.20.4"
-    # Only test YDBGo v1 against this Go version
-    TEST_VERSION: .
-
-unit_tests1.21.13:
-  extends: .unit_tests
-  variables:
-    GOLANG_VERSION: "1.20.4"
-    # Only test YDBGo v1 against this Go version
-    TEST_VERSION: .
-
-unit_tests1.20.14:
-  extends: .unit_tests
-  variables:
-    GOLANG_VERSION: "1.20.4"
-    # Only test YDBGo v1 against this Go version
-    TEST_VERSION: .
-
-unit_tests1.19.13:
-  extends: .unit_tests
-  variables:
-    GOLANG_VERSION: "1.19.9"
-    # Only test YDBGo v1 against this Go version
-    TEST_VERSION: .
-
-unit_tests1.18.10:
-  extends: .unit_tests
-  variables:
-    GOLANG_VERSION: "1.18.10"
-    # Only test YDBGo v1 against this Go version
-    TEST_VERSION: .
+    # Test against the latest point release of Go in each major version since the version of Go specified in go.mod up to latest
+    TEST_GO_VERSIONS: "1.18.10 1.19.13 1.20.14 1.21.13 1.22.12 1.23.11 latest"
 
 
 # ~~~ Race detector tests
 
 race_detector:
   stage: test
-  script:
-  script:
+  script: |-
     # Test v1
-    - go get -t
-    - go test -v -race
+    go get -t
+    go test -v -race
     # Test v2
-    - go get -C v2 -t
-    - go test -C v2 -v -race
+    go get -C v2 -t
+    go test -C v2 -v -race
 
 
 # ~~~ Coverage tests
 
 coverage:
   stage: test
-  script:
-    - mkdir -p $CI_PROJECT_DIR/cover
-    - go get -C ${TEST_VERSION} -t
-    - go test -C ${TEST_VERSION} -covermode=count -coverprofile "$CI_PROJECT_DIR/cover/coverage.cov"
-    - go tool cover -func=$CI_PROJECT_DIR/cover/coverage.cov
-    - go tool cover -html=$CI_PROJECT_DIR/cover/coverage.cov -o $CI_PROJECT_DIR/cover/coverage.html
+  script: |-
+    mkdir -p $CI_PROJECT_DIR/cover
+    go get -C ${TEST_VERSION} -t
+    go test -C ${TEST_VERSION} -covermode=count -coverprofile "$CI_PROJECT_DIR/cover/coverage.cov"
+    go tool cover -func=$CI_PROJECT_DIR/cover/coverage.cov
+    go tool cover -html=$CI_PROJECT_DIR/cover/coverage.cov -o $CI_PROJECT_DIR/cover/coverage.html
     # https://docs.gitlab.com/ee/ci/testing/test_coverage_visualization.html
-    - go get github.com/boumenot/gocover-cobertura
-    - go install github.com/boumenot/gocover-cobertura
-    - gocover-cobertura < $CI_PROJECT_DIR/cover/coverage.cov > $CI_PROJECT_DIR/cover/coverage.xml
+    go get github.com/boumenot/gocover-cobertura
+    go install github.com/boumenot/gocover-cobertura
+    gocover-cobertura < $CI_PROJECT_DIR/cover/coverage.cov > $CI_PROJECT_DIR/cover/coverage.xml
   # https://docs.gitlab.com/ee/ci/yaml/index.html#coverage
   coverage: '/coverage: \d+(?:\.\d+)?/'
   artifacts:
@@ -150,40 +119,40 @@ coverage:
 commit-verify:
   image: ubuntu:24.04
   stage: test
-  before_script:
-    - apt-get update -qq && apt-get install -y -qq git wget gnupg
-  script:
+  before_script: |-
+    apt-get update -qq && apt-get install -y -qq git wget gnupg
+  script: |-
     # Copy commit gpg key verify script to build directory and execute
-    - wget https://gitlab.com/YottaDB/DB/YDB/-/raw/master/ci/commit_verify.sh
-    - chmod +x commit_verify.sh
-    - ./commit_verify.sh scripts/needs_copyright.sh https://gitlab.com/YottaDB/Lang/YDBGo
+    wget https://gitlab.com/YottaDB/DB/YDB/-/raw/master/ci/commit_verify.sh
+    chmod +x commit_verify.sh
+    ./commit_verify.sh scripts/needs_copyright.sh https://gitlab.com/YottaDB/Lang/YDBGo
 
 lint_code:
   stage: test
-  script:
-    - go install honnef.co/go/tools/cmd/staticcheck@latest
-    - staticcheck -checks inherit,-ST1017,-SA4006,-S1006,-S1005,-S1000,-S1008
-    - (cd v2; staticcheck -checks -SA1019)
+  script: |-
+    go install honnef.co/go/tools/cmd/staticcheck@latest
+    staticcheck -checks inherit,-ST1017,-SA4006,-S1006,-S1005,-S1000,-S1008
+    (cd v2; staticcheck -checks -SA1019)
 
 error_codes:
   stage: test
-  script:
-    - go generate
-    - git diff --exit-code error_codes.go || (echo "There is a difference between the latest YottaDB master and the currently committed error_codes.go, please run 'go generate' and commit error_codes.go" && exit 1)
+  script: |-
+    go generate
+    git diff --exit-code error_codes.go || (echo "There is a difference between the latest YottaDB master and the currently committed error_codes.go, please run 'go generate' and commit error_codes.go" && exit 1)
 
 build:
   stage: build
-  script:
-    - go build -v
-    - go build -C v2 -v
+  script: |-
+    go build -v
+    go build -C v2 -v
 
 pages:
   stage: deploy
   dependencies:
     - coverage
-  script:
-    - mkdir $CI_PROJECT_DIR/public
-    - mv cover/coverage.html $CI_PROJECT_DIR/public/
+  script: |-
+    mkdir $CI_PROJECT_DIR/public
+    mv cover/coverage.html $CI_PROJECT_DIR/public/
   artifacts:
     paths:
       - public
