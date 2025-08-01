@@ -1,6 +1,6 @@
 # YottaDB Go Wrapper v2
 
-[![Go Report Card](https://goreportcard.com/badge/gitlab.com/YottaDB/Lang/YDBGo?style=flat-square)](https://goreportcard.com/report/gitlab.com/YottaDB/Lang/YDBGo/v2) [![Go Doc](https://img.shields.io/badge/godoc-reference-blue.svg?style=flat-square)](http://godoc.org/gitlab.com/YottaDB/Lang/YDBGo/v2) [![Coverage report](https://gitlab.com/YottaDB/Lang/YDBGo/v2/badges/master/coverage.svg?job=coverage)](https://gitlab.com/YottaDB/Lang/YDBGo/v2/-/jobs)
+[![Go Report Card](https://goreportcard.com/badge/lang.yottadb.com/go/yottadb/v2?style=flat-square)](https://goreportcard.com/report/lang.yottadb.com/go/yottadb/v2) | [![Go Doc](https://img.shields.io/badge/godoc-reference-blue.svg?style=flat-square)](http://godoc.org/lang.yottadb.com/go/yottadb/v2) | [![Coverage report](https://gitlab.com/YottaDB/Lang/YDBGo/badges/master/coverage.svg?job=v2_coverage)](https://gitlab.com/YottaDB/Lang/YDBGo/v2/-/jobs?name=v2_coverage)
 
 Warning: YDBGo v2 is in alpha testing. Reference documentation is on the [Go packages website](https://pkg.go.dev/lang.yottadb.com/go/yottadb/v2).
 

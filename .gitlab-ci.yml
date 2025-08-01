@@ -17,12 +17,11 @@ stages:
   - deploy
 
 variables:
+  # Default Go version to install in the docker build
   # Note: If GOLANG_VERSION below is bumped up in the future, you may also wish to consider bumping ./Dockerfile
   #       so that any developer using the Dockerfile has the same version.
   #       However, note that the actual Go versions tested against are specified in TEST_GO_VERSIONS below.
   GOLANG_VERSION: 1.24.0
-  # Set version to run coverage test for; set it to . to test v1
-  TEST_VERSION: .
 
 before_script: |-
   apt-get update && apt-get install -y --no-install-recommends wget ca-certificates git g++ gcc libc6-dev make pkg-config && rm -rf /var/lib/apt/lists/*
@@ -70,9 +69,10 @@ v2_unit_tests:
     # Test against the latest point release of Go in each major version since the version of Go specified in go.mod up to latest
     TEST_GO_VERSIONS: "1.24.0 latest"
 
-unit_tests:
+v1_unit_tests:
   extends: .unit_tests
   variables:
+    # Set version to . to test v1
     TEST_VERSION: .
     # Test against the latest point release of Go in each major version since the version of Go specified in go.mod up to latest
     TEST_GO_VERSIONS: "1.18.10 1.19.13 1.20.14 1.21.13 1.22.12 1.23.11 latest"
@@ -93,28 +93,45 @@ race_detector:
 
 # ~~~ Coverage tests
 
-coverage:
+.coverage:
   stage: test
+  variables:
+    # Set version to . to test v1
+    TEST_VERSION: .
   script: |-
-    mkdir -p $CI_PROJECT_DIR/cover
+    mkdir -p $CI_PROJECT_DIR/cover/${TEST_VERSION}
     go get -C ${TEST_VERSION} -t
-    go test -C ${TEST_VERSION} -covermode=count -coverprofile "$CI_PROJECT_DIR/cover/coverage.cov"
-    go tool cover -func=$CI_PROJECT_DIR/cover/coverage.cov
-    go tool cover -html=$CI_PROJECT_DIR/cover/coverage.cov -o $CI_PROJECT_DIR/cover/coverage.html
-    # https://docs.gitlab.com/ee/ci/testing/test_coverage_visualization.html
+    go test -C ${TEST_VERSION} -covermode=count -coverprofile "$CI_PROJECT_DIR/cover/${TEST_VERSION}/coverage.cov"
+    go tool -C ${TEST_VERSION} cover -func=$CI_PROJECT_DIR/cover/${TEST_VERSION}/coverage.cov
+    go tool -C ${TEST_VERSION} cover -html=$CI_PROJECT_DIR/cover/${TEST_VERSION}/coverage.cov -o $CI_PROJECT_DIR/cover/${TEST_VERSION}/coverage.html
+    # Visualization instructions: https://docs.gitlab.com/ci/testing/code_coverage/?tab=Go
     go get github.com/boumenot/gocover-cobertura
     go install github.com/boumenot/gocover-cobertura
-    gocover-cobertura < $CI_PROJECT_DIR/cover/coverage.cov > $CI_PROJECT_DIR/cover/coverage.xml
-  # https://docs.gitlab.com/ee/ci/yaml/index.html#coverage
+    (cd ${TEST_VERSION} && gocover-cobertura < $CI_PROJECT_DIR/cover/${TEST_VERSION}/coverage.cov > $CI_PROJECT_DIR/cover/${TEST_VERSION}/coverage.xml)
+  # Capture output of go test `-covermode` switch above
+  #   cf. https://docs.gitlab.com/ci/yaml/#coverage
   coverage: '/coverage: \d+(?:\.\d+)?/'
   artifacts:
     paths:
-      - cover/coverage.cov
-      - cover/coverage.html
+      - cover/${TEST_VERSION}/coverage.cov
+      - cover/${TEST_VERSION}/coverage.html
     reports:
       coverage_report:
         coverage_format: cobertura
-        path: cover/coverage.xml
+        path: cover/${TEST_VERSION}/coverage.xml
+    expire_in: 2 years  # default is 1 week but YDBGo can exist for a long time without change
+
+v2_coverage:
+  extends: .coverage
+  variables:
+    TEST_VERSION: v2
+
+v1_coverage:
+  extends: .coverage
+  variables:
+    # Set version to . to test v1
+    TEST_VERSION: .
+
 
 commit-verify:
   image: ubuntu:24.04
@@ -149,7 +166,8 @@ build:
 pages:
   stage: deploy
   dependencies:
-    - coverage
+    - v1_coverage
+    - v2_coverage
   script: |-
     mkdir $CI_PROJECT_DIR/public
     mv cover/coverage.html $CI_PROJECT_DIR/public/
