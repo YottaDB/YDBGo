@@ -48,7 +48,7 @@ const WrapperRelease string = "v2.0.2-alpha4"
 
 // Set default exit wait times. The user may change these.
 var (
-	// MaxPanicExitWait is the maximum wait when a panic caused by a signal has occured (likely unable to run Exit().
+	// MaxPanicExitWait is the maximum wait when a panic caused by a signal has occurred (likely unable to run Exit().
 	// It specifies the wait in seconds that yottadb.Exit() will wait for ydb_exit() to run before
 	// giving up and forcing the process to exit. Note the normal exit wait is longer as we expect ydb_exit() to be
 	// successful so can afford to wait as long as needed to do the sync but for a signal exit, the rundown is likely

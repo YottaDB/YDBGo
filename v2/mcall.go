@@ -157,24 +157,24 @@ type typeInfo struct {
 }
 
 var typeMapper map[string]typeInfo = map[string]typeInfo{
-	"":        typeInfo{reflect.Invalid, "void"},
-	"string":  typeInfo{reflect.String, "ydb_buffer_t*"},
-	"int":     typeInfo{reflect.Int, "ydb_long_t*"}, // YottaDB (u)long type switches between 32- and 64-bit by platform, just like Go int
-	"uint":    typeInfo{reflect.Uint, "ydb_ulong_t*"},
-	"int32":   typeInfo{reflect.Int32, "ydb_int_t*"}, // YottaDB (u)int type is 32-bit only like Go int32
-	"uint32":  typeInfo{reflect.Uint32, "ydb_uint_t*"},
-	"int64":   typeInfo{reflect.Int64, "ydb_int64_t*"},
-	"uint64":  typeInfo{reflect.Uint64, "ydb_uint64_t*"},
-	"float32": typeInfo{reflect.Float32, "ydb_float_t*"},
-	"float64": typeInfo{reflect.Float64, "ydb_double_t*"},
+	"":        {reflect.Invalid, "void"},
+	"string":  {reflect.String, "ydb_buffer_t*"},
+	"int":     {reflect.Int, "ydb_long_t*"}, // YottaDB (u)long type switches between 32- and 64-bit by platform, just like Go int
+	"uint":    {reflect.Uint, "ydb_ulong_t*"},
+	"int32":   {reflect.Int32, "ydb_int_t*"}, // YottaDB (u)int type is 32-bit only like Go int32
+	"uint32":  {reflect.Uint32, "ydb_uint_t*"},
+	"int64":   {reflect.Int64, "ydb_int64_t*"},
+	"uint64":  {reflect.Uint64, "ydb_uint64_t*"},
+	"float32": {reflect.Float32, "ydb_float_t*"},
+	"float64": {reflect.Float64, "ydb_double_t*"},
 }
 
 var returnTypes map[string]struct{} = map[string]struct{}{
-	"":        struct{}{},
-	"string":  struct{}{},
-	"int":     struct{}{},
-	"int64":   struct{}{},
-	"float64": struct{}{},
+	"":        {},
+	"string":  {},
+	"int":     {},
+	"int64":   {},
+	"float64": {},
 }
 
 // CallTable stores internal metadata used for calling M and a table of Go functions by name loaded from the M call-in table.
@@ -542,7 +542,7 @@ func (conn *Conn) callM(routine *RoutineData, args []any) (any, error) {
 	}
 
 	// Allocate enough space for all parameters and any string preallocations.
-	// Do this with a single malloc for speed, or don't do it at all if conn.value is large enough to accomodate us.
+	// Do this with a single malloc for speed, or don't do it at all if conn.value is large enough to accommodate us.
 	paramBlock := conn.paramAlloc() // allocated in conn for in subsequent calls
 	var prealloc unsafe.Pointer
 	// Use statically-available connection space if prealloction fits within its maximum; otherwise malloc
