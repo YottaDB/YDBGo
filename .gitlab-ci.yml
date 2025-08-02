@@ -45,11 +45,11 @@ before_script: |-
     export YDB_GO_SKIP_TIMED_TESTS="yes"
     cd ${TEST_VERSION}
     go get -t
-    versions=$(echo -e "${TEST_GO_VERSIONS// /\\n}" | sort --version-sort --unique) # remove duplicates
-    for ver in $TEST_GO_VERSIONS; do
-      [ "$ver" == "latest" ] && ver=$(wget -qO - https://go.dev/VERSION?m=text | head -n1 | cut -c3-)
-      go install golang.org/dl/go$ver@latest
-      go$ver download
+    latest=$(wget -qO - https://go.dev/VERSION?m=text | head -n1 | cut -c3-)
+    versions="${TEST_GO_VERSIONS//latest/$latest}"
+    versions=$(echo -e "${versions// /\\n}" | sort --version-sort --unique) # remove duplicates
+    for ver in $versions; do
+      go install golang.org/dl/go$ver@latest && go$ver download
       go$ver test -v
       # the following ls tests for the existence of the wildcard to prevent cp error when no file exists
       mkdir -p $CI_PROJECT_DIR/artifacts/go$ver
@@ -74,8 +74,9 @@ v1_unit_tests:
   variables:
     # Set version to . to test v1
     TEST_VERSION: .
-    # Test against the latest point release of Go in each major version since the version of Go specified in go.mod up to latest
-    TEST_GO_VERSIONS: "1.18.10 1.19.13 1.20.14 1.21.13 1.22.12 1.23.11 latest"
+    # Test against the release of Go specified in go.mod and also against the latest version of Go.
+    # This will adequate rather than intermediate versions of Go since Go is intentionally designed for backward compatiblity.
+    TEST_GO_VERSIONS: "1.18.10 latest"
 
 
 # ~~~ Race detector tests
