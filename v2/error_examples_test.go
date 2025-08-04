@@ -27,8 +27,8 @@ func ExampleErrorIs() {
 	fmt.Println("Error is INVSTRLEN:", yottadb.ErrorIs(err, ydberr.INVSTRLEN))
 	fmt.Println(" or using longform:", errors.Is(err, &yottadb.Error{Code: ydberr.INVSTRLEN}))
 
-	wrapped := fmt.Errorf("wrapped: %w", err)
-	fmt.Println("Wrapped error is still INVSTRLEN:", yottadb.ErrorIs(wrapped, ydberr.INVSTRLEN))
+	wrapper := fmt.Errorf("wrapped: %w", err)
+	fmt.Println("Wrapped error is still INVSTRLEN:", yottadb.ErrorIs(wrapper, ydberr.INVSTRLEN))
 
 	fmt.Println()
 	fmt.Println("Or you can Grab the error with Error.As():")

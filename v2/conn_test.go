@@ -14,6 +14,7 @@ package yottadb
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -25,6 +26,32 @@ import (
 func TestEnsureValueSize(t *testing.T) {
 	tconn := SetupTest(t)
 	assert.Panics(t, func() { tconn.ensureValueSize(YDB_MAX_STR + 1) })
+}
+
+func TestZwr2Str(t *testing.T) {
+	tconn := SetupTest(t)
+	str, err := tconn.Zwr2Str(`"X"_$C(0)_"ABC"`)
+	assert.Nil(t, err)
+	assert.Equal(t, str, "X\x00ABC")
+	_, err = tconn.Zwr2Str(`"` + strings.Repeat("A", YDB_MAX_STR-2) + `"`)
+	assert.Nil(t, err)
+	_, err = tconn.Zwr2Str(`"` + strings.Repeat("A", YDB_MAX_STR-1) + `"`)
+	assert.NotNil(t, err)
+}
+
+func TestStr2Zwr(t *testing.T) {
+	tconn := SetupTest(t)
+	str, err := tconn.Str2Zwr("X\x00ABC")
+	assert.Nil(t, err)
+	assert.Equal(t, str, `"X"_$C(0)_"ABC"`)
+	input := strings.Repeat("A", YDB_MAX_STR-2)
+	str, err = tconn.Str2Zwr(input)
+	assert.Nil(t, err)
+	assert.Equal(t, `"`+input+`"`, str)
+	str, err = tconn.Str2Zwr(input + "A")
+	assert.NotNil(t, err)
+
+	assert.Panics(t, func() { tconn.Quote(input + "\x00") })
 }
 
 func TestKillLocalsExcept(t *testing.T) {

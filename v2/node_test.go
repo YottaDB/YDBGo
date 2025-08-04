@@ -23,6 +23,14 @@ import (
 
 // ---- Tests
 
+func TestNode(t *testing.T) {
+	tconn := SetupTest(t)
+	// Check various input types convert property to subscript strings
+	n := tconn.Node("var", "str", []byte("bytes"), int(-1), int32(-32), int64(-64), uint(1), uint32(32), uint64(64), float32(32.32), float64(64.64))
+	assert.Equal(t, `var("str","bytes",-1,-32,-64,1,32,64,32.32,64.64)`, n.String())
+	assert.Panics(t, func() { tconn.Node("var", true) })
+}
+
 func TestCloneNode(t *testing.T) {
 	conn1 := SetupTest(t)
 	conn2 := NewConn()
@@ -139,6 +147,24 @@ func TestSetGet(t *testing.T) {
 	n.Set("-12abc")
 	assert.Equal(t, 0, n.GetInt())
 	assert.Equal(t, float64(0), n.GetFloat())
+	// Test Set to various input types
+	n.Set(int(-1))
+	assert.Equal(t, "-1", n.Get())
+	n.Set(int32(-32))
+	assert.Equal(t, "-32", n.Get())
+	n.Set(int64(-64))
+	assert.Equal(t, "-64", n.Get())
+	n.Set(uint(1))
+	assert.Equal(t, "1", n.Get())
+	n.Set(uint32(32))
+	assert.Equal(t, "32", n.Get())
+	n.Set(uint64(64))
+	assert.Equal(t, "64", n.Get())
+	n.Set(float32(32.32))
+	assert.Equal(t, "32.32", n.Get())
+	n.Set(float64(64.64))
+	assert.Equal(t, "64.64", n.Get())
+	assert.Panics(t, func() { n.Set(true) })
 }
 
 func TestData(t *testing.T) {

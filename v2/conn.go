@@ -224,12 +224,18 @@ func (conn *Conn) getValue() string {
 }
 
 // Zwr2Str takes the given ZWRITE-formatted string and converts it to return as a normal ASCII string.
-//   - If zstr is not in valid zwrite format, return the empty string and yottadb.Error.Code=ydberr.InvalidZwriteFormat.
+//   - If the input string does not fit within the maximum YottaDB string size, return a *Error with Code=ydberr.InvalidStringLength
+//   - If zstr is not in valid zwrite format, return the empty string and a *Error with Code=ydberr.InvalidZwriteFormat.
+//   - Otherwise, return the decoded string.
 //   - Note that the length of a string in zwrite format is always greater than or equal to the string in its original, unencoded format.
 //
 // Panics on other errors because they are are all panic-worthy (e.g. invalid variable names).
 func (conn *Conn) Zwr2Str(zstr string) (string, error) {
 	cconn := conn.cconn
+	// Don't rely on setValue (below) to check length because it panics, whereas this function is supposed to return errors
+	if len(zstr) > C.YDB_MAX_STR {
+		return "", errorf(ydberr.InvalidStringLength, "Invalid string length %d: max %d", len(zstr), C.YDB_MAX_STR)
+	}
 	cbuf := conn.setValue(zstr)
 	conn.prepAPI()
 	status := C.ydb_zwr2str_st(cconn.tptoken, &cconn.errstr, cbuf, cbuf)
@@ -254,13 +260,18 @@ func (conn *Conn) Zwr2Str(zstr string) (string, error) {
 }
 
 // Str2Zwr takes the given Go string and converts it to return a ZWRITE-formatted string
-//   - If the returned zwrite-formatted string does not fit within the maximum YottaDB string size, return a *Error with Code=ydberr.INVSTRLEN.
-//     Otherwise, return the ZWRITE-formatted string.
+//   - If the input string does not fit within the maximum YottaDB string size, return a *Error with Code=ydberr.InvalidStringLength
+//   - If the output string does not fit within the maximum YottaDB string size, return a *Error with Code=ydberr.INVSTRLEN
+//   - Otherwise, return the ZWRITE-formatted string.
 //   - Note that the length of a string in zwrite format is always greater than or equal to the string in its original, unencoded format.
 //
 // Panics on other errors because they are are all panic-worthy (e.g. invalid variable names).
 func (conn *Conn) Str2Zwr(str string) (string, error) {
 	cconn := conn.cconn
+	// Don't rely on setValue (below) to check length because it panics, whereas this function is supposed to return errors
+	if len(str) > C.YDB_MAX_STR {
+		return "", errorf(ydberr.InvalidStringLength, "Invalid string length %d: max %d", len(str), C.YDB_MAX_STR)
+	}
 	cbuf := conn.setValue(str)
 	conn.prepAPI()
 	status := C.ydb_str2zwr_st(cconn.tptoken, &cconn.errstr, cbuf, cbuf)

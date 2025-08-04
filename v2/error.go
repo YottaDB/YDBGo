@@ -50,7 +50,7 @@ func (err *Error) Error() string {
 	return err.Message // The error code's name is already included in the message from YottaDB, so don't add the code
 }
 
-// Unwrap allows yottadb.Error to wrap other underlying errors. See [newError].
+// Unwrap allows yottadb.Error to wrap other underlying errors. See [errors.Unwrap].
 func (err *Error) Unwrap() []error {
 	return err.chain
 }
@@ -159,6 +159,7 @@ func (conn *Conn) lastCode() C.int {
 }
 
 // recoverMessage tries to get the error message (albeit without argument substitution) from the supplied status code in cases where the message has been lost.
+// Note: lastCode() may not be called after recoverMessage() because recoverMessage clobbers cconn.errstr when it calls ydb_message_t
 func (conn *Conn) recoverMessage(status C.int) string {
 	cconn := conn.cconn
 	// Check special cases first.
@@ -183,6 +184,7 @@ func (conn *Conn) recoverMessage(status C.int) string {
 		return "%YDB-E-CALLINAFTERXIT, After a ydb_exit(), a process cannot create a valid YottaDB context"
 	}
 	// note: ydb_message_t() only looks at the absolute value of status so no need to negate it
+	conn.prepAPI()
 	rc := C.ydb_message_t(cconn.tptoken, nil, status, &cconn.errstr)
 	if rc != YDB_OK {
 		if rc == ydberr.UNKNOWNSYSERR {
