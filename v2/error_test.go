@@ -79,4 +79,5 @@ func TestLastError(t *testing.T) {
 	// Clear the returned error to test code paths where that is the case
 	conn.cconn.errstr.len_used = 0
 	assert.Equal(t, 0, int(conn.lastCode()))
+	assert.Equal(t, err.Error(), conn.lastError(lastCode).Error())
 }

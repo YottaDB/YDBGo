@@ -21,6 +21,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	v1 "lang.yottadb.com/go/yottadb"
@@ -97,7 +98,7 @@ func Benchmark________________________________(b *testing.B) {
 	b.Skip()
 }
 
-func setupLogger(testDir string, verbose bool) (*log.Logger, *os.File) {
+func setupLogger(testDir string, verbose bool) *os.File {
 	testLogFile := filepath.Join(testDir, "output.log")
 	f, err := os.OpenFile(testLogFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
@@ -105,15 +106,17 @@ func setupLogger(testDir string, verbose bool) (*log.Logger, *os.File) {
 	}
 	multi := io.MultiWriter(f)
 	if verbose {
-		multi = io.MultiWriter(multi, os.Stdout)
+		multi = io.MultiWriter(multi, os.Stderr)
 	}
-	logger := log.New(multi, "YDBGo:", log.Lshortfile)
-	return logger, f
+	log.SetPrefix("YDBGo:")
+	log.SetFlags(log.Lshortfile)
+	log.SetOutput(multi)
+	return f
 }
 
-func createDatabase(testDir string, logger *log.Logger) string {
+func createDatabase(testDir string) string {
 	// Setup environment variables
-	logger.Printf("Test directory is %s", testDir)
+	log.Printf("Test directory is %s", testDir)
 	ydbGbldir := filepath.Join(testDir, "mumps.gld")
 	ydbDatfile := filepath.Join(testDir, "mumps.dat")
 	os.Setenv("ydb_gbldir", ydbGbldir)
@@ -128,23 +131,23 @@ func createDatabase(testDir string, logger *log.Logger) string {
 	cmd := exec.Command(mumpsExe, "-run", "^GDE",
 		"change -seg DEFAULT -file="+ydbDatfile)
 	output, err := cmd.CombinedOutput()
-	logger.Printf("%s\n", output)
+	log.Printf("%s\n", output)
 	if err != nil {
-		logger.Fatal(err)
+		log.Fatal(err)
 	}
 
 	// Create database itself
 	cmd = exec.Command(mupipExe, "create")
 	output, err = cmd.CombinedOutput()
-	logger.Printf("%s\n", output)
+	log.Printf("%s\n", output)
 	if err != nil {
-		logger.Fatal(err)
+		log.Fatal(err)
 	}
 	return testDir
 }
 
-func cleanupDatabase(logger *log.Logger, testDir string) {
-	logger.Printf("Cleaning up test directory")
+func cleanupDatabase(testDir string) {
+	log.Printf("Cleaning up test directory")
 	os.RemoveAll(testDir)
 }
 
@@ -165,13 +168,20 @@ func _testMain(m *testing.M) int {
 
 	// Setup the log file, print to stdout if needed
 	verbose := false
+	coverage := false
 	for _, b := range os.Args {
 		if b == "-test.v=true" || b == "-test.v" {
 			verbose = true
 		}
+		if strings.HasPrefix(b, "-test.gocoverdir") {
+			coverage = true
+		}
 	}
-	logger, logfile := setupLogger(testDir, verbose)
+	logfile := setupLogger(testDir, verbose)
 	defer logfile.Close()
+	if coverage {
+		debugMode = 100 // cover every possible code path
+	}
 
 	// Create test database if necessary.
 	// Determine if this is an invocation of "go test" from the YDBTest repo (YottaDB test system).
@@ -179,7 +189,7 @@ func _testMain(m *testing.M) int {
 	// (qdbrundown, replication etc.) and will get more coverage using that database than this on-the-fly database.
 	_, isYDBTestInvocation := os.LookupEnv("tst_working_dir")
 	if !isYDBTestInvocation {
-		testDir = createDatabase(testDir, logger)
+		testDir = createDatabase(testDir)
 	}
 
 	db, err := Init()
@@ -201,7 +211,7 @@ func _testMain(m *testing.M) int {
 
 	// Cleanup the temp directory, but leave it if we are in verbose mode or the test failed
 	if !isYDBTestInvocation && !verbose && ret == 0 {
-		cleanupDatabase(logger, testDir)
+		cleanupDatabase(testDir)
 	}
 	return ret
 }

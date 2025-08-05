@@ -26,6 +26,8 @@ else
   perflock:=$(perflock) $(PERFLAGS)
 endif
 
+coverdir ?= .
+
 test:
 	go test
 
@@ -46,4 +48,9 @@ check: BENCH=-count=6
 check: benchtime=0.1s
 check: benchmark
 
-.PHONY: test bench benchmarks benchmark check
+cover: coverage
+coverage:
+	go test -covermode=count -coverprofile "$(coverdir)/coverage.cov"
+	go tool cover -html="$(coverdir)/coverage.cov" -o $(coverdir)/coverage.html
+
+.PHONY: test bench benchmarks benchmark check cover coverage

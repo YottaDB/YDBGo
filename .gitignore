@@ -25,3 +25,4 @@
 *.o
 go.work
 go.work.sum
+coverage.*

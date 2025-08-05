@@ -14,7 +14,10 @@ package yottadb_test
 
 import (
 	"fmt"
+	"strings"
+	"testing"
 
+	assert "github.com/stretchr/testify/require"
 	"lang.yottadb.com/go/yottadb/v2"
 )
 
@@ -73,4 +76,229 @@ func ExampleNode_String() {
 	// Output:
 	// var("sub1","sub2")
 	// var2(1,2)
+}
+
+// Example of getting next subscript
+func ExampleNode_Next() {
+	conn := yottadb.NewConn()
+	n := conn.Node("X", 1)
+	n.Child(2, "3").Set("123")
+	n.Child(2, 3, 7).Set(1237)
+	n.Child(2, 4).Set(124)
+
+	x := conn.Node("X", 1, "2", "")
+	x = x.Next()
+	for x != nil {
+		fmt.Printf("%s=%s\n", x, x.Get())
+		x = x.Next()
+	}
+	// Output:
+	// X(1,2,3)=123
+	// X(1,2,4)=124
+}
+
+// Example of listing all local database variable names
+func ExampleNode_Next_varnames() {
+	conn := yottadb.NewConn()
+	conn.KillAllLocals()
+	conn.Node("X", 1).Set("X1")
+	conn.Node("X", 1, 2).Set("X12")
+	conn.Node("Y", 2).Set("Y2")
+
+	fmt.Println("Display all top-level database variable names, starting after '%' (which is the first possible name in sort order)")
+	x := conn.Node("%")
+	x = x.Next()
+	for x != nil {
+		fmt.Printf("%s\n", x)
+		x = x.Next()
+	}
+	// Output:
+	// Display all top-level database variable names, starting after '%' (which is the first possible name in sort order)
+	// X
+	// Y
+}
+
+// Example of getting all child nodes
+func ExampleNode_Children() {
+	conn := yottadb.NewConn()
+	n := conn.Node("X", 1)
+	n.Child(2, 3).Set(123)
+	n.Child(2, 4).Set(124)
+	n.Child(2, 3, "person").Set(1237)
+
+	// Note that the following person fields will come out in alphabetical order below
+	n.Child(2, 3, "person", "address").Set("2 Rocklands Rd")
+	n.Child(2, 3, "person", "address", "postcode").Set(1234)
+	n.Child(2, 3, "person", "occupation").Set("engineer")
+	n.Child(2, 3, "person", "age").Set(42)
+	n.Child(2, 3, "person", "sex").Set("male")
+
+	n = conn.Node("X", 1, 2)
+	for x := range n.Children() {
+		fmt.Printf("%s=%s\n", x, x.Get())
+	}
+
+	fmt.Println("Do the same in reverse:")
+	for x := range n.ChildrenBackward() {
+		fmt.Printf("%s=%s\n", x, x.Get())
+	}
+
+	n = conn.Node("X", 1, 2, 3, "person")
+	fmt.Printf("Person fields: (")
+	for _, sub := range n.Children() {
+		fmt.Printf("%s ", sub)
+	}
+	fmt.Println(")")
+
+	// Output:
+	// X(1,2,3)=123
+	// X(1,2,4)=124
+	// Do the same in reverse:
+	// X(1,2,4)=124
+	// X(1,2,3)=123
+	// Person fields: (address age occupation sex )
+}
+
+// Example of getting a mutable version of node
+func ExampleNode_Mutate() {
+	conn := yottadb.NewConn()
+	n := conn.Node("X", 1, 2, 3)
+	mutation1 := n.MutableChild().Mutate(4)
+	mutation2 := n.MutableChild().Mutate("text")
+	fmt.Println(n)
+	fmt.Println(mutation1)
+	fmt.Println(mutation2)
+	// Output:
+	// X(1,2,3)
+	// X(1,2,4)
+	// X(1,2,"text")
+}
+
+// Example of traversing a database tree
+func ExampleNode_GoString() {
+	conn := yottadb.NewConn()
+	n := conn.Node("tree", 1)
+	n.Child(2, 3).Set(123)
+	n.Child(2, 3, 7).Set("Hello!")
+	n.Child(2, 4).Set(124)
+
+	fmt.Printf("Dump is:\n%#v", n)
+
+	// Output:
+	// Dump is:
+	// tree(1,2,3)=123
+	// tree(1,2,3,7)="Hello!"
+	// tree(1,2,4)=124
+}
+
+// Example of traversing a database tree
+func ExampleNode_Dump() {
+	conn := yottadb.NewConn()
+	n := conn.Node("tree", 1)
+	n.Child(6).Set(16)
+	n.Child(2, 3).Set(123)
+	n.Child(2, 3, 7).Set("Hello!")
+	n.Child(2, 4).Set(124)
+	n.Child(2, 5, 9).Set(1259)
+	nb := conn.Node("tree", "B")
+	nb.Child(1).Set("AB")
+
+	fmt.Println(n.Dump())
+
+	n.Child(2, 3).Set("~ A\x00\x7f" + strings.Repeat("A", 1000))
+	fmt.Print(n.Dump(2, 8))
+
+	// Output:
+	// tree(1,2,3)=123
+	// tree(1,2,3,7)="Hello!"
+	// tree(1,2,4)=124
+	// tree(1,2,5,9)=1259
+	// tree(1,6)=16
+	//
+	// tree(1,2,3)="~ A"_$C(0,127)_"AAA"...
+	// tree(1,2,3,7)="Hello!"
+	// ...
+}
+
+// Example of traversing a database tree
+func ExampleNode_TreeNext() {
+	conn := yottadb.NewConn()
+	n := conn.Node("tree", 1)
+	n.Child(2, 3).Set(123)
+	n.Child(2, 3, 7).Set(1237)
+	n.Child(2, 4).Set(124)
+	n.Child(2, 5, 9).Set("Hello!")
+	n.Child(6).Set(16)
+	nb := conn.Node("tree", "B")
+	nb.Child(1).Set("AB")
+
+	x := conn.Node("tree").TreeNext()
+	for x != nil {
+		fmt.Printf("%s=%s\n", x, conn.Quote(x.Get()))
+		x = x.TreeNext()
+	}
+
+	fmt.Println("Re-start half way through and go in reverse order:")
+	x = conn.Node("tree", 1, 2, 4)
+	for x != nil {
+		fmt.Printf("%s=%s\n", x, conn.Quote(x.Get()))
+		x = x.TreePrev()
+	}
+
+	// Output:
+	// tree(1,2,3)=123
+	// tree(1,2,3,7)=1237
+	// tree(1,2,4)=124
+	// tree(1,2,5,9)="Hello!"
+	// tree(1,6)=16
+	// tree("B",1)="AB"
+	// Re-start half way through and go in reverse order:
+	// tree(1,2,4)=124
+	// tree(1,2,3,7)=1237
+	// tree(1,2,3)=123
+}
+
+// Example of traversing a database tree
+func ExampleNode_Tree() {
+	conn := yottadb.NewConn()
+	n := conn.Node("tree", 1)
+	n.Child(2, 3).Set(123)
+	n.Child(2, 3, 7).Set(1237)
+	n.Child(2, 4).Set(124)
+	n.Child(2, 5, 9).Set(1259)
+	n.Child(6).Set(16)
+	nb := conn.Node("tree", "B")
+	nb.Child(1).Set("AB")
+
+	for x := range n.Child(2).Tree() {
+		fmt.Printf("%s=%s\n", x, conn.Quote(x.Get()))
+	}
+
+	// Output:
+	// tree(1,2,3)=123
+	// tree(1,2,3,7)=1237
+	// tree(1,2,4)=124
+	// tree(1,2,5,9)=1259
+}
+
+// Test cases that ExampleNode_TreeNext() did not catch
+func TestTreeNext(t *testing.T) {
+	conn := yottadb.NewConn()
+
+	// Ensure TreeNext will work even if it has to allocate new subscript memory up to the size of YDB_MAX_STR
+	bigstring := strings.Repeat("A", yottadb.YDB_MAX_STR)
+	n := conn.Node("X", bigstring)
+	n.Child(2, 3).Set("Big23")
+	n.Child(5, bigstring).Set("Big5Big")
+
+	x := conn.Node("X")
+	output := ""
+	for {
+		x = x.TreeNext()
+		if x == nil {
+			break
+		}
+		output += fmt.Sprintf("%s=%s ", x, x.Get())
+	}
+	assert.Equal(t, `X("`+bigstring+`",2,3)=Big23 X("`+bigstring+`",5,"`+bigstring+`")=Big5Big `, output)
 }

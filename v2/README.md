@@ -113,7 +113,9 @@ The `git ignore` line prevents you from committing this local change to the publ
 
 Now you can modify the YottaDB Go wrapper elsewhere on your local file system, and it will be immediately used by your client application, even before you commit the wrapper changes.
 
-## Docker Container
+If you are developing YDBGo itself, you may find it useful to increase debugMode to increase debug logging as documented in `yottadb.go`. This is a private variable that cannot be set by the YDBGo user. It is only intended for use by developers of YDBGo. Coverage tests turn it on to ensure coverage of that debug portion of the code.
+
+#### Docker Container
 
 The Dockerfile included in this repository creates an Ubuntu image with YottaDB, Go, and some basic development tools (git, gcc, make, vim, etc).
 

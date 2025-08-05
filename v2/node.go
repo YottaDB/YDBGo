@@ -16,7 +16,6 @@ package yottadb
 
 import (
 	"bytes"
-	"fmt"
 	"iter"
 	"runtime"
 	"strconv"
@@ -539,7 +538,7 @@ func (n *Node) Incr(amount any) string {
 	return valuestring
 }
 
-// Lock attempts to acquire or increment the count a lock matching this node, waiting up to timeout for availability.
+// Lock attempts to acquire or increment the count of a lock matching this node, waiting up to timeout for availability.
 // Equivalent to the M `LOCK +lockpath` command.
 //   - If no timeout is supplied, wait forever. A timeout of zero means try only once.
 //   - Return true if lock was acquired; otherwise false.
@@ -803,9 +802,6 @@ func (n *Node) _treeNext(reverse bool) *Node {
 			status = C.ydb_node_next_st(cconn.tptoken, &cconn.errstr, &cnode.buffers, cnode.len-1, bufferIndex(&cnode.buffers, 1), &retSubs, bufferIndex(&retNode.cnode.buffers, 1))
 		}
 		if status == ydberr.INSUFFSUBS {
-			if debugMode {
-				fmt.Printf("INSUFFSUBS: %d (need %d subscripts) so allocating more\n", retNode.cnode.len-1, retSubs)
-			}
 			extraStrings := make([]any, retSubs-(retNode.cnode.len-1))
 			// Pre-fill node subscripts
 			for i := range extraStrings {
@@ -815,9 +811,6 @@ func (n *Node) _treeNext(reverse bool) *Node {
 			continue
 		}
 		if status == ydberr.INVSTRLEN {
-			if debugMode {
-				fmt.Printf("INVSTRLEN subscript %d so reallocating\n", retSubs)
-			}
 			buf := bufferIndex(&retNode.cnode.buffers, int(retSubs+1)) // +1 because cnode counts the varname as a subscript and ydb_node_next_st() does not
 			len := buf.len_used
 			newbuf := C.malloc(C.size_t(len))

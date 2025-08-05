@@ -240,6 +240,7 @@ func (conn *Conn) Zwr2Str(zstr string) (string, error) {
 	conn.prepAPI()
 	status := C.ydb_zwr2str_st(cconn.tptoken, &cconn.errstr, cbuf, cbuf)
 	if status == ydberr.INVSTRLEN {
+		// NOTE: this code will never run in the current design because setValue() above always allocates enough space
 		// Allocate more space and retry the call
 		conn.ensureValueSize(int(cconn.value.len_used))
 		conn.prepAPI()

@@ -69,9 +69,10 @@ var (
 
 // ---- Debug settings
 
-var debugMode bool                // false by default -- can be enabled by test/debugging code to turn things on
-const dbgPrintEPHdrs bool = false // Print entry point headers when routine is entered
-const dbgSigHandling bool = false // Print extra signal processing info when true
+// debugMode=0: no debug logging (default)
+// debugMode=1: log at entrypoint of M functions or Go signal callbacks; and don't remove temporary callback table file
+// debugMode=2: in addition, log extra signal processing info
+var debugMode int = 0 // increasing values 1, 2 or 3 for increasing log output
 
 // ---- Utility functions
 

@@ -13,9 +13,9 @@
 package yottadb
 
 import (
-	"fmt"
 	"strings"
 	"testing"
+	"time"
 	"unsafe"
 
 	assert "github.com/stretchr/testify/require"
@@ -24,11 +24,28 @@ import (
 // ---- Tests
 
 func TestNode(t *testing.T) {
-	tconn := SetupTest(t)
+	conn := SetupTest(t)
 	// Check various input types convert property to subscript strings
-	n := tconn.Node("var", "str", []byte("bytes"), int(-1), int32(-32), int64(-64), uint(1), uint32(32), uint64(64), float32(32.32), float64(64.64))
+	n := conn.Node("var", "str", []byte("bytes"), int(-1), int32(-32), int64(-64), uint(1), uint32(32), uint64(64), float32(32.32), float64(64.64))
 	assert.Equal(t, `var("str","bytes",-1,-32,-64,1,32,64,32.32,64.64)`, n.String())
-	assert.Panics(t, func() { tconn.Node("var", true) })
+	assert.Panics(t, func() { conn.Node("var", true) })
+
+	// Test that various code paths that panic on programmer errors
+	invalidNode := conn.Node("!@#$")
+	assert.Panics(t, func() { invalidNode.Set(3) })
+	assert.Panics(t, func() { invalidNode.Get() })
+	assert.Panics(t, func() { invalidNode.HasValue() })
+	assert.Panics(t, func() { invalidNode.Kill() })
+	assert.Panics(t, func() { invalidNode.Clear() })
+	assert.Panics(t, func() { invalidNode.Incr(10) })
+	assert.Panics(t, func() { invalidNode.Next() })
+	assert.Panics(t, func() { invalidNode.Lock(1 * time.Millisecond) })
+	assert.Panics(t, func() { conn.Lock(1*time.Millisecond, invalidNode) })
+	assert.Panics(t, func() { invalidNode.Unlock() })
+	assert.Panics(t, func() {
+		for range invalidNode.Tree() {
+		}
+	})
 }
 
 func TestCloneNode(t *testing.T) {
@@ -78,6 +95,51 @@ func (n *Node) checkBuffers(t *testing.T) {
 	}
 }
 
+func testCloneNode(t *testing.T) {
+	conn1 := SetupTest(t)
+	conn2 := NewConn()
+	n1 := conn1.Node("var", "abc")
+	n2 := conn2.CloneNode(n1)
+	assert.NotEqual(t, n1.Conn.cconn, n2.Conn.cconn)
+	assert.NotEqual(t, n1.Conn.cconn.errstr.buf_addr, n2.Conn.cconn.errstr.buf_addr)
+	assert.NotEqual(t, n1.Conn.cconn.value.buf_addr, n2.Conn.cconn.value.buf_addr)
+
+	assert.Equal(t, "", n1.Get())
+	n2.Set(3)
+	assert.Equal(t, "3", n1.Get())
+}
+
+func TestIteration(t *testing.T) {
+	conn := SetupTest(t)
+	n := conn.Node("var")
+	n.Child(1).Set(1)
+	assert.Equal(t, false, n.IsMutable())
+	for i, subscript := range n.Children() {
+		assert.Equal(t, "1", subscript)
+		assert.Equal(t, true, i.IsMutable())
+	}
+	assert.Equal(t, false, n.IsMutable())
+	assert.Equal(t, true, n.MutableChild("def").IsMutable())
+	assert.Equal(t, false, n.IsMutable())
+	assert.Equal(t, false, n.MutableChild("def").Clone().IsMutable())
+
+	// Traverse early exit code path in _children() for code coverage
+	for range n.Children() {
+		break
+	}
+
+	// Code coverage for when Next() gets an INVSTRLEN error and has to retry
+	longString := strings.Repeat("A", YDB_MAX_STR)
+	conn2 := NewConn() // new conn to ensure no large pre-allocated buffer
+	n = conn2.Node("var")
+	n.Child(1).Set(1)
+	n.Child(longString).Set(2)
+	assert.Equal(t, longString, n.Child(1).Next().Subscript(-1))
+	assert.Equal(t, "1", n.Child(longString).Prev().Subscript(-1))
+	conn.KillAllLocals()
+	assert.Nil(t, n.Child(1).Prev())
+}
+
 func TestChild(t *testing.T) {
 	conn := SetupTest(t)
 	n1 := conn.Node("var", "abc")
@@ -112,18 +174,28 @@ func TestMutateNode(t *testing.T) {
 }
 
 func TestSetGet(t *testing.T) {
-	tconn := SetupTest(t)
-	n := tconn.Node("var")
+	conn := SetupTest(t)
+	n := conn.Node("var")
 	val, ok := n.Lookup()
 	assert.Equal(t, "", val)
+	assert.False(t, ok)
+	valbytes, ok := n.LookupBytes()
+	assert.Equal(t, []byte{}, valbytes)
 	assert.False(t, ok)
 	assert.Equal(t, "", n.Get())
 	assert.Equal(t, "default", n.Get("default"))
 	assert.Equal(t, "", n.Get())
 	assert.Equal(t, []byte("default"), n.GetBytes([]byte("default")))
+	assert.Equal(t, []byte{}, n.GetBytes())
 	assert.Equal(t, []byte(""), n.GetBytes([]byte("")))
 
 	n.Set("value")
+	val, ok = n.Lookup()
+	assert.Equal(t, "value", val)
+	assert.True(t, ok)
+	valbytes, ok = n.LookupBytes()
+	assert.Equal(t, []byte("value"), valbytes)
+	assert.True(t, ok)
 	assert.Equal(t, "value", n.Get())
 	assert.Equal(t, "value", n.Get("default"))
 
@@ -131,6 +203,13 @@ func TestSetGet(t *testing.T) {
 	assert.Equal(t, "Hello", n.Get())
 	assert.Equal(t, "Hello", n.Get("defaultvalue"))
 	assert.Equal(t, []byte("Hello"), n.GetBytes([]byte("defaultvalue")))
+
+	// Set to a really big value to exercise _Lookup's code path to re-try lookup after YDB says buffer isn't big enough
+	longString := strings.Repeat("A", YDB_MAX_STR)
+	n.Set(longString)
+	conn2 := NewConn() // new conn to ensure no large pre-allocated buffer
+	n2 := conn2.CloneNode(n)
+	assert.Equal(t, longString, n2.Get())
 
 	// Test Set to a number
 	n.Set(5)
@@ -168,8 +247,8 @@ func TestSetGet(t *testing.T) {
 }
 
 func TestData(t *testing.T) {
-	tconn := SetupTest(t)
-	n := tconn.Node("var")
+	conn := SetupTest(t)
+	n := conn.Node("var")
 	assert.Equal(t, true, n.HasNone())
 	assert.Equal(t, false, n.HasValue())
 	assert.Equal(t, false, n.HasTree())
@@ -195,10 +274,10 @@ func TestData(t *testing.T) {
 }
 
 func TestKill(t *testing.T) {
-	tconn := SetupTest(t)
-	n1 := tconn.Node("var1")
-	n2 := tconn.Node("var2")
-	n3 := tconn.Node("var3")
+	conn := SetupTest(t)
+	n1 := conn.Node("var1")
+	n2 := conn.Node("var2")
+	n3 := conn.Node("var3")
 	n1.Set("v1")
 	n2.Set("v2")
 	n3.Set("v3")
@@ -211,10 +290,10 @@ func TestKill(t *testing.T) {
 }
 
 func TestClear(t *testing.T) {
-	tconn := SetupTest(t)
-	n1 := tconn.Node("var1")
-	n2 := tconn.Node("var2")
-	n3 := tconn.Node("var3")
+	conn := SetupTest(t)
+	n1 := conn.Node("var1")
+	n2 := conn.Node("var2")
+	n3 := conn.Node("var3")
 	n1.Set("v1")
 	n2.Set("v2")
 	n3.Set("v3")
@@ -229,8 +308,8 @@ func TestClear(t *testing.T) {
 }
 
 func TestIncr(t *testing.T) {
-	tconn := SetupTest(t)
-	n := tconn.Node("var")
+	conn := SetupTest(t)
+	n := conn.Node("var")
 	assert.Equal(t, "1", n.Incr(1))
 	assert.Equal(t, "1", n.Get())
 	assert.Equal(t, "3", n.Incr(2))
@@ -245,239 +324,11 @@ func TestIncr(t *testing.T) {
 	assert.Equal(t, "2", n.Incr("1abcdefg"))
 }
 
-// Example of getting next subscript
-func ExampleNode_Next() {
-	conn := NewConn()
-	conn.KillAllLocals()
-	n := conn.Node("X", 1)
-	n.Child(2, "3").Set("123")
-	n.Child(2, 3, 7).Set(1237)
-	n.Child(2, 4).Set(124)
-
-	x := conn.Node("X", 1, "2", "")
-	x = x.Next()
-	for x != nil {
-		fmt.Printf("%s=%s\n", x, x.Get())
-		x = x.Next()
-	}
-	// Output:
-	// X(1,2,3)=123
-	// X(1,2,4)=124
-}
-
-// Example of listing all local database variable names
-func ExampleNode_Next_varnames() {
-	conn := NewConn()
-	conn.Node("X", 1).Set("X1")
-	conn.Node("X", 1, 2).Set("X12")
-	conn.Node("Y", 2).Set("Y2")
-
-	fmt.Println("Display all top-level database variable names, starting after '%' (which is the first possible name in sort order)")
-	x := conn.Node("%")
-	x = x.Next()
-	for x != nil {
-		fmt.Printf("%s\n", x)
-		x = x.Next()
-	}
-	// Output:
-	// Display all top-level database variable names, starting after '%' (which is the first possible name in sort order)
-	// X
-	// Y
-}
-
-// Example of getting all child nodes
-func ExampleNode_Children() {
-	conn := NewConn()
-	conn.KillAllLocals()
-	n := conn.Node("X", 1)
-	n.Child(2, 3).Set(123)
-	n.Child(2, 4).Set(124)
-	n.Child(2, 3, "person").Set(1237)
-
-	// Note that the following person fields will come out in alphabetical order below
-	n.Child(2, 3, "person", "address").Set("2 Rocklands Rd")
-	n.Child(2, 3, "person", "address", "postcode").Set(1234)
-	n.Child(2, 3, "person", "occupation").Set("engineer")
-	n.Child(2, 3, "person", "age").Set(42)
-	n.Child(2, 3, "person", "sex").Set("male")
-
-	n = conn.Node("X", 1, 2)
-	for x := range n.Children() {
-		fmt.Printf("%s=%s\n", x, x.Get())
-	}
-
-	fmt.Println("Do the same in reverse:")
-	for x := range n.ChildrenBackward() {
-		fmt.Printf("%s=%s\n", x, x.Get())
-	}
-
-	n = conn.Node("X", 1, 2, 3, "person")
-	fmt.Printf("Person fields: (")
-	for _, sub := range n.Children() {
-		fmt.Printf("%s ", sub)
-	}
-	fmt.Println(")")
-
-	// Output:
-	// X(1,2,3)=123
-	// X(1,2,4)=124
-	// Do the same in reverse:
-	// X(1,2,4)=124
-	// X(1,2,3)=123
-	// Person fields: (address age occupation sex )
-}
-
-// Example of fast iteration of a node to increment only children with subscripts 0..999999.
-func ExampleNode_Mutate() {
-	conn := NewConn()
-	n := conn.Node("counter").MutableChild("")
-	n.Mutate(1000000).Set("untouched")
-	for i := range 1000000 {
-		n.Mutate(i).Incr(1)
-	}
-
-	fmt.Printf("%s: %s\n", n.Mutate(0), n.Get())
-	fmt.Printf("%s: %s\n", n.Mutate(999999), n.Get())
-	fmt.Printf("%s: %s\n", n.Mutate(1000000), n.Get())
-	// Output:
-	// counter(0): 1
-	// counter(999999): 1
-	// counter(1000000): untouched
-}
-
-// Example of traversing a database tree
-func ExampleNode_GoString() {
+// Test traversal of a database tree
+func TestDump(t *testing.T) {
 	conn := NewConn()
 	conn.KillAllLocals()
 	n := conn.Node("tree", 1)
-	n.Child(2, 3).Set(123)
-	n.Child(2, 3, 7).Set("Hello!")
-	n.Child(2, 4).Set(124)
-
-	fmt.Printf("Dump is:\n%#v", n)
-
-	// Output:
-	// Dump is:
-	// tree(1,2,3)=123
-	// tree(1,2,3,7)="Hello!"
-	// tree(1,2,4)=124
-}
-
-// Example of traversing a database tree
-func ExampleNode_Dump() {
-	conn := NewConn()
-	conn.KillAllLocals()
-	trunk := conn.Node("tree")
-	n := trunk.Child(1)
-	n.Child(6).Set(16)
-	n.Child(2, 3).Set(123)
-	n.Child(2, 3, 7).Set("Hello!")
-	n.Child(2, 4).Set(124)
-	n.Child(2, 5, 9).Set(1259)
-	nb := conn.Node("tree", "B")
-	nb.Child(1).Set("AB")
-
-	fmt.Println(n.Dump())
-
-	trunk.Set("trunk")
-	n.Child(2, 3).Set("~ A\x00\x7f" + strings.Repeat("A", 1000))
-	fmt.Print(trunk.Dump(3, 8))
-
-	// Output:
-	// tree(1,2,3)=123
-	// tree(1,2,3,7)="Hello!"
-	// tree(1,2,4)=124
-	// tree(1,2,5,9)=1259
-	// tree(1,6)=16
-	//
-	// tree="trunk"
-	// tree(1,2,3)="~ A"_$C(0,127)_"AAA"...
-	// tree(1,2,3,7)="Hello!"
-	// ...
-}
-
-// Example of traversing a database tree
-func ExampleNode_TreeNext() {
-	conn := NewConn()
-	conn.KillAllLocals()
-	n := conn.Node("tree", 1)
-	n.Child(2, 3).Set(123)
-	n.Child(2, 3, 7).Set(1237)
-	n.Child(2, 4).Set(124)
-	n.Child(2, 5, 9).Set("Hello!")
-	n.Child(6).Set(16)
-	nb := conn.Node("tree", "B")
-	nb.Child(1).Set("AB")
-
-	x := conn.Node("tree").TreeNext()
-	for x != nil {
-		fmt.Printf("%s=%s\n", x, conn.Quote(x.Get()))
-		x = x.TreeNext()
-	}
-
-	fmt.Println("Re-start half way through and go in reverse order:")
-	x = conn.Node("tree", 1, 2, 4)
-	for x != nil {
-		fmt.Printf("%s=%s\n", x, conn.Quote(x.Get()))
-		x = x.TreePrev()
-	}
-
-	// Output:
-	// tree(1,2,3)=123
-	// tree(1,2,3,7)=1237
-	// tree(1,2,4)=124
-	// tree(1,2,5,9)="Hello!"
-	// tree(1,6)=16
-	// tree("B",1)="AB"
-	// Re-start half way through and go in reverse order:
-	// tree(1,2,4)=124
-	// tree(1,2,3,7)=1237
-	// tree(1,2,3)=123
-}
-
-// Example of traversing a database tree
-func ExampleNode_Tree() {
-	conn := NewConn()
-	conn.KillAllLocals()
-	n := conn.Node("tree", 1)
-	n.Child(2, 3).Set(123)
-	n.Child(2, 3, 7).Set(1237)
-	n.Child(2, 4).Set(124)
-	n.Child(2, 5, 9).Set(1259)
-	n.Child(6).Set(16)
-	nb := conn.Node("tree", "B")
-	nb.Child(1).Set("AB")
-
-	for x := range n.Child(2).Tree() {
-		fmt.Printf("%s=%s\n", x, conn.Quote(x.Get()))
-	}
-
-	// Output:
-	// tree(1,2,3)=123
-	// tree(1,2,3,7)=1237
-	// tree(1,2,4)=124
-	// tree(1,2,5,9)=1259
-}
-
-// Test cases that ExampleNode_TreeNext() did not catch
-func TestTreeNext(t *testing.T) {
-	tconn := NewConn()
-	tconn.KillAllLocals()
-
-	// Ensure TreeNext will work even if it has to allocate new subscript memory up to the size of YDB_MAX_STR
-	bigstring := strings.Repeat("A", YDB_MAX_STR)
-	n := tconn.Node("X", bigstring)
-	n.Child(2, 3).Set("Big23")
-	n.Child(5, bigstring).Set("Big5Big")
-
-	x := tconn.Node("X")
-	output := ""
-	for {
-		x = x.TreeNext()
-		if x == nil {
-			break
-		}
-		output += fmt.Sprintf("%s=%s ", x, x.Get())
-	}
-	assert.Equal(t, `X("`+bigstring+`",2,3)=Big23 X("`+bigstring+`",5,"`+bigstring+`")=Big5Big `, output)
+	assert.Panics(t, func() { n.Dump(3, 4, 5) })
+	// The rest is tested in ExampleNode_Dump
 }

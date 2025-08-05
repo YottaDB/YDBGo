@@ -16,6 +16,7 @@ package yottadb
 
 import (
 	"fmt"
+	"log"
 	"log/syslog"
 	"os"
 	"os/signal"
@@ -83,12 +84,12 @@ func init() {
 
 // printEntry is a function to print the entry point of the function, when entered, if the printEPHdrs flag is enabled.
 func printEntry(funcName string) {
-	if dbgPrintEPHdrs {
+	if debugMode >= 1 {
 		_, file, line, ok := runtime.Caller(2)
 		if ok {
-			fmt.Println("Entered ", funcName, " from ", file, " at line ", line)
+			log.Println("Entered ", funcName, " from ", file, " at line ", line)
 		} else {
-			fmt.Println("Entered ", funcName)
+			log.Println("Entered ", funcName)
 		}
 	}
 }
@@ -190,9 +191,9 @@ func NotifyYDB(sig os.Signal) bool {
 	info.servicing.Store(true)
 	defer info.servicing.Store(false)
 
-	if dbgSigHandling && (sig != syscall.SIGURG) {
+	if debugMode >= 2 && sig != syscall.SIGURG {
 		// SIGURG happens almost continually, so don't report it.
-		fmt.Fprintf(os.Stderr, "goroutine-sighandler: calling YottaDB signal handler for signal %d (%v)\n", sig, sig)
+		log.Printf("goroutine-sighandler: calling YottaDB signal handler for signal %d (%v)\n", sig, sig)
 	}
 	signum := C.int(sig.(syscall.Signal)) // have to type-assert before converting to an int
 	// Note this call to ydb_sig_dispatch() does not pass a tptoken. The reason for this is that inside
@@ -207,7 +208,9 @@ func NotifyYDB(sig os.Signal) bool {
 	case YDB_DEFER_HANDLER:
 		// Signal was deferred for some reason
 		// Not an error, but the fact is logged
-		fmt.Fprintf(os.Stderr, "goroutine-sighandler: YottaDB deferred signal %d (%v)\n", sig, sig)
+		if debugMode >= 2 {
+			log.Printf("goroutine-sighandler: YottaDB deferred signal %d (%v)\n", sig, sig)
+		}
 		return false
 	case ydberr.CALLINAFTERXIT:
 		// If CALLINAFTERXIT, we're done - exit goroutine
@@ -261,8 +264,8 @@ func handleSignal(info *sigInfo) {
 	info.shutdownNow = make(chan struct{}, 1) // Need to buffer only 1 element since shutdownSignalGoroutine() is non-blocking
 	// Tell Go to pass this signal to our channel.
 	signal.Notify(sigchan, sig)
-	if dbgSigHandling {
-		fmt.Fprintf(os.Stderr, "goroutine-sighandler: Signal handler initialized for %d (%v)\n", sig, sig)
+	if debugMode >= 2 {
+		log.Printf("goroutine-sighandler: Signal handler initialized for %d (%v)\n", sig, sig)
 	}
 	wgSigInit.Done() // Signal parent goroutine that we have completed initializing signal handling
 	allDone := false
@@ -287,8 +290,8 @@ func handleSignal(info *sigInfo) {
 		info.updating.Unlock()
 		if notifyChan != nil {
 			// Notify user code via the supplied channel
-			if dbgSigHandling {
-				fmt.Fprintf(os.Stderr, "goroutine-sighandler: notifying user-specified channel of signal %d (%v)\n", sig, sig)
+			if debugMode >= 2 {
+				log.Printf("goroutine-sighandler: notifying user-specified channel of signal %d (%v)\n", sig, sig)
 			}
 			// Send to channel without blocking (same as Signal.Notify)
 			select {
@@ -301,8 +304,8 @@ func handleSignal(info *sigInfo) {
 		}
 	}
 	signal.Stop(sigchan) // No more signal notification for this signal channel
-	if dbgSigHandling {
-		fmt.Fprintf(os.Stderr, "goroutine-sighandler: exiting goroutine for signal %d (%v)\n", sig, sig)
+	if debugMode >= 2 {
+		log.Printf("goroutine-sighandler: exiting goroutine for signal %d (%v)\n", sig, sig)
 	}
 	info.shutdownDone.Store(true)  // Indicate this channel is closed
 	ydbShutdownCheck <- struct{}{} // Notify shutdownSignalGoroutines that it needs to check if all channels closed now
@@ -327,8 +330,8 @@ func shutdownSignalGoroutines() {
 	shutdownSigGoroutinesMutex.Lock()
 	if shutdownSigGoroutines { // Nothing to do if already done
 		shutdownSigGoroutinesMutex.Unlock()
-		if dbgSigHandling {
-			fmt.Println("shutdownSignalGoroutines: Bypass shutdownSignalGoroutines as it has already run")
+		if debugMode >= 2 {
+			log.Println("shutdownSignalGoroutines: Bypass shutdownSignalGoroutines as it has already run")
 		}
 		return
 	}
@@ -368,21 +371,21 @@ func shutdownSignalGoroutines() {
 	}()
 	select {
 	case <-doneChan: // All signal monitoring goroutines are shutdown or are busy!
-		if dbgSigHandling {
-			fmt.Fprintln(os.Stderr, "shutdownSignalGoroutines: All signal goroutines successfully closed or active")
+		if debugMode >= 2 {
+			log.Println("shutdownSignalGoroutines: All signal goroutines successfully closed or active")
 		}
 	case <-time.After(MaxSigShutdownWait):
 		// Notify syslog that this timeout happened
-		if dbgSigHandling {
-			fmt.Fprintln(os.Stderr, "shutdownSignalGoroutines: Timeout! Some signal goroutines did not shutdown")
+		if debugMode >= 2 {
+			log.Println("shutdownSignalGoroutines: Timeout! Some signal goroutines did not shutdown")
 		}
 		syslogEntry("Shutdown of signal goroutines timed out")
 	}
 	shutdownSigGoroutines = true
 	shutdownSigGoroutinesMutex.Unlock()
 	// All signal routines should be finished or otherwise occupied
-	if dbgSigHandling {
-		fmt.Fprintln(os.Stderr, "shutdownSignalGoroutines: Channel closings complete")
+	if debugMode >= 2 {
+		log.Println("shutdownSignalGoroutines: Channel closings complete")
 	}
 }
 

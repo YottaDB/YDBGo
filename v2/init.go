@@ -15,8 +15,7 @@
 package yottadb
 
 import (
-	"fmt"
-	"os"
+	"log"
 	"strconv"
 	"strings"
 	"sync"
@@ -214,8 +213,8 @@ func Shutdown(handle *DB) error {
 		return nil
 	}
 
-	if dbgSigHandling {
-		fmt.Fprintln(os.Stderr, "Exit(): YDB Engine shutdown started")
+	if debugMode >= 2 {
+		log.Println("Exit(): YDB Engine shutdown started")
 	}
 	// When we run ydb_exit(), set up a timer that will pop if ydb_exit() gets stuck in a deadlock or whatever. We could
 	// be running after some fatal error has occurred so things could potentially be fairly screwed up and ydb_exit() may
@@ -253,8 +252,8 @@ func Shutdown(handle *DB) error {
 		// We don't really care at this point what the return code is as we're just trying to run things down the
 		// best we can as this is the end of using the YottaDB engine in this process.
 	case <-time.After(exitWait):
-		if dbgSigHandling {
-			fmt.Fprintln(os.Stderr, "Shutdown(): Wait for ydb_exit() expired")
+		if debugMode >= 2 {
+			log.Println("Shutdown(): Wait for ydb_exit() expired")
 		}
 		if !ydbSigPanicCalled.Load() {
 			// If we panic'd due to a signal, we definitely have run the exit handler as it runs before the panic is
