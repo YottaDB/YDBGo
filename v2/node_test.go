@@ -129,6 +129,16 @@ func TestSetGet(t *testing.T) {
 	assert.Equal(t, "5", n.Get())
 	n.Set(5.6)
 	assert.Equal(t, "5.6", n.Get())
+
+	n.Set("abc")
+	assert.Equal(t, 0, n.GetInt())
+	assert.Equal(t, float64(0), n.GetFloat())
+	n.Set("-12")
+	assert.Equal(t, -12, n.GetInt())
+	assert.Equal(t, float64(-12), n.GetFloat())
+	n.Set("-12abc")
+	assert.Equal(t, 0, n.GetInt())
+	assert.Equal(t, float64(0), n.GetFloat())
 }
 
 func TestData(t *testing.T) {

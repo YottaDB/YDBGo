@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"iter"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 	"unsafe"
@@ -316,6 +317,34 @@ func (n *Node) Get(defaultValue ...string) string {
 	r := C.GoStringN(cconn.value.buf_addr, C.int(cconn.value.len_used))
 	runtime.KeepAlive(n) // ensure n sticks around until we've finished copying data from it's C allocation
 	return r
+}
+
+// GetInt fetches and returns the value of a database node as an integer.
+// Return zero if the node's value does not exist or is not convertable to an integer.
+func (n *Node) GetInt() int {
+	val := n.Get()
+	num, err := strconv.ParseInt(val, 10, 0)
+	if err != nil {
+		if _, ok := err.(*strconv.NumError); !ok {
+			panic(err) // unknown error unrelated to conversion
+		}
+		return 0
+	}
+	return int(num)
+}
+
+// GetFloat fetches and returns the value of a database node as a float64.
+// Return zero if the node's value does not exist or is not convertable to float64.
+func (n *Node) GetFloat() float64 {
+	val := n.Get()
+	num, err := strconv.ParseFloat(val, 64)
+	if err != nil {
+		if _, ok := err.(*strconv.NumError); !ok {
+			panic(err) // unknown error unrelated to conversion
+		}
+		return 0
+	}
+	return num
 }
 
 // GetBytes is the same as [Node.Get] except that it accepts and returns []byte slices rather than strings.
