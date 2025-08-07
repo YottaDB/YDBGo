@@ -58,7 +58,7 @@ type Node struct {
 	// Node type wraps a C.node struct in a Go struct so Go can add methods to it.
 	// Pointer to C.node rather than the item itself so we can point to it from C without Go moving it.
 	cnode   *C.node
-	conn    *Conn // Node.conn points to the Go conn; Node.cnode.conn will point directly to the C.conn
+	Conn    *Conn // Node.Conn points to the Go conn; Node.cnode.conn will point directly to the C.conn
 	mutable bool  // Whether the node may be altered for fast iteration
 }
 
@@ -114,7 +114,7 @@ func (conn *Conn) _Node(varname any, subscripts []any) (n *Node) {
 		C.free(unsafe.Pointer(cnode))
 	}, n.cnode)
 
-	n.conn = conn
+	n.Conn = conn
 	cnode := n.cnode
 	cnode.conn = conn.cconn // point to the C version of the conn
 	cnode.len = C.int(len(subscripts) + firstLen)
@@ -171,7 +171,7 @@ func (conn *Conn) CloneNode(n *Node) *Node {
 // Child creates a child node of parent that represents parent with subscripts appended.
 //   - [Node.Clone]() without parameters is equivalent to [Node.Child]() without parameters.
 func (n *Node) Child(subscripts ...any) (child *Node) {
-	return n.conn._Node(n, subscripts)
+	return n.Conn._Node(n, subscripts)
 }
 
 // Clone creates an immutable copy of node.
@@ -179,7 +179,7 @@ func (n *Node) Child(subscripts ...any) (child *Node) {
 //
 // See [Node.IsMutable]() for notes on mutability.
 func (n *Node) Clone() (clone *Node) {
-	return n.conn._Node(n, nil)
+	return n.Conn._Node(n, nil)
 }
 
 // Subscripts returns a string that holds the specified varname or subscript of the given node.
@@ -227,7 +227,7 @@ func (n *Node) String() string {
 		if i == 1 {
 			bld.WriteString("(")
 		}
-		bld.WriteString(n.conn.Quote(s))
+		bld.WriteString(n.Conn.Quote(s))
 		if i == len(subs)-1 {
 			bld.WriteString(")")
 		} else {
@@ -276,10 +276,10 @@ func (n *Node) Dump(args ...int) string {
 		bld.WriteString("=")
 		val := node.Get("<Variable '" + node.Subscript(0) + "' deleted while iterating it>")
 		if maxString != -1 && len(val) > maxString {
-			bld.WriteString(node.conn.Quote(val[:maxString]))
+			bld.WriteString(node.Conn.Quote(val[:maxString]))
 			bld.WriteString("...")
 		} else {
-			bld.WriteString(node.conn.Quote(val))
+			bld.WriteString(node.Conn.Quote(val))
 		}
 		bld.WriteString("\n")
 	}
@@ -291,11 +291,11 @@ func (n *Node) Dump(args ...int) string {
 func (n *Node) Set(val any) {
 	cnode := n.cnode // access C equivalents of Go types
 	cconn := cnode.conn
-	n.conn.setAnyValue(val)
-	n.conn.prepAPI()
+	n.Conn.setAnyValue(val)
+	n.Conn.prepAPI()
 	status := C.ydb_set_st(cconn.tptoken, &cconn.errstr, &cnode.buffers, cnode.len-1, bufferIndex(&cnode.buffers, 1), &cconn.value)
 	if status != YDB_OK {
-		panic(n.conn.lastError(status))
+		panic(n.Conn.lastError(status))
 	}
 }
 
@@ -397,19 +397,19 @@ func (n *Node) LookupBytes() ([]byte, bool) {
 func (n *Node) _Lookup() bool {
 	cnode := n.cnode // access C equivalents of Go types
 	cconn := cnode.conn
-	n.conn.prepAPI()
+	n.Conn.prepAPI()
 	status := C.ydb_get_st(cconn.tptoken, &cconn.errstr, &cnode.buffers, cnode.len-1, bufferIndex(&cnode.buffers, 1), &cconn.value)
 	if status == ydberr.INVSTRLEN {
 		// Allocate more space and retry the call
-		n.conn.ensureValueSize(int(cconn.value.len_used))
-		n.conn.prepAPI()
+		n.Conn.ensureValueSize(int(cconn.value.len_used))
+		n.Conn.prepAPI()
 		status = C.ydb_get_st(cconn.tptoken, &cconn.errstr, &cnode.buffers, cnode.len-1, bufferIndex(&cnode.buffers, 1), &cconn.value)
 	}
 	if status == ydberr.GVUNDEF || status == ydberr.LVUNDEF || status == ydberr.INVSVN {
 		return false
 	}
 	if status != YDB_OK {
-		panic(n.conn.lastError(status))
+		panic(n.Conn.lastError(status))
 	}
 	return true
 }
@@ -425,10 +425,10 @@ func (n *Node) data() int {
 	cnode := n.cnode // access C equivalents of Go types
 	cconn := cnode.conn
 	var val C.uint
-	n.conn.prepAPI()
+	n.Conn.prepAPI()
 	status := C.ydb_data_st(cconn.tptoken, &cconn.errstr, &cnode.buffers, cnode.len-1, bufferIndex(&cnode.buffers, 1), &val)
 	if status != YDB_OK {
-		panic(n.conn.lastError(status))
+		panic(n.Conn.lastError(status))
 	}
 	return int(val)
 }
@@ -468,10 +468,10 @@ func (n *Node) HasNone() bool {
 func (n *Node) Kill() {
 	cnode := n.cnode // access C equivalents of Go types
 	cconn := cnode.conn
-	n.conn.prepAPI()
+	n.Conn.prepAPI()
 	status := C.ydb_delete_st(cconn.tptoken, &cconn.errstr, &cnode.buffers, cnode.len-1, bufferIndex(&cnode.buffers, 1), C.YDB_DEL_TREE)
 	if status != YDB_OK {
-		panic(n.conn.lastError(status))
+		panic(n.Conn.lastError(status))
 	}
 }
 
@@ -480,10 +480,10 @@ func (n *Node) Kill() {
 func (n *Node) Clear() {
 	cnode := n.cnode // access C equivalents of Go types
 	cconn := cnode.conn
-	n.conn.prepAPI()
+	n.Conn.prepAPI()
 	status := C.ydb_delete_st(cconn.tptoken, &cconn.errstr, &cnode.buffers, cnode.len-1, bufferIndex(&cnode.buffers, 1), C.YDB_DEL_NODE)
 	if status != YDB_OK {
-		panic(n.conn.lastError(status))
+		panic(n.Conn.lastError(status))
 	}
 }
 
@@ -496,15 +496,15 @@ func (n *Node) Incr(amount any) string {
 	cnode := n.cnode // access C equivalents of Go types
 	cconn := cnode.conn
 
-	n.conn.setAnyValue(amount)
+	n.Conn.setAnyValue(amount)
 	if cconn.value.len_used == 0 {
 		panic(errorf(ydberr.IncrementEmpty, `cannot increment by the empty string ""`))
 	}
 
-	n.conn.prepAPI()
+	n.Conn.prepAPI()
 	status := C.ydb_incr_st(cconn.tptoken, &cconn.errstr, &cnode.buffers, cnode.len-1, bufferIndex(&cnode.buffers, 1), &cconn.value, &cconn.value)
 	if status != YDB_OK {
-		panic(n.conn.lastError(status))
+		panic(n.Conn.lastError(status))
 	}
 
 	valuestring := C.GoStringN(cconn.value.buf_addr, C.int(cconn.value.len_used))
@@ -530,7 +530,7 @@ func (n *Node) Lock(timeout ...time.Duration) bool {
 	}
 
 	for {
-		n.conn.prepAPI()
+		n.Conn.prepAPI()
 		status := C.ydb_lock_incr_st(cconn.tptoken, &cconn.errstr, timeoutNsec, &cnode.buffers, cnode.len-1, bufferIndex(&cnode.buffers, 1))
 		if status == YDB_OK {
 			return true
@@ -539,7 +539,7 @@ func (n *Node) Lock(timeout ...time.Duration) bool {
 			return false
 		}
 		if status != YDB_OK {
-			panic(n.conn.lastError(status))
+			panic(n.Conn.lastError(status))
 		}
 	}
 }
@@ -551,10 +551,10 @@ func (n *Node) Unlock() {
 	cnode := n.cnode // access C equivalents of Go types
 	cconn := cnode.conn
 
-	n.conn.prepAPI()
+	n.Conn.prepAPI()
 	status := C.ydb_lock_decr_st(cconn.tptoken, &cconn.errstr, &cnode.buffers, cnode.len-1, bufferIndex(&cnode.buffers, 1))
 	if status != YDB_OK {
-		panic(n.conn.lastError(status))
+		panic(n.Conn.lastError(status))
 	}
 }
 
@@ -576,7 +576,7 @@ func (n *Node) Mutate(val any) *Node {
 		strs := stringArrayToAnyArray(n.Subscripts())
 		// Overallocate by appending preallocSubscript to value
 		strs[len(strs)-1] = value + preallocSubscript
-		retNode = n.conn._Node(strs[0], strs[1:])
+		retNode = n.Conn._Node(strs[0], strs[1:])
 		retNode.mutable = true
 		lastbuf := bufferIndex(&retNode.cnode.buffers, len(strs)-1)
 		lastbuf.len_used = C.uint(len(value))
@@ -612,7 +612,7 @@ func (n *Node) _next(reverse bool) (string, bool) {
 
 	var status C.int
 	for range 2 {
-		n.conn.prepAPI()
+		n.Conn.prepAPI()
 		if reverse {
 			status = C.ydb_subscript_previous_st(cconn.tptoken, &cconn.errstr, &cnode.buffers, cnode.len-1, bufferIndex(&cnode.buffers, 1), &cconn.value)
 		} else {
@@ -620,7 +620,7 @@ func (n *Node) _next(reverse bool) (string, bool) {
 		}
 		if status == ydberr.INVSTRLEN {
 			// Allocate more space and retry the call
-			n.conn.ensureValueSize(int(cconn.value.len_used))
+			n.Conn.ensureValueSize(int(cconn.value.len_used))
 			continue
 		}
 		break
@@ -630,7 +630,7 @@ func (n *Node) _next(reverse bool) (string, bool) {
 		return "", false
 	}
 	if status != YDB_OK {
-		panic(n.conn.lastError(status))
+		panic(n.Conn.lastError(status))
 	}
 	r := C.GoStringN(cconn.value.buf_addr, C.int(cconn.value.len_used))
 	runtime.KeepAlive(n) // ensure n sticks around until we've finished copying data from it's C allocation
@@ -742,7 +742,7 @@ func (n *Node) _treeNext(reverse bool) *Node {
 	var status C.int
 	for {
 		retSubs = retNode.cnode.len - 1 // -1 because cnode counts the varname as a subscript and ydb_node_next_st() does not
-		n.conn.prepAPI()
+		n.Conn.prepAPI()
 		if reverse {
 			status = C.ydb_node_previous_st(cconn.tptoken, &cconn.errstr, &cnode.buffers, cnode.len-1, bufferIndex(&cnode.buffers, 1), &retSubs, bufferIndex(&retNode.cnode.buffers, 1))
 		} else {
@@ -779,13 +779,13 @@ func (n *Node) _treeNext(reverse bool) *Node {
 		return nil
 	}
 	if status != YDB_OK {
-		panic(n.conn.lastError(status))
+		panic(n.Conn.lastError(status))
 	}
 	retNode.cnode.len = C.int(retSubs + 1) // +1 because cnode counts the varname as a subscript and ydb_node_next_st() does not
 	// if we malloced anything, make sure we take a copy of it before defer runs to free the mallocs on return
 	if malloced {
 		strings := stringArrayToAnyArray(retNode.Subscripts())
-		retNode = n.conn._Node(strings[0], strings[1:])
+		retNode = n.Conn._Node(strings[0], strings[1:])
 	}
 	return retNode
 }

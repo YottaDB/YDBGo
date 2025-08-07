@@ -31,24 +31,24 @@ func TestCloneNode(t *testing.T) {
 
 	// Make sure the LVUNDEF error ends with "var1"
 	n1.Get()
-	status := n1.conn.lastCode()
-	err := n1.conn.lastError(status)
+	status := n1.Conn.lastCode()
+	err := n1.Conn.lastError(status)
 	assert.Contains(t, err.Error(), ": var1")
 
 	// Make sure conn2 LVUNDEF error returns "var2"
 	n2.Get()
-	status = n1.conn.lastCode()
-	err = n2.conn.lastError(status)
+	status = n1.Conn.lastCode()
+	err = n2.Conn.lastError(status)
 	assert.Contains(t, err.Error(), ": var2")
 	// Alter tptoken in n2's conn
-	n2.conn.cconn.tptoken++
+	n2.Conn.cconn.tptoken++
 
 	// Above should not have changed the last message that's still stored in conn1
-	status = n1.conn.lastCode()
-	err = n1.conn.lastError(status)
+	status = n1.Conn.lastCode()
+	err = n1.Conn.lastError(status)
 	assert.Contains(t, err.Error(), ": var1")
 	// Check that a changed tptoken in n2's conn doesn't affect n1's conn
-	assert.NotEqual(t, n1.conn.cconn.tptoken, n2.conn.cconn.tptoken)
+	assert.NotEqual(t, n1.Conn.cconn.tptoken, n2.Conn.cconn.tptoken)
 }
 
 func (n *Node) checkBuffers(t *testing.T) {
