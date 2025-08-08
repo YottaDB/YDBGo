@@ -73,9 +73,9 @@ func (n *Node) checkBuffers(t *testing.T) {
 func TestChild(t *testing.T) {
 	conn := SetupTest(t)
 	n1 := conn.Node("var", "abc")
-	n2 := n1.Mutate("def")
+	n2 := n1.MutableChild().Mutate("def")
 	n3 := n2.Child("ghi", "jkl")
-	n4 := n3.Mutate("mno")
+	n4 := n3.MutableChild().Mutate("mno")
 	n1.checkBuffers(t)
 	n2.checkBuffers(t)
 	n3.checkBuffers(t)
@@ -98,7 +98,7 @@ func TestSubscript(t *testing.T) {
 func TestMutateNode(t *testing.T) {
 	conn := SetupTest(t)
 	n := conn.Node("var1", "asdf")
-	n2 := n.Mutate("jkl")
+	n2 := n.MutableChild().Mutate("jkl")
 	n3 := n2.Child("qwerty")
 	assert.Equal(t, `var1("jkl","qwerty")`, n3.String())
 }
@@ -299,19 +299,22 @@ func ExampleNode_Children() {
 	// Person fields: (address age occupation sex )
 }
 
-// Example of getting a mutable version of node
+// Example of fast iteration of a node to increment only children with subscripts 0..999999.
 func ExampleNode_Mutate() {
 	conn := NewConn()
-	n := conn.Node("X", 1, 2, 3)
-	mutation1 := n.Mutate(4)
-	mutation2 := n.Mutate("text")
-	fmt.Println(n)
-	fmt.Println(mutation1)
-	fmt.Println(mutation2)
+	n := conn.Node("counter").MutableChild("")
+	n.Mutate(1000000).Set("untouched")
+	for i := range 1000000 {
+		n.Mutate(i).Incr(1)
+	}
+
+	fmt.Printf("%s: %s\n", n.Mutate(0), n.Get())
+	fmt.Printf("%s: %s\n", n.Mutate(999999), n.Get())
+	fmt.Printf("%s: %s\n", n.Mutate(1000000), n.Get())
 	// Output:
-	// X(1,2,3)
-	// X(1,2,4)
-	// X(1,2,"text")
+	// counter(0): 1
+	// counter(999999): 1
+	// counter(1000000): untouched
 }
 
 // Example of traversing a database tree

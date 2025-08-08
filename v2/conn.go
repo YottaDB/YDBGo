@@ -15,6 +15,7 @@
 package yottadb
 
 import (
+	"reflect"
 	"runtime"
 	"runtime/cgo"
 	"strconv"
@@ -172,7 +173,7 @@ func anyToString(val any) string {
 	case float64:
 		return strconv.FormatFloat(n, 'G', -1, 64)
 	default:
-		panic(errorf(ydberr.InvalidValueType, "subscript (%v) must be a string, number, or []byte slice", val))
+		panic(errorf(ydberr.InvalidValueType, "subscript (%v) must be a string, number, or []byte slice but is %s", val, reflect.TypeOf(val)))
 	}
 }
 
@@ -208,7 +209,7 @@ func (conn *Conn) setAnyValue(val any) {
 	case float64:
 		str = strconv.FormatFloat(n, 'G', -1, 64)
 	default:
-		panic(errorf(ydberr.InvalidValueType, "value (%v) must be a string, number, or []byte slice", val))
+		panic(errorf(ydberr.InvalidValueType, "value (%v) must be a string, number, or []byte slice but is %s", val, reflect.TypeOf(val)))
 	}
 	// The following is equivalent to setValue() but without the size check which is unnecessary since NewConn allocates at least overalloc size
 	C.fill_buffer(&conn.cconn.value, str)

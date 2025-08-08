@@ -26,6 +26,7 @@ const (
 	InvalidStringLength          // String is too long. Same as YottaDB INVSTRLEN but caught in YDBGo
 	InvalidValueType             // Value type is not a string or number
 	InvalidSubscriptIndex        // Subscript index is out of bounds
+	MutateImmutableNode          // Attempt to mutate an immutable node
 	TooManyParameters            // Too many parameters supplied to function
 	OutOfMemory                  // Not enough memory for attempted allocation
 	YDBMessageInvalid            // Failure decoding message prefixes from YottaDB

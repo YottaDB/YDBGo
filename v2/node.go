@@ -558,27 +558,52 @@ func (n *Node) Unlock() {
 	}
 }
 
-// Mutate returns a mutable version of node n with the final subscript changed to the given value.
-//   - Only creates a clone of node if the supplied node is not already mutable or doesn't have enough space for the changed subscript.
+// MutableChild returns a mutable copy of node n with optional subscripts added.
+// Equivalent to [Node.Child] except that it returns a mutable node ready for iteration.
+// Since creating new nodes is expensive, this method may be used with [Node.Mutate] for fast iteraton by varying its last subscript.
+func (n *Node) MutableChild(subscripts ...any) *Node {
+	subs := stringArrayToAnyArray(n.Subscripts())
+	subs = append(subs, subscripts...)
+	last := len(subs) - 1
+	value := anyToString(subs[last])
+	// Overallocate by appending preallocSubscript to final subscript
+	subs[last] = value + preallocSubscript
+	retNode := n.Conn._Node(subs[0], subs[1:])
+	retNode.mutable = true
+	// Alter last node length to exclude extra preallocated space
+	lastbuf := bufferIndex(&retNode.cnode.buffers, last)
+	lastbuf.len_used = C.uint(len(value))
+	return retNode
+}
+
+// Mutate returns a node n with the final subscript changed to the given value.
+// Since creating new nodes is expensive, this method may be used for fast iteration by varying its last subscript.
+//   - Only creates a clone of node if the supplied node doesn't have enough space for the changed subscript.
+//   - Only operates on mutable nodes created by [Node.MutableChild] or [Node.Children].
+//   - Panics with ydberr.MutateImmutableNode if called with an immutable node.
 //
-// Since creating new nodes is expensive, this method may be used for a fast iterator. For example, to kill nodes var(0..1000000):
+// Example to increment nodes counter(0..1000000):
 //
-//	n := conn.Node("var", "").Mutate("")
+//	n := conn.Node("counter").MutableChild("")
 //	for i := range 1000000 {
-//	  n.Mutate(strconv.Itoa(i)).kill()
+//		n.Mutate(i).Incr(1)
 //	}
 func (n *Node) Mutate(val any) *Node {
+	if !n.IsMutable() {
+		panic(errorf(ydberr.MutateImmutableNode, "cannot mutate an immutable node %s", n))
+	}
 	value := anyToString(val)
 	cnode := n.cnode // access C equivalents of Go types
 	retNode := n
 	lastbuf := bufferIndex(&cnode.buffers, int(cnode.len-1))
-	if !n.IsMutable() || int(lastbuf.len_alloc) < len(value) {
-		strs := stringArrayToAnyArray(n.Subscripts())
+	if int(lastbuf.len_alloc) < len(value) {
+		subs := stringArrayToAnyArray(n.Subscripts())
 		// Overallocate by appending preallocSubscript to value
-		strs[len(strs)-1] = value + preallocSubscript
-		retNode = n.Conn._Node(strs[0], strs[1:])
+		last := len(subs) - 1
+		subs[last] = value + preallocSubscript
+		retNode = n.Conn._Node(subs[0], subs[1:])
 		retNode.mutable = true
-		lastbuf := bufferIndex(&retNode.cnode.buffers, len(strs)-1)
+		lastbuf := bufferIndex(&retNode.cnode.buffers, last)
 		lastbuf.len_used = C.uint(len(value))
 	} else {
 		C.memcpy(unsafe.Pointer(lastbuf.buf_addr), unsafe.Pointer(unsafe.StringData(value)), C.size_t(len(value)))
@@ -661,6 +686,9 @@ func (n *Node) Next() *Node {
 	if !ok {
 		return nil
 	}
+	if !n.IsMutable() {
+		n = n.MutableChild()
+	}
 	return n.Mutate(next)
 }
 
@@ -671,6 +699,9 @@ func (n *Node) Prev() *Node {
 	if !ok {
 		return nil
 	}
+	if !n.IsMutable() {
+		n = n.MutableChild()
+	}
 	return n.Mutate(next)
 }
 
@@ -680,11 +711,7 @@ func (n *Node) Prev() *Node {
 //
 // See further documentation at Iterate().
 func (n *Node) _children(reverse bool) iter.Seq2[*Node, string] {
-	// The next 3 lines are functionally n := n.Child("") but result in faster subsequent code because they create a mutable
-	// node with enough spare subscript space to avoid Node.Next() having to immediately create a mutable node.
-	n = n.Child(preallocSubscript)
-	n.mutable = true
-	n = n.Mutate("")
+	n = n.MutableChild("")
 
 	return func(yield func(*Node, string) bool) {
 		for {
@@ -735,8 +762,8 @@ func (n *Node) _treeNext(reverse bool) *Node {
 	cnode := n.cnode // access C equivalents of Go types
 	cconn := cnode.conn
 
-	// Preallocate child subscripts of this size as a reasonable guess of space to fit most subscripts
-	retNode := n.Child(preallocSubscript) // Create new node to store result with a single preallocated child
+	// Create new node to store result with a single preallocated child as an initial guess of space needed.
+	retNode := n.Child(preallocSubscript)
 	var retSubs C.int
 	var malloced bool // whether we had to malloc() and hence defer free()
 	var status C.int
@@ -750,7 +777,7 @@ func (n *Node) _treeNext(reverse bool) *Node {
 		}
 		if status == ydberr.INSUFFSUBS {
 			if debugMode {
-				fmt.Printf("INSUFFSUBS: %d (need %d)\n", retNode.cnode.len-1, retSubs)
+				fmt.Printf("INSUFFSUBS: %d (need %d subscripts) so allocating more\n", retNode.cnode.len-1, retSubs)
 			}
 			extraStrings := make([]any, retSubs-(retNode.cnode.len-1))
 			// Pre-fill node subscripts
@@ -762,7 +789,7 @@ func (n *Node) _treeNext(reverse bool) *Node {
 		}
 		if status == ydberr.INVSTRLEN {
 			if debugMode {
-				fmt.Printf("INVSTRLEN subscript %d\n", retSubs)
+				fmt.Printf("INVSTRLEN subscript %d so reallocating\n", retSubs)
 			}
 			buf := bufferIndex(&retNode.cnode.buffers, int(retSubs+1)) // +1 because cnode counts the varname as a subscript and ydb_node_next_st() does not
 			len := buf.len_used
@@ -791,7 +818,8 @@ func (n *Node) _treeNext(reverse bool) *Node {
 }
 
 // TreeNext returns the next node in the traversal of a database tree of a database variable.
-// Equivalent to the M function [$QUERY()]. It yields immutable nodes instances.
+// Equivalent to the M function [$QUERY()].
+//   - It yields immutable nodes.
 //   - The next node is chosen in depth-first order (i.e by descending deeper into the subscript tree before moving to the next node at the same level).
 //   - The order of returned nodes matches the collation order of the M database.
 //   - The node path supplied does not need to exist in the database to find the next match.
