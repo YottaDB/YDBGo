@@ -251,30 +251,37 @@ func (n *Node) GoString() string {
 }
 
 // Dump returns a string representation of this database node and subtrees with their contents in YottaDB ZWRITE format.
-// Output subscripts and values as unquoted numbers if they convert to float64 and back without change (using [Node.Quote]).
-// Output strings in YottaDB ZWRITE format.
+// For example output, see [Node.GoString]. Output lines are formatted as follows:
+//   - Output subscripts and values as unquoted numbers if they convert to float64 and back without change (using [Node.Quote]).
+//   - Output strings in YottaDB ZWRITE format.
+//   - Every line output ends with "\n", including the final line.
+//   - If the receiver is nil, output is "<nil>\n"
+//   - If node has no value and no children, outputs the empty string.
+//
 // See [Node.GoString] for an example of the output format.
 // Two optional integers may be supplied to specify maximums where both default to -1:
-//   - first specifies the maximum number of lines to output, where -1 means infinite. If lines are truncated, the output ends with "\n...\n".
-//   - second specifies the maximum number of characters at which to truncate values prior to output where -1 means infinite.
+//   - first parameter specifies the maximum number of lines to output (not including a file "...\n" line indicating truncation). A maximum of -1 means infinite.
+//     If lines are truncated, an additional line "...\n" is added so that the output ends with "\n...\n". A maximum of 0 lines is treated as 1.
+//   - second parameter specifies the maximum number of characters at which to truncate values prior to output where -1 means infinite.
 //     Truncated values are output with suffix "..." after any ending quotes. Note that conversion to ZWRITE format may expand this.
 func (n *Node) Dump(args ...int) string {
-	var bld strings.Builder
 	if len(args) > 2 {
 		panic(errorf(ydberr.TooManyParameters, "%d parameters supplied to Dump() which only takes 2", len(args)))
 	}
 	args = append(args, -1, -1) // defaults
 	maxLines, maxString := args[0], args[1]
-	i := 0
-	for node := range n.Tree() {
-		i++
-		if maxLines != -1 && i > maxLines {
-			bld.WriteString("...\n")
-			break
-		}
+	if maxLines == 0 {
+		maxLines = 1 // This ensures ending is always "\n...\n" whenever lines are truncated
+	}
+	if n == nil {
+		return "<nil>\n"
+	}
+
+	var bld strings.Builder
+	// local func to output one line of the tree
+	dumpLine := func(node *Node, val string) {
 		bld.WriteString(node.String())
 		bld.WriteString("=")
-		val := node.Get("<Variable '" + node.Subscript(0) + "' deleted while iterating it>")
 		if maxString != -1 && len(val) > maxString {
 			bld.WriteString(node.Conn.Quote(val[:maxString]))
 			bld.WriteString("...")
@@ -282,6 +289,26 @@ func (n *Node) Dump(args ...int) string {
 			bld.WriteString(node.Conn.Quote(val))
 		}
 		bld.WriteString("\n")
+	}
+
+	lines := 0
+	val, ok := n.Lookup()
+	if ok {
+		lines++
+		dumpLine(n, val)
+	}
+	for node := range n.Tree() {
+		val, ok = node.Lookup()
+		if !ok {
+			// Node subscript was deleted while iterating it, so don't print that subscript
+			continue
+		}
+		lines++
+		if maxLines != -1 && lines > maxLines {
+			bld.WriteString("...\n")
+			break
+		}
+		dumpLine(node, val)
 	}
 	return bld.String()
 }

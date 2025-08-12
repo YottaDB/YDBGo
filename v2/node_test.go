@@ -222,6 +222,7 @@ func TestIncr(t *testing.T) {
 // Example of getting next subscript
 func ExampleNode_Next() {
 	conn := NewConn()
+	conn.KillAllLocals()
 	n := conn.Node("X", 1)
 	n.Child(2, "3").Set("123")
 	n.Child(2, 3, 7).Set(1237)
@@ -261,6 +262,7 @@ func ExampleNode_Next_varnames() {
 // Example of getting all child nodes
 func ExampleNode_Children() {
 	conn := NewConn()
+	conn.KillAllLocals()
 	n := conn.Node("X", 1)
 	n.Child(2, 3).Set(123)
 	n.Child(2, 4).Set(124)
@@ -320,6 +322,7 @@ func ExampleNode_Mutate() {
 // Example of traversing a database tree
 func ExampleNode_GoString() {
 	conn := NewConn()
+	conn.KillAllLocals()
 	n := conn.Node("tree", 1)
 	n.Child(2, 3).Set(123)
 	n.Child(2, 3, 7).Set("Hello!")
@@ -337,7 +340,9 @@ func ExampleNode_GoString() {
 // Example of traversing a database tree
 func ExampleNode_Dump() {
 	conn := NewConn()
-	n := conn.Node("tree", 1)
+	conn.KillAllLocals()
+	trunk := conn.Node("tree")
+	n := trunk.Child(1)
 	n.Child(6).Set(16)
 	n.Child(2, 3).Set(123)
 	n.Child(2, 3, 7).Set("Hello!")
@@ -348,8 +353,9 @@ func ExampleNode_Dump() {
 
 	fmt.Println(n.Dump())
 
+	trunk.Set("trunk")
 	n.Child(2, 3).Set("~ A\x00\x7f" + strings.Repeat("A", 1000))
-	fmt.Print(n.Dump(2, 8))
+	fmt.Print(trunk.Dump(3, 8))
 
 	// Output:
 	// tree(1,2,3)=123
@@ -358,6 +364,7 @@ func ExampleNode_Dump() {
 	// tree(1,2,5,9)=1259
 	// tree(1,6)=16
 	//
+	// tree="trunk"
 	// tree(1,2,3)="~ A"_$C(0,127)_"AAA"...
 	// tree(1,2,3,7)="Hello!"
 	// ...
@@ -366,6 +373,7 @@ func ExampleNode_Dump() {
 // Example of traversing a database tree
 func ExampleNode_TreeNext() {
 	conn := NewConn()
+	conn.KillAllLocals()
 	n := conn.Node("tree", 1)
 	n.Child(2, 3).Set(123)
 	n.Child(2, 3, 7).Set(1237)
@@ -404,6 +412,7 @@ func ExampleNode_TreeNext() {
 // Example of traversing a database tree
 func ExampleNode_Tree() {
 	conn := NewConn()
+	conn.KillAllLocals()
 	n := conn.Node("tree", 1)
 	n.Child(2, 3).Set(123)
 	n.Child(2, 3, 7).Set(1237)
@@ -427,6 +436,7 @@ func ExampleNode_Tree() {
 // Test cases that ExampleNode_TreeNext() did not catch
 func TestTreeNext(t *testing.T) {
 	tconn := NewConn()
+	tconn.KillAllLocals()
 
 	// Ensure TreeNext will work even if it has to allocate new subscript memory up to the size of YDB_MAX_STR
 	bigstring := strings.Repeat("A", YDB_MAX_STR)
