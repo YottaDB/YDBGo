@@ -56,9 +56,10 @@ func bufferIndex(buf *C.ydb_buffer_t, i int) *C.ydb_buffer_t {
 type Node struct {
 	// Node type wraps a C.node struct in a Go struct so Go can add methods to it.
 	// Pointer to C.node rather than the item itself so we can point to it from C without Go moving it.
-	cnode   *C.node
-	Conn    *Conn // Node.Conn points to the Go conn; Node.cnode.conn will point directly to the C.conn
-	mutable bool  // Whether the node may be altered for fast iteration
+	cnode     *C.node
+	Conn      *Conn // Node.Conn points to the Go conn; Node.cnode.conn will point directly to the C.conn
+	mutable   bool  // Whether the node may be altered for fast iteration
+	alternate *Node // Mutated child of this node created by Index(), or nil if non exists yet; if Node is mutable, it is the immutable parent of this node
 }
 
 // Convert []string to []any.
@@ -80,51 +81,67 @@ func (conn *Conn) _Node(varname any, subscripts []any) (n *Node) {
 	// Concatenate strings the fastest Go way.
 	// This involves creating an extra copy of subscripts but is probably faster than one C.memcpy call per subscript
 	var joiner bytes.Buffer
-	var first string // first string stored in joiner
-	var firstLen int // number of subscripts in first string
-	var node1 *Node  // if varname is a node, store it in here
+	var firstLen int   // length of concatenated subscripts in varname
+	var firstCount int // number of subscripts in varname
+	var node1 *Node    // if varname is a node, store it in here
 	subs := make([]string, len(subscripts))
 	switch val := varname.(type) {
 	case *Node:
 		node1 = val
 		cnode := node1.cnode
-		firstLen = int(cnode.len)
-		firstStringAddr := cnode.buffers.buf_addr
-		lastbuf := bufferIndex(&cnode.buffers, firstLen-1)
-		// Calculate data size of all strings in node to copy = address of last string - address of first string + length of last string
-		datasize := C.uint(uintptr(unsafe.Pointer(lastbuf.buf_addr))) - C.uint(uintptr(unsafe.Pointer(firstStringAddr)))
-		datasize += lastbuf.len_used
-		first = C.GoStringN(firstStringAddr, C.int(datasize))
+		firstCount = int(cnode.len)
+		if node1.mutable {
+			// if mutable, there may be gaps between strings due to overallocation, so remove gaps by concatenating each string individually
+			for i := range int(cnode.len) {
+				buffer := bufferIndex(&cnode.buffers, i)
+				str := C.GoStringN(buffer.buf_addr, C.int(buffer.len_used))
+				joiner.WriteString(str)
+			}
+			firstLen = joiner.Len()
+		} else {
+			// if immutable, we can copy all subscripts in a single lump as there are no gaps between strings
+			firstStringAddr := cnode.buffers.buf_addr
+			lastbuf := bufferIndex(&cnode.buffers, firstCount-1)
+			// Calculate data size of all strings in node to copy: address of last string - address of first string + length of last string
+			datasize := C.uint(uintptr(unsafe.Pointer(lastbuf.buf_addr))) - C.uint(uintptr(unsafe.Pointer(firstStringAddr)))
+			datasize += lastbuf.len_used
+			first := C.GoStringN(firstStringAddr, C.int(datasize))
+			joiner.WriteString(first)
+			firstLen = len(first)
+		}
 	default:
-		first = anyToString(val)
-		firstLen = 1
+		first := anyToString(val)
+		joiner.WriteString(first)
+		firstLen = len(first)
+		firstCount = 1
 	}
-	joiner.WriteString(first)
 	for i, s := range subscripts {
 		subs[i] = anyToString(s)
 		joiner.WriteString(subs[i])
 	}
 
-	size := C.sizeof_node + C.sizeof_ydb_buffer_t*(firstLen-1+len(subscripts)) + joiner.Len()
+	size := C.sizeof_node + C.sizeof_ydb_buffer_t*(firstCount-1+len(subscripts)) + joiner.Len()
 	n = &Node{}
-	n.cnode = (*C.node)(calloc(C.size_t(size))) // must use our calloc, not malloc: see calloc doc
+	cnode := (*C.node)(calloc(C.size_t(size))) // must use our calloc, not malloc: see calloc doc
+	//The following line is already performed by calloc above so comment it out
+	//cnode.freechain = nil
+	n.cnode = cnode
 	// Queue the cleanup function to free it
 	runtime.AddCleanup(n, func(cnode *C.node) {
 		C.free(unsafe.Pointer(cnode))
-	}, n.cnode)
+	}, cnode)
 
 	n.Conn = conn
-	cnode := n.cnode
 	cnode.conn = conn.cconn // point to the C version of the conn
-	cnode.len = C.int(len(subscripts) + firstLen)
+	cnode.len = C.int(len(subscripts) + firstCount)
 
-	dataptr := unsafe.Pointer(bufferIndex(&cnode.buffers, len(subscripts)+firstLen))
+	dataptr := unsafe.Pointer(bufferIndex(&cnode.buffers, len(subscripts)+firstCount))
 	if joiner.Len() > 0 {
 		// Note: have tried to replace the following with copy() to avoid a CGo invocation, but it's slower
 		C.memcpy(dataptr, unsafe.Pointer(&joiner.Bytes()[0]), C.size_t(joiner.Len()))
 	}
 
-	// Function to each buffer to dataptr++ as I loop through strings
+	// Function to set each buffer to string[dataptr++] as I loop through strings
 	setbuf := func(buf *C.ydb_buffer_t, length C.uint) {
 		buf.buf_addr = (*C.char)(dataptr)
 		buf.len_used, buf.len_alloc = length, length
@@ -134,17 +151,17 @@ func (conn *Conn) _Node(varname any, subscripts []any) (n *Node) {
 	// Now fill in ydb_buffer_t pointers
 	if node1 != nil {
 		// First set buffers for all strings copied from parent node
-		for i := range firstLen {
+		for i := range firstCount {
 			buf := bufferIndex(&cnode.buffers, i)
 			setbuf(buf, bufferIndex(&node1.cnode.buffers, i).len_used)
 		}
 		runtime.KeepAlive(node1) // ensure node1 sticks around until we've finished copying data from it's C allocation
 	} else {
 		buf := bufferIndex(&cnode.buffers, 0)
-		setbuf(buf, C.uint(len(first)))
+		setbuf(buf, C.uint(firstLen))
 	}
 	for i, s := range subs {
-		buf := bufferIndex(&cnode.buffers, i+firstLen)
+		buf := bufferIndex(&cnode.buffers, i+firstCount)
 		setbuf(buf, C.uint(len(s)))
 	}
 	return n
@@ -584,72 +601,101 @@ func (n *Node) Unlock() {
 	}
 }
 
-// MutableChild returns a mutable copy of node n with optional subscripts added.
-// Equivalent to [Node.Child] except that it returns a mutable node ready for iteration.
-// Since creating new nodes is expensive, this method may be used with [Node.Mutate] for fast iteraton by varying its last subscript.
-func (n *Node) MutableChild(subscripts ...any) *Node {
-	subs := stringArrayToAnyArray(n.Subscripts())
-	subs = append(subs, subscripts...)
-	last := len(subs) - 1
-	value := anyToString(subs[last])
-	// Overallocate by appending preallocSubscript to final subscript
-	subs[last] = value + preallocSubscript
-	retNode := n.Conn._Node(subs[0], subs[1:])
-	retNode.mutable = true
-	// Alter last node length to exclude extra preallocated space
-	lastbuf := bufferIndex(&retNode.cnode.buffers, last)
-	lastbuf.len_used = C.uint(len(value))
-	return retNode
-}
+// This subscript string is used to preallocate subscript string space in mutable nodes that may have their final subscript name changed.
+// When it is exceeded by subsequent Node.Index() iterations, the entire node must be cloned to achieve reallocation.
+var preallocSubscript string = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 
-// Mutate returns a node n with the final subscript changed to the given value.
-// Since creating new nodes is expensive, this method may be used for fast iteration by varying its last subscript.
-//   - Only creates a clone of node if the supplied node doesn't have enough space for the changed subscript.
-//   - Only operates on mutable nodes created by [Node.MutableChild] or [Node.Children].
-//   - Panics with ydberr.MutateImmutableNode if called with an immutable node.
+// Index allows fast temporary access to subnodes referenced by the given subscripts.
+// It indexes a node object with the given subscripts and returns a mutable node object that will change next time Index is invoked on the same node.
+// Fast access is achieved by removing the overhead of creating a new node object every access, e.g. each time around a loop.
+// For example, [Node.Children] yields mutable nodes created by Index().
+// [Node.Child] should be used instead, for non-temporary access, for example, where nodes will be passed to subroutines.
+//   - Returns a mutable child of the given node with the given subscripts appended (see [Node.IsMutable] for mutability details).
 //
-// Example to increment nodes counter(0..1000000):
-//
-//	n := conn.Node("counter").MutableChild("")
-//	for i := range 1000000 {
-//		n.Mutate(i).Incr(1)
-//	}
-func (n *Node) Mutate(val any) *Node {
-	if !n.IsMutable() {
-		panic(errorf(ydberr.MutateImmutableNode, "cannot mutate an immutable node %s", n))
+// Usage is similar to [Node.Child] except that it run about 4 times as fast and returns mutable instead of immutable nodes.
+func (n *Node) Index(subscripts ...any) *Node {
+	if n.mutable {
+		// Disallow n.Index(...).Index(...) because it is obscure what database node the child object will point to if the parent index node mutates.
+		panic(errorf(ydberr.InvalidMutableOperation, "Index() is not permitted on a mutable node object (%s)", n))
 	}
-	value := anyToString(val)
-	cnode := n.cnode // access C equivalents of Go types
-	retNode := n
-	lastbuf := bufferIndex(&cnode.buffers, int(cnode.len-1))
-	if int(lastbuf.len_alloc) < len(value) {
-		subs := stringArrayToAnyArray(n.Subscripts())
-		// Overallocate by appending preallocSubscript to value
-		last := len(subs) - 1
-		subs[last] = value + preallocSubscript
-		retNode = n.Conn._Node(subs[0], subs[1:])
-		retNode.mutable = true
-		lastbuf := bufferIndex(&retNode.cnode.buffers, last)
-		lastbuf.len_used = C.uint(len(value))
+	// Check whether an existing mutable node is attached to n and whether it has space for these new subscripts
+	mutated := n.alternate
+	reallocate := true // unless we find otherwise below
+	originalSubs := int(n.cnode.len)
+
+	// Cast
+	newsubs := make([]string, len(subscripts))
+	for i, sub := range subscripts {
+		newsubs[i] = anyToString(sub)
+	}
+
+	if mutated != nil && mutated.cnode.len_allocated >= C.int(originalSubs+len(newsubs)) {
+		for i, sub := range newsubs {
+			space := bufferIndex(&mutated.cnode.buffers, int(originalSubs)+i).len_alloc
+			if int(space) < len(sub) {
+				break
+			}
+		}
+		reallocate = false
+	}
+	if reallocate {
+		subs := make([]any, len(newsubs))
+		for i := range subscripts {
+			// append preallocSubscript to each allocated subscript so that we don't have to reallocate small increases
+			subs[i] = newsubs[i] + preallocSubscript
+		}
+		mutated = n.Conn._Node(n, subs)
+		mutated.mutable = true
+		// point node.alternate to the original immutable version of the node
+		if n.mutable {
+			mutated.alternate = n.alternate
+		} else {
+			mutated.alternate = n
+		}
+		mutated.cnode.len_allocated = mutated.cnode.len
+		for i := range newsubs {
+			// remove preallocSubscript over-allocation from the end of each subscript
+			bufferIndex(&mutated.cnode.buffers, originalSubs+i).len_used -= C.uint(len(preallocSubscript))
+		}
 	} else {
-		C.memcpy(unsafe.Pointer(lastbuf.buf_addr), unsafe.Pointer(unsafe.StringData(value)), C.size_t(len(value)))
-		lastbuf.len_used = C.uint(len(value))
+		// if no need to reallocate, just store the new subscripts into mutated node
+		for i, sub := range newsubs {
+			// append preallocSubscript to each allocated subscript so that we don't have to reallocate small increases
+			buffer := bufferIndex(&mutated.cnode.buffers, originalSubs+i)
+			C.memcpy(unsafe.Pointer(buffer.buf_addr), unsafe.Pointer(unsafe.StringData(sub)), C.size_t(len(sub)))
+			buffer.len_used = C.uint(len(sub))
+		}
 	}
-	runtime.KeepAlive(n) // ensure n sticks around until we've finished copying data into it's C allocation
-	return retNode
+	return mutated
 }
 
 // IsMutable returns whether given node is mutable.
-//   - Mutable nodes are returned only by [Node.Next]() and generated by [Node.Iterate](). Mutable nodes will change their final
-//     subscript each iteration or each call to Node.Next().
-//   - If you need to take an immutable snapshot of a mutable node this may be done with [Node.Clone]().
+// Mutable nodes may have their subscripts changed each loop iteration or each call to Node.Index(). This means that
+// the same mutable node object may reference different database nodes and will not always point to the same one.
+//   - Mutable nodes are returned by [Node.Index], [Node.Next], [Node.Prev] and iterator [Node.Children].
+//   - All standard node methods operate on a mutable node.
+//   - If an immutable copy of a mutable node is required, use [Node.Clone] or [Node.Child].
+//   - If you need to take an immutable snapshot of a mutable node this may be done with [Node.Clone] or [Node.Child].
+//
+// A mutable node object is like a regular node object except that it will change to point to a different database
+// node each time [Node.Index] is invoked on its originating node object n, so if you store a reference to it,
+// that reference will no longer point to the same database node as it originally did. For example, the following
+// code will print the most recent vehicle, not the heaviest vehicle as intended, because [Node.Children]() yields
+// mutable nodes.
+//
+//	n := conn.Node("vehicles")
+//	var heaviest *yottadb.Node
+//	var maxWeight float64 = 0
+//	for vehicle := range n.Children() {
+//	  if vehicle.Index("weight").GetFloat() > maxWeight {
+//	    heaviest = vehicle
+//	    maxWeight = vehicle.Index("weight")
+//	  }
+//	}
+//	fmt.Print(heaviest.Dump())
 func (n *Node) IsMutable() bool {
 	return n.mutable
 }
-
-// This subscript name is used to preallocate subscript space in mutable nodes that may have their final subscript name changed.
-// When it is exceeded by subsequent Node.Next() iterations, the entire node must be cloned to achieve reallocation
-var preallocSubscript string = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 
 // _next returns the name of the next subscript at the same depth level as the given node.
 // This implements the logic for both Next() and Prev().
@@ -688,6 +734,30 @@ func (n *Node) _next(reverse bool) (string, bool) {
 	return r, true
 }
 
+// _Next is the same as Next but accepts a reverse flag.
+// It returns a mutable Node object pointing to the next subscript (unlike _next() which returns the next subscript as a string).
+func (n *Node) _Next(reverse bool) *Node {
+	next, ok := n._next(reverse)
+	if !ok {
+		return nil
+	}
+	if n.mutable {
+		original := n.alternate // get the original immutable parent and index that
+		if n.cnode.len != original.cnode.len+1 {
+			panic(errorf(ydberr.InvalidMutableOperation, "Next/Prev is not permitted on a mutable node object (%s) unless it is subscripted only once from its parent (%s)", n, original))
+		}
+		n = original
+	} else {
+		if n.cnode.len <= 1 {
+			// Cannot index a node without no varname, so just return a new immutable node
+			return n.Conn.Node(next)
+		}
+		subs := n.Subscripts()
+		n = n.Conn._Node(subs[0], stringArrayToAnyArray(subs[1:max(1, len(subs)-1)]))
+	}
+	return n.Index(next)
+}
+
 // Next returns a Node instance pointing to the next subscript at the same depth level.
 // Return a mutable node pointing to the database node with the next subscript after the given node, at the same depth level.
 // Unless you want to start half way through a sequence of subscripts, it's usually tidier to use Node.Iterate() instead.
@@ -708,27 +778,13 @@ func (n *Node) _next(reverse bool) (string, bool) {
 //
 // [$ORDER()]: https://docs.yottadb.com/ProgrammersGuide/functions.html#order
 func (n *Node) Next() *Node {
-	next, ok := n._next(false)
-	if !ok {
-		return nil
-	}
-	if !n.IsMutable() {
-		n = n.MutableChild()
-	}
-	return n.Mutate(next)
+	return n._Next(false)
 }
 
 // Prev is the same as Next but operates in the reverse order.
 // See [Node.Next]()
 func (n *Node) Prev() *Node {
-	next, ok := n._next(true)
-	if !ok {
-		return nil
-	}
-	if !n.IsMutable() {
-		n = n.MutableChild()
-	}
-	return n.Mutate(next)
+	return n._Next(true)
 }
 
 // _children returns an interator that can FOR-loop through all a node's single-depth child subscripts.
@@ -737,15 +793,15 @@ func (n *Node) Prev() *Node {
 //
 // See further documentation at Iterate().
 func (n *Node) _children(reverse bool) iter.Seq2[*Node, string] {
-	n = n.MutableChild("")
-
+	first := n.Clone() // ensure our mutable access to this node doesn't clobber the caller's use of Index() on this node
+	n = n.Index("")
 	return func(yield func(*Node, string) bool) {
 		for {
 			next, ok := n._next(reverse)
 			if !ok {
 				return
 			}
-			n = n.Mutate(next)
+			n = first.Index(next)
 			if !yield(n, next) {
 				return
 			}

@@ -76,6 +76,7 @@ func TestCloneNode(t *testing.T) {
 	assert.NotEqual(t, n1.Conn.cconn.tptoken, n2.Conn.cconn.tptoken)
 }
 
+// checkBuffers verifies that all the buffers in n point consecutively into the n's own string storage space
 func (n *Node) checkBuffers(t *testing.T) {
 	cnode := n.cnode
 	lastbuf := bufferIndex(&cnode.buffers, int(cnode.len-1))
@@ -143,13 +144,17 @@ func TestIteration(t *testing.T) {
 func TestChild(t *testing.T) {
 	conn := SetupTest(t)
 	n1 := conn.Node("var", "abc")
-	n2 := n1.MutableChild().Mutate("def")
+	n2 := n1.Index("def")
 	n3 := n2.Child("ghi", "jkl")
-	n4 := n3.MutableChild().Mutate("mno")
+	n4 := n3.Index("mno")
+	n5 := n3.Index(1, 2, 3, 4, 5)
+	n6 := n5.Clone()
 	n1.checkBuffers(t)
 	n2.checkBuffers(t)
 	n3.checkBuffers(t)
 	n4.checkBuffers(t)
+	n6.checkBuffers(t)
+	assert.Equal(t, `var("abc","def","ghi","jkl",1,2,3,4,5)`, n6.String())
 }
 
 func TestSubscript(t *testing.T) {
@@ -165,10 +170,10 @@ func TestSubscript(t *testing.T) {
 	assert.Panics(t, func() { n.Subscript(-4) })
 }
 
-func TestMutateNode(t *testing.T) {
+func TestIndex(t *testing.T) {
 	conn := SetupTest(t)
-	n := conn.Node("var1", "asdf")
-	n2 := n.MutableChild().Mutate("jkl")
+	n := conn.Node("var1")
+	n2 := n.Index("jkl")
 	n3 := n2.Child("qwerty")
 	assert.Equal(t, `var1("jkl","qwerty")`, n3.String())
 }
