@@ -13,6 +13,7 @@
 package yottadb
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -48,7 +49,7 @@ func TestNode(t *testing.T) {
 	})
 }
 
-func TestCloneNode(t *testing.T) {
+func TestConn(t *testing.T) {
 	conn1 := SetupTest(t)
 	conn2 := NewConn()
 	n1 := conn1.Node("var1")
@@ -79,15 +80,15 @@ func TestCloneNode(t *testing.T) {
 // checkBuffers verifies that all the buffers in n point consecutively into the n's own string storage space
 func (n *Node) checkBuffers(t *testing.T) {
 	cnode := n.cnode
-	lastbuf := bufferIndex(&cnode.buffers, int(cnode.len-1))
-	start := int(uintptr(unsafe.Pointer(&cnode.buffers)))
-	end := int(uintptr(unsafe.Pointer(bufferIndex(&cnode.buffers, int(cnode.len)))))
+	lastbuf := bufferIndex(cnode.buffers, int(cnode.len-1))
+	start := int(uintptr(unsafe.Pointer(cnode.buffers)))
+	end := int(uintptr(unsafe.Pointer(bufferIndex(cnode.buffers, int(cnode.len)))))
 	for _, s := range n.Subscripts() {
 		end += len(s)
 	}
 	end += int(lastbuf.len_alloc) - int(lastbuf.len_used) // Adjust for last string being overallocated
 	for i := range int(cnode.len) {
-		buf := bufferIndex(&cnode.buffers, i)
+		buf := bufferIndex(cnode.buffers, i)
 		assert.GreaterOrEqualf(t, int(uintptr(unsafe.Pointer(buf))), start, "%s subscript %d buffer is located before memory allocation", n, i)
 		assert.LessOrEqualf(t, int(uintptr(unsafe.Pointer(buf))), end, "%s subscript %d buffer is located after allocation", n, i)
 		assert.GreaterOrEqualf(t, int(uintptr((unsafe.Pointer(buf.buf_addr)))), start, "%s subscript %d string is located before allocation", n, i)
@@ -96,33 +97,43 @@ func (n *Node) checkBuffers(t *testing.T) {
 	}
 }
 
-func testCloneNode(t *testing.T) {
+func TestCloneNode(t *testing.T) {
 	conn1 := SetupTest(t)
 	conn2 := NewConn()
-	n1 := conn1.Node("var", "abc")
-	n2 := conn2.CloneNode(n1)
-	assert.NotEqual(t, n1.Conn.cconn, n2.Conn.cconn)
-	assert.NotEqual(t, n1.Conn.cconn.errstr.buf_addr, n2.Conn.cconn.errstr.buf_addr)
-	assert.NotEqual(t, n1.Conn.cconn.value.buf_addr, n2.Conn.cconn.value.buf_addr)
+	n := conn1.Node("var", "abc")
+	clone1 := conn1.CloneNode(n)
+	clone2 := conn2.CloneNode(n)
+	assert.NotEqual(t, fmt.Sprintf("%p", clone1.Conn.cconn), fmt.Sprintf("%p", clone2.Conn.cconn))
+	assert.NotEqual(t, fmt.Sprintf("%p", clone1.Conn.cconn.errstr.buf_addr), fmt.Sprintf("%p", clone2.Conn.cconn.errstr.buf_addr))
+	assert.NotEqual(t, fmt.Sprintf("%p", clone1.Conn.cconn.value.buf_addr), fmt.Sprintf("%p", clone2.Conn.cconn.value.buf_addr))
 
-	assert.Equal(t, "", n1.Get())
-	n2.Set(3)
-	assert.Equal(t, "3", n1.Get())
+	assert.Equal(t, "", clone1.Get())
+	clone2.Set(3)
+	assert.Equal(t, "3", clone1.Get())
+
+	// Verify that a panic results if programmer tries to clone a mutable node
+	mutable := n.Index(1)
+	assert.Panics(t, func() { conn2.CloneNode(mutable) })
 }
 
 func TestIteration(t *testing.T) {
 	conn := SetupTest(t)
-	n := conn.Node("var")
+	// Test that iteration yields mutable nodes
+	n := conn.Node("person")
 	n.Child(1).Set(1)
 	assert.Equal(t, false, n.IsMutable())
 	for i, subscript := range n.Children() {
 		assert.Equal(t, "1", subscript)
 		assert.Equal(t, true, i.IsMutable())
 	}
+	// Test that Next() on a mutable node finds the correct parent to return an index of
+	n.Child(1, "age").Set(51)
+	n.Child(1, "height").Set(178)
+	assert.Equal(t, `person(1,"height")`, n.Index(1, "age").Next().String())
 	assert.Equal(t, false, n.IsMutable())
-	assert.Equal(t, true, n.MutableChild("def").IsMutable())
+	assert.Equal(t, true, n.Index("def").IsMutable())
 	assert.Equal(t, false, n.IsMutable())
-	assert.Equal(t, false, n.MutableChild("def").Clone().IsMutable())
+	assert.Equal(t, false, n.Index("def").Clone().IsMutable())
 
 	// Traverse early exit code path in _children() for code coverage
 	for range n.Children() {
@@ -173,9 +184,68 @@ func TestSubscript(t *testing.T) {
 func TestIndex(t *testing.T) {
 	conn := SetupTest(t)
 	n := conn.Node("var1")
+	assert.Panics(t, func() { n.Index() }) // call with no parameters should panic
 	n2 := n.Index("jkl")
 	n3 := n2.Child("qwerty")
 	assert.Equal(t, `var1("jkl","qwerty")`, n3.String())
+
+	// Test that Index(...).Index(...) works
+	n = conn.Node("person")
+	n.Child(1, "name").Set("fred")
+	n.Child(2, "name").Set("daph")
+	n.Child(1, "address").Set("2 Rocklands Rd")
+	n.Child(2, "address").Set("5 Moonshine St")
+	n.Child(1, "address", "postcode").Set(1234)
+	n.Child(2, "address", "postcode").Set(5678)
+	n.Child(1, "age").Set(59)
+	n.Child(2, "age").Set(14)
+	age := map[string]int{}
+	for person := range n.Children() {
+		name := person.Index("name").Get()
+		age[name] = person.Index("age").GetInt()
+	}
+	assert.Equal(t, map[string]int{"fred": 59, "daph": 14}, age)
+
+	// Check that mutable node reallocation works when new subscript doesn't fit into mutable node
+	// Create fresh node without an indexed mutation attached
+	n = conn.Node("person")
+	index1 := n.Index(1)
+	index2 := n.Index(2)
+	// Check that index1 is also changed to the new depth-0 subscript of index2 -- i.e. node reused, not reallocated
+	assert.Equal(t, index1.String(), index2.String())
+	// Force reallocation: make sure new subscript is big enough to cause a reallocation
+	bigSubscript := preallocSubscript + "ABC"
+	index3 := n.Index(bigSubscript)
+	// This NotEqual test only works because internally an index of depth 1 points to a real mutation, not a stub
+	// The mutation has been reallocated but the old index1 still points to the previous one
+	// This means depth-1 indexes last slightly longer than depth >1 but anyway programmers should not be counting
+	// on it lasting past the next use of index (per documentation), so their own fault if they depend on this fact.
+	assert.NotEqual(t, index1.String(), index3.String())
+
+	// Check that a sequence of using a longer-shorter-longer index depth doesn't require reallocation the second time
+	n = conn.Node("person")
+	n.Index(1, "a")
+	index1 = n.Index(bigSubscript) // force reallocation of depth 1 -- but it should retain depth 2 capacity
+	index2 = n.Index(3, "b")
+	// Check that index1 is also changed to the new depth-0 subscript of index2 -- i.e. node reused, not reallocated
+	assert.Equal(t, "3", index1.Subscript(1))
+
+	// Check indexing a node with more than YDB_MAX_SUBS panics
+	subs := []any{}
+	for range YDB_MAX_SUBS - 1 {
+		subs = append(subs, "")
+	}
+	n = conn.Node("person", subs...)
+	// should work with exactly YDB_MAX_SUBS
+	n.Index(1).Get()
+	// should fail with YDB_MAX_SUBS+1
+	assert.Panics(t, func() { n.Index(1, 2) })
+
+	// Same test but with one more sub -- so requiring one less index depth to fail
+	subs = append(subs, "")
+	n = conn.Node("person", subs...)
+	// should fail YDB_MAX_SUBS+1
+	assert.Panics(t, func() { n.Index(1) })
 }
 
 func TestSetGet(t *testing.T) {

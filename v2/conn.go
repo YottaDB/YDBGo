@@ -152,16 +152,17 @@ func (conn *Conn) setValueBytes(val []byte) *C.ydb_buffer_t {
 //   - val may be a string, []byte slice, integer type, or float; numeric types are converted to a string using the appropriate strconv function.
 func anyToString(val any) string {
 	switch n := val.(type) {
+	// Go evaluates these cases in order, so put common ones first
 	case string:
 		return n
-	case []byte:
-		return string(n)
 	case int:
 		return strconv.FormatInt(int64(n), 10)
-	case int32:
-		return strconv.FormatInt(int64(n), 10)
+	case float64:
+		return strconv.FormatFloat(n, 'G', -1, 64)
 	case int64:
 		return strconv.FormatInt(n, 10)
+	case int32:
+		return strconv.FormatInt(int64(n), 10)
 	case uint:
 		return strconv.FormatUint(uint64(n), 10)
 	case uint32:
@@ -170,8 +171,8 @@ func anyToString(val any) string {
 		return strconv.FormatUint(n, 10)
 	case float32:
 		return strconv.FormatFloat(float64(n), 'G', -1, 32)
-	case float64:
-		return strconv.FormatFloat(n, 'G', -1, 64)
+	case []byte:
+		return string(n)
 	default:
 		panic(errorf(ydberr.InvalidValueType, "subscript (%v) must be a string, number, or []byte slice but is %s", val, reflect.TypeOf(val)))
 	}
@@ -185,19 +186,19 @@ func anyToString(val any) string {
 func (conn *Conn) setAnyValue(val any) {
 	var str string
 	switch n := val.(type) {
+	// Go evaluates these cases in order, so put common ones first
 	case string:
 		// ensure enough space is allocated (not needed for number cases
 		conn.setValue(n)
 		return
-	case []byte:
-		conn.setValueBytes(n)
-		return
 	case int:
 		str = strconv.FormatInt(int64(n), 10)
-	case int32:
-		str = strconv.FormatInt(int64(n), 10)
+	case float64:
+		str = strconv.FormatFloat(n, 'G', -1, 64)
 	case int64:
 		str = strconv.FormatInt(n, 10)
+	case int32:
+		str = strconv.FormatInt(int64(n), 10)
 	case uint:
 		str = strconv.FormatUint(uint64(n), 10)
 	case uint32:
@@ -206,8 +207,9 @@ func (conn *Conn) setAnyValue(val any) {
 		str = strconv.FormatUint(n, 10)
 	case float32:
 		str = strconv.FormatFloat(float64(n), 'G', -1, 32)
-	case float64:
-		str = strconv.FormatFloat(n, 'G', -1, 64)
+	case []byte:
+		conn.setValueBytes(n)
+		return
 	default:
 		panic(errorf(ydberr.InvalidValueType, "value (%v) must be a string, number, or []byte slice but is %s", val, reflect.TypeOf(val)))
 	}
@@ -255,7 +257,7 @@ func (conn *Conn) Zwr2Str(zstr string) (string, error) {
 		if len(s) > 80 {
 			s = s[:80] + "..."
 		}
-		return "", errorf(ydberr.InvalidZwriteFormat, "string (%s) has invalid ZWRITE-format", s)
+		return "", errorf(ydberr.InvalidZwriteFormat, "string has invalid ZWRITE-format: %s", s)
 	}
 	return val, nil
 }
@@ -335,7 +337,7 @@ func (conn *Conn) KillLocalsExcept(exclusions ...string) {
 		// use a Node type just as a handy way to store exclusions strings as a ydb_buffer_t array
 		namelist := conn._Node(names[0], names[1:])
 		conn.prepAPI()
-		status = C.ydb_delete_excl_st(cconn.tptoken, &cconn.errstr, C.int(len(names)), &namelist.cnode.buffers)
+		status = C.ydb_delete_excl_st(cconn.tptoken, &cconn.errstr, C.int(len(names)), namelist.cnode.buffers)
 		runtime.KeepAlive(namelist) // ensure namelist sticks around until we've finished copying data from it's C allocation
 	}
 	if status != YDB_OK {
@@ -367,9 +369,9 @@ func (conn *Conn) Lock(timeout time.Duration, nodes ...*Node) bool {
 	conn.vpAddParam(uintptr(len(nodes)))
 	for _, node := range nodes {
 		cnode := node.cnode
-		conn.vpAddParam(uintptr(unsafe.Pointer(&cnode.buffers)))
+		conn.vpAddParam(uintptr(unsafe.Pointer(cnode.buffers)))
 		conn.vpAddParam(uintptr(cnode.len - 1))
-		conn.vpAddParam(uintptr(unsafe.Pointer(bufferIndex(&cnode.buffers, 1))))
+		conn.vpAddParam(uintptr(unsafe.Pointer(bufferIndex(cnode.buffers, 1))))
 	}
 
 	// vplist now contains the parameter list we want to send to ydb_lock_st(). But CGo doesn't permit us
@@ -448,7 +450,7 @@ func (conn *Conn) Transaction(transID string, localsToRestore []string, callback
 		namelist := conn._Node(names[0], names[1:])
 		conn.prepAPI()
 		status = C.ydb_tp_st(cconn.tptoken, &cconn.errstr, C.ydb_tpfnptr_t(C.tp_callback_wrapper), unsafe.Pointer(&handle),
-			(*C.char)(unsafe.Pointer(unsafe.StringData(transID))), C.int(len(names)), &namelist.cnode.buffers)
+			(*C.char)(unsafe.Pointer(unsafe.StringData(transID))), C.int(len(names)), namelist.cnode.buffers)
 		runtime.KeepAlive(namelist) // ensure namelist sticks around until we've finished copying data from it's C allocation
 	}
 	if status == YDB_TP_ROLLBACK {

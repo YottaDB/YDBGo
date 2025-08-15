@@ -159,19 +159,22 @@ func ExampleNode_Children() {
 	// Person fields: (address age occupation sex )
 }
 
-// Example of getting a mutable version of node
-func ExampleNode_Mutate() {
+// Example of fast iteration of a node to increment only children with subscripts 0..99999.
+func ExampleNode_Index() {
 	conn := yottadb.NewConn()
-	n := conn.Node("X", 1, 2, 3)
-	mutation1 := n.MutableChild().Mutate(4)
-	mutation2 := n.MutableChild().Mutate("text")
-	fmt.Println(n)
-	fmt.Println(mutation1)
-	fmt.Println(mutation2)
+	n := conn.Node("counter")
+	n.Index(100000).Set("untouched")
+	for i := range 100000 {
+		n.Index(i).Incr(1)
+	}
+
+	fmt.Printf("%s: %s\n", n.Index(0), n.Index(0).Get())
+	fmt.Printf("%s: %s\n", n.Index(99999), n.Index(99999).Get())
+	fmt.Printf("%s: %s\n", n.Index(100000), n.Index(100000).Get())
 	// Output:
-	// X(1,2,3)
-	// X(1,2,4)
-	// X(1,2,"text")
+	// counter(0): 1
+	// counter(99999): 1
+	// counter(100000): untouched
 }
 
 // Example of traversing a database tree

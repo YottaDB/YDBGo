@@ -27,6 +27,7 @@ const (
 	InvalidValueType             // Value type is not a string or number
 	InvalidSubscriptIndex        // Subscript index is out of bounds
 	InvalidMutableOperation      // The operation may not be performed on a mutable node object
+	SubscriptRequired            // Method requires a subscript
 	TooManyParameters            // Too many parameters supplied to function
 	OutOfMemory                  // Not enough memory for attempted allocation
 	YDBMessageInvalid            // Failure decoding message prefixes from YottaDB

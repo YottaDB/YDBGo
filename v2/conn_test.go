@@ -36,9 +36,14 @@ func TestZwr2Str(t *testing.T) {
 	// Test InvalidZwriteFormat format error
 	_, err = conn.Zwr2Str(`"X"_$C(1234`)
 	assert.NotNil(t, err)
-	_, err = conn.Zwr2Str(`"` + strings.Repeat("A", YDB_MAX_STR-2) + `"`)
+	// Test test the same again but now exercise code path that truncates the string for the error message
+	bigString := strings.Repeat("A", 200)
+	_, err = conn.Zwr2Str(`"X"_$C(1234` + bigString)
+	assert.NotNil(t, err)
+	bigString = strings.Repeat("A", YDB_MAX_STR-2)
+	_, err = conn.Zwr2Str(`"` + bigString + `"`)
 	assert.Nil(t, err)
-	_, err = conn.Zwr2Str(`"` + strings.Repeat("A", YDB_MAX_STR-1) + `"`)
+	_, err = conn.Zwr2Str(`"` + bigString + `A"`)
 	assert.NotNil(t, err)
 }
 

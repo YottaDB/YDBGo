@@ -30,8 +30,8 @@ typedef struct conn {
 typedef struct node {
 	conn *conn;
 	int len;			// number of buffers[] that store subscripts/strings
-	int len_allocated;		// number of buffers[] allocated: ignored for immutable nodes, but may be >len for mutable nodes
-	ydb_buffer_t buffers;		// first of an array of buffers (typically varname)
-	ydb_buffer_t buffersn[];	// rest of array
+	ydb_buffer_t *buffers;		// pointer to an array of buffers (typically varname followed by subscripts)
+	// The following spaces are allocated immediately after this struct
+	// ydb_buffer_t buffersn[];	// array of buffers
 	// char *data;			// stored after `buffers` (however large they are), which point into this data
 } node;
