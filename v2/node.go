@@ -352,11 +352,7 @@ func (n *Node) Set(val any) {
 	}
 }
 
-// Get fetches and returns the value of a database node or defaultValue[0] if the node's variable name does not exist.
-//   - Note that the default only works on undefined variables, not on empty *subscripted* variables.
-//     If the node's variable name (M local or M global) exists but the subscripted node has no value, Get() will return the empty string.
-//     If you need to distinguish between an empty string and a value-less node you must use [Node.HasValue]()
-//   - Since a default is supplied, the only possible errors are panic-worthy, so this calls panic on them.
+// Get fetches and returns the value of a database node or defaultValue[0] if the database node is empty.
 func (n *Node) Get(defaultValue ...string) string {
 	ok := n._Lookup()
 	if !ok {
@@ -374,28 +370,34 @@ func (n *Node) Get(defaultValue ...string) string {
 
 // GetInt fetches and returns the value of a database node as an integer.
 // Return zero if the node's value does not exist or is not convertable to an integer.
-func (n *Node) GetInt() int {
+func (n *Node) GetInt(defaultValue ...int) int {
 	val := n.Get()
 	num, err := strconv.ParseInt(val, 10, 0)
 	if err != nil {
 		if _, ok := err.(*strconv.NumError); !ok {
 			panic(err) // unknown error unrelated to conversion
 		}
-		return 0
+		if len(defaultValue) == 0 {
+			return 0
+		}
+		return defaultValue[0]
 	}
 	return int(num)
 }
 
 // GetFloat fetches and returns the value of a database node as a float64.
 // Return zero if the node's value does not exist or is not convertable to float64.
-func (n *Node) GetFloat() float64 {
+func (n *Node) GetFloat(defaultValue ...float64) float64 {
 	val := n.Get()
 	num, err := strconv.ParseFloat(val, 64)
 	if err != nil {
 		if _, ok := err.(*strconv.NumError); !ok {
 			panic(err) // unknown error unrelated to conversion
 		}
-		return 0
+		if len(defaultValue) == 0 {
+			return 0
+		}
+		return defaultValue[0]
 	}
 	return num
 }
@@ -419,7 +421,7 @@ func (n *Node) GetBytes(defaultValue ...[]byte) []byte {
 // Lookup returns the value of a database node and true, or if the variable name could not be found, returns the empty string and false.
 //   - If the node's variable name (M local or M global) exists but the subscripted node has no value, Lookup() will return the empty string and true.
 //     If you need to distinguish between an empty string and a value-less node you must use [Node.HasValue]()
-//   - bool false is returned on errors GVUNDEF (undefined M global), LVUNDEF (undefined M local), or INVSVN (invalid Special Variable Name).
+//   - bool false is returned on errors GVUNDEF (undefined M global) or LVUNDEF (undefined M local). Other errors panic.
 //   - You may use [Node.Get]() to return a default value when an undefined variable is accessed.
 func (n *Node) Lookup() (string, bool) {
 	ok := n._Lookup()
@@ -458,7 +460,7 @@ func (n *Node) _Lookup() bool {
 		n.Conn.prepAPI()
 		status = C.ydb_get_st(cconn.tptoken, &cconn.errstr, cnode.buffers, cnode.len-1, bufferIndex(cnode.buffers, 1), &cconn.value)
 	}
-	if status == ydberr.GVUNDEF || status == ydberr.LVUNDEF || status == ydberr.INVSVN {
+	if status == ydberr.GVUNDEF || status == ydberr.LVUNDEF {
 		return false
 	}
 	if status != YDB_OK {

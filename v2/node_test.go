@@ -52,29 +52,23 @@ func TestNode(t *testing.T) {
 func TestConn(t *testing.T) {
 	conn1 := SetupTest(t)
 	conn2 := NewConn()
-	n1 := conn1.Node("var1")
-	n2 := conn2.Node("var2")
+	n1 := conn1.Node("$invalidSVN")
+	n2 := conn2.Node("var")
 
-	// Make sure the LVUNDEF error ends with "var1"
-	n1.Get()
-	status := n1.Conn.lastCode()
-	err := n1.Conn.lastError(status)
-	assert.Contains(t, err.Error(), ": var1")
-
-	// Make sure conn2 LVUNDEF error returns "var2"
-	n2.Get()
-	status = n1.Conn.lastCode()
-	err = n2.Conn.lastError(status)
-	assert.Contains(t, err.Error(), ": var2")
-	// Alter tptoken in n2's conn
+	// Produce different errors for conn1 and conn2 and ensure that the latter doesn't clobber the former
+	assert.Panics(t, func() { n1.Get() })
+	lastErr := n1.Conn.lastError(n1.Conn.lastCode())
+	assert.Contains(t, lastErr.Error(), "INVSVN")
+	bigString := strings.Repeat("A", YDB_MAX_STR)
+	_, lastErr = conn2.Str2Zwr(bigString)
+	assert.Contains(t, lastErr.Error(), "MAXSTRLEN")
+	// Alter tptoken in n2's conn -- ensure it also does not change the last message that's still stored in conn1
 	n2.Conn.cconn.tptoken++
-
-	// Above should not have changed the last message that's still stored in conn1
-	status = n1.Conn.lastCode()
-	err = n1.Conn.lastError(status)
-	assert.Contains(t, err.Error(), ": var1")
-	// Check that a changed tptoken in n2's conn doesn't affect n1's conn
 	assert.NotEqual(t, n1.Conn.cconn.tptoken, n2.Conn.cconn.tptoken)
+
+	// Now ensure error buf of n1 has remained unchanged
+	lastErr = n1.Conn.lastError(n1.Conn.lastCode())
+	assert.Contains(t, lastErr.Error(), "INVSVN")
 }
 
 // checkBuffers verifies that all the buffers in n point consecutively into the n's own string storage space
@@ -250,25 +244,35 @@ func TestIndex(t *testing.T) {
 
 func TestSetGet(t *testing.T) {
 	conn := SetupTest(t)
-	n := conn.Node("var")
-	val, ok := n.Lookup()
-	assert.Equal(t, "", val)
-	assert.False(t, ok)
-	valbytes, ok := n.LookupBytes()
-	assert.Equal(t, []byte{}, valbytes)
-	assert.False(t, ok)
-	assert.Equal(t, "", n.Get())
-	assert.Equal(t, "default", n.Get("default"))
-	assert.Equal(t, "", n.Get())
-	assert.Equal(t, []byte("default"), n.GetBytes([]byte("default")))
-	assert.Equal(t, []byte{}, n.GetBytes())
-	assert.Equal(t, []byte(""), n.GetBytes([]byte("")))
+	// Test Lookup and Get-with-default on non-existent var
+	testDefault := func(n *Node) {
+		val, ok := n.Lookup()
+		assert.Equal(t, "", val)
+		assert.False(t, ok)
+		valbytes, ok := n.LookupBytes()
+		assert.Equal(t, []byte{}, valbytes)
+		assert.False(t, ok)
+		assert.Equal(t, "", n.Get())
+		assert.Equal(t, 0, n.GetInt())
+		assert.Equal(t, 0.0, n.GetFloat())
+		assert.Equal(t, "default", n.Get("default"))
+		assert.Equal(t, 10, n.GetInt(10))
+		assert.Equal(t, 10.0, n.GetFloat(10.0))
+		assert.Equal(t, "", n.Get())
+		assert.Equal(t, []byte("default"), n.GetBytes([]byte("default")))
+		assert.Equal(t, []byte{}, n.GetBytes())
+		assert.Equal(t, []byte(""), n.GetBytes([]byte("")))
+	}
+	testDefault(conn.Node("var"))
+	testDefault(conn.Node("var", 1))
 
+	// Test Set()
+	n := conn.Node("var")
 	n.Set("value")
-	val, ok = n.Lookup()
+	val, ok := n.Lookup()
 	assert.Equal(t, "value", val)
 	assert.True(t, ok)
-	valbytes, ok = n.LookupBytes()
+	valbytes, ok := n.LookupBytes()
 	assert.Equal(t, []byte("value"), valbytes)
 	assert.True(t, ok)
 	assert.Equal(t, "value", n.Get())
