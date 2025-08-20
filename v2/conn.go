@@ -471,3 +471,23 @@ func (conn *Conn) Transaction(transID string, localsToRestore []string, callback
 func (conn *Conn) TransactionFast(localsToRestore []string, callback func() int) bool {
 	return conn.Transaction("BATCH", localsToRestore, callback)
 }
+
+// TransactionToken sets the transaction-level token being using by the given connection conn.
+// This is for use only in the unusual situation of mixing YDBGo v1 and v2 code and you have a v2 transaction
+// that needs to call a v1 function (which must therefore be passed the v2 Conn's tptoken).
+// It would be tidier, however, to avoid mixing versions within a transaction, therefore this function is deprecated
+// from its inception and will be removed in a future version once there has been plenty of time to migrate all code to v2.
+// See [Conn.TransactionTokenSet]
+func (conn *Conn) TransactionToken() (tptoken uint64) {
+	return uint64(conn.cconn.tptoken)
+}
+
+// TransactionTokenSet sets the transaction-level token being using by the given connection conn.
+// This is for use only in the unusual situation of mixing YDBGo v1 and v2 code and you have a v1 transaction
+// that needs to call a v2 function (which must therefore be run on a Conn with the v1 tptoken).
+// It would be tidier, however, to avoid mixing versions within a transaction, therefore this function is deprecated
+// from its inception and will be removed in a future version once there has been plenty of time to migrate all code to v2.
+// See [Conn.TransactionToken]
+func (conn *Conn) TransactionTokenSet(tptoken uint64) {
+	conn.cconn.tptoken = C.uint64_t(tptoken)
+}

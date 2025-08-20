@@ -34,7 +34,7 @@ func tpCallbackWrapper(tptoken C.uint64_t, errstr *C.ydb_buffer_t, handle unsafe
 	saveToken := cconn.tptoken
 	cconn.tptoken = tptoken
 	if errstr != &cconn.errstr {
-		panic(errorf(ydberr.CallbackWrongGoroutine, "YDBGo design fault: callback invoked from a different goroutine than the one used by the connection"))
+		panic(errorf(ydberr.CallbackWrongGoroutine, "YDBGo design fault: transaction callback from a different connection than the one that initiated the transaction; contact YottaDB support."))
 	}
 	retval := info.callback()
 	cconn.tptoken = saveToken

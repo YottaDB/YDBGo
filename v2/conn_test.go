@@ -131,3 +131,11 @@ func TestLock(t *testing.T) {
 	assert.Equal(t, false, lockExists(fmt.Sprint(n)))
 	assert.Equal(t, false, lockExists(fmt.Sprint(n2)))
 }
+
+func TestSetTpToken(t *testing.T) {
+	// Make sure that a cloned conn points to the same tptoken as its parent
+	conn1 := NewConn()
+	original := conn1.TransactionToken()
+	conn1.TransactionTokenSet(original + 1)
+	assert.Equal(t, original+1, uint64(conn1.cconn.tptoken))
+}
