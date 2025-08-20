@@ -346,7 +346,7 @@ func (n *Node) Set(val any) {
 	cconn := cnode.conn
 	n.Conn.setAnyValue(val)
 	n.Conn.prepAPI()
-	status := C.ydb_set_st(cconn.tptoken, &cconn.errstr, cnode.buffers, cnode.len-1, bufferIndex(cnode.buffers, 1), &cconn.value)
+	status := C.ydb_set_st(C.uint64_t(n.Conn.tptoken.Load()), &cconn.errstr, cnode.buffers, cnode.len-1, bufferIndex(cnode.buffers, 1), &cconn.value)
 	if status != YDB_OK {
 		panic(n.Conn.lastError(status))
 	}
@@ -453,12 +453,12 @@ func (n *Node) _Lookup() bool {
 	cnode := n.cnode // access C equivalents of Go types
 	cconn := cnode.conn
 	n.Conn.prepAPI()
-	status := C.ydb_get_st(cconn.tptoken, &cconn.errstr, cnode.buffers, cnode.len-1, bufferIndex(cnode.buffers, 1), &cconn.value)
+	status := C.ydb_get_st(C.uint64_t(n.Conn.tptoken.Load()), &cconn.errstr, cnode.buffers, cnode.len-1, bufferIndex(cnode.buffers, 1), &cconn.value)
 	if status == ydberr.INVSTRLEN {
 		// Allocate more space and retry the call
 		n.Conn.ensureValueSize(int(cconn.value.len_used))
 		n.Conn.prepAPI()
-		status = C.ydb_get_st(cconn.tptoken, &cconn.errstr, cnode.buffers, cnode.len-1, bufferIndex(cnode.buffers, 1), &cconn.value)
+		status = C.ydb_get_st(C.uint64_t(n.Conn.tptoken.Load()), &cconn.errstr, cnode.buffers, cnode.len-1, bufferIndex(cnode.buffers, 1), &cconn.value)
 	}
 	if status == ydberr.GVUNDEF || status == ydberr.LVUNDEF {
 		return false
@@ -481,7 +481,7 @@ func (n *Node) data() int {
 	cconn := cnode.conn
 	var val C.uint
 	n.Conn.prepAPI()
-	status := C.ydb_data_st(cconn.tptoken, &cconn.errstr, cnode.buffers, cnode.len-1, bufferIndex(cnode.buffers, 1), &val)
+	status := C.ydb_data_st(C.uint64_t(n.Conn.tptoken.Load()), &cconn.errstr, cnode.buffers, cnode.len-1, bufferIndex(cnode.buffers, 1), &val)
 	if status != YDB_OK {
 		panic(n.Conn.lastError(status))
 	}
@@ -524,7 +524,7 @@ func (n *Node) Kill() {
 	cnode := n.cnode // access C equivalents of Go types
 	cconn := cnode.conn
 	n.Conn.prepAPI()
-	status := C.ydb_delete_st(cconn.tptoken, &cconn.errstr, cnode.buffers, cnode.len-1, bufferIndex(cnode.buffers, 1), C.YDB_DEL_TREE)
+	status := C.ydb_delete_st(C.uint64_t(n.Conn.tptoken.Load()), &cconn.errstr, cnode.buffers, cnode.len-1, bufferIndex(cnode.buffers, 1), C.YDB_DEL_TREE)
 	if status != YDB_OK {
 		panic(n.Conn.lastError(status))
 	}
@@ -536,7 +536,7 @@ func (n *Node) Clear() {
 	cnode := n.cnode // access C equivalents of Go types
 	cconn := cnode.conn
 	n.Conn.prepAPI()
-	status := C.ydb_delete_st(cconn.tptoken, &cconn.errstr, cnode.buffers, cnode.len-1, bufferIndex(cnode.buffers, 1), C.YDB_DEL_NODE)
+	status := C.ydb_delete_st(C.uint64_t(n.Conn.tptoken.Load()), &cconn.errstr, cnode.buffers, cnode.len-1, bufferIndex(cnode.buffers, 1), C.YDB_DEL_NODE)
 	if status != YDB_OK {
 		panic(n.Conn.lastError(status))
 	}
@@ -557,7 +557,7 @@ func (n *Node) Incr(amount any) string {
 	}
 
 	n.Conn.prepAPI()
-	status := C.ydb_incr_st(cconn.tptoken, &cconn.errstr, cnode.buffers, cnode.len-1, bufferIndex(cnode.buffers, 1), &cconn.value, &cconn.value)
+	status := C.ydb_incr_st(C.uint64_t(n.Conn.tptoken.Load()), &cconn.errstr, cnode.buffers, cnode.len-1, bufferIndex(cnode.buffers, 1), &cconn.value, &cconn.value)
 	if status != YDB_OK {
 		panic(n.Conn.lastError(status))
 	}
@@ -586,7 +586,7 @@ func (n *Node) Lock(timeout ...time.Duration) bool {
 
 	for {
 		n.Conn.prepAPI()
-		status := C.ydb_lock_incr_st(cconn.tptoken, &cconn.errstr, timeoutNsec, cnode.buffers, cnode.len-1, bufferIndex(cnode.buffers, 1))
+		status := C.ydb_lock_incr_st(C.uint64_t(n.Conn.tptoken.Load()), &cconn.errstr, timeoutNsec, cnode.buffers, cnode.len-1, bufferIndex(cnode.buffers, 1))
 		if status == YDB_OK {
 			return true
 		}
@@ -607,7 +607,7 @@ func (n *Node) Unlock() {
 	cconn := cnode.conn
 
 	n.Conn.prepAPI()
-	status := C.ydb_lock_decr_st(cconn.tptoken, &cconn.errstr, cnode.buffers, cnode.len-1, bufferIndex(cnode.buffers, 1))
+	status := C.ydb_lock_decr_st(C.uint64_t(n.Conn.tptoken.Load()), &cconn.errstr, cnode.buffers, cnode.len-1, bufferIndex(cnode.buffers, 1))
 	if status != YDB_OK {
 		panic(n.Conn.lastError(status))
 	}
@@ -795,15 +795,16 @@ func (n *Node) IsMutable() bool {
 // See further documentation at Next().
 func (n *Node) _next(reverse bool) (string, bool) {
 	cnode := n.cnode // access C equivalents of Go types
+	conn := n.Conn
 	cconn := cnode.conn
 
 	var status C.int
 	for range 2 {
 		n.Conn.prepAPI()
 		if reverse {
-			status = C.ydb_subscript_previous_st(cconn.tptoken, &cconn.errstr, cnode.buffers, cnode.len-1, bufferIndex(cnode.buffers, 1), &cconn.value)
+			status = C.ydb_subscript_previous_st(C.uint64_t(conn.tptoken.Load()), &cconn.errstr, cnode.buffers, cnode.len-1, bufferIndex(cnode.buffers, 1), &cconn.value)
 		} else {
-			status = C.ydb_subscript_next_st(cconn.tptoken, &cconn.errstr, cnode.buffers, cnode.len-1, bufferIndex(cnode.buffers, 1), &cconn.value)
+			status = C.ydb_subscript_next_st(C.uint64_t(conn.tptoken.Load()), &cconn.errstr, cnode.buffers, cnode.len-1, bufferIndex(cnode.buffers, 1), &cconn.value)
 		}
 		if status == ydberr.INVSTRLEN {
 			// Allocate more space and retry the call
@@ -941,6 +942,7 @@ func (n *Node) ChildrenBackward() iter.Seq2[*Node, string] {
 // See further documentation at TreeNext().
 func (n *Node) _treeNext(reverse bool) *Node {
 	cnode := n.cnode // access C equivalents of Go types
+	conn := n.Conn
 	cconn := cnode.conn
 
 	// Create new node to store result with a single preallocated child as an initial guess of space needed.
@@ -952,9 +954,9 @@ func (n *Node) _treeNext(reverse bool) *Node {
 		retSubs = retNode.cnode.len - 1 // -1 because cnode counts the varname as a subscript and ydb_node_next_st() does not
 		n.Conn.prepAPI()
 		if reverse {
-			status = C.ydb_node_previous_st(cconn.tptoken, &cconn.errstr, cnode.buffers, cnode.len-1, bufferIndex(cnode.buffers, 1), &retSubs, bufferIndex(retNode.cnode.buffers, 1))
+			status = C.ydb_node_previous_st(C.uint64_t(conn.tptoken.Load()), &cconn.errstr, cnode.buffers, cnode.len-1, bufferIndex(cnode.buffers, 1), &retSubs, bufferIndex(retNode.cnode.buffers, 1))
 		} else {
-			status = C.ydb_node_next_st(cconn.tptoken, &cconn.errstr, cnode.buffers, cnode.len-1, bufferIndex(cnode.buffers, 1), &retSubs, bufferIndex(retNode.cnode.buffers, 1))
+			status = C.ydb_node_next_st(C.uint64_t(conn.tptoken.Load()), &cconn.errstr, cnode.buffers, cnode.len-1, bufferIndex(cnode.buffers, 1), &retSubs, bufferIndex(retNode.cnode.buffers, 1))
 		}
 		if status == ydberr.INSUFFSUBS {
 			extraStrings := make([]any, retSubs-(retNode.cnode.len-1))

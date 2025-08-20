@@ -19,6 +19,7 @@ import (
 	"runtime"
 	"runtime/cgo"
 	"strconv"
+	"sync/atomic"
 	"time"
 	"unsafe"
 
@@ -75,13 +76,18 @@ const overalloc = 1024 // Initial size (may be enlarged).
 type Conn struct {
 	// Pointer to C.conn rather than the item itself so we can malloc it and point to it from C without Go moving it.
 	cconn *C.conn
+	// tptoken is a place to store tptoken for thread-safe ydb_*_st() function calls
+	// It is a pointer and atomic so that Conn.Clone works.
+	// Note that on a 64-bit machine using atomic is not supposed to have any overhead.
+	tptoken *atomic.Uint64
 }
 
 // _newConn is a subset of NewConn without initCheck and value space -- used by signals.init()
 func _newConn() *Conn {
 	var conn Conn
 	conn.cconn = (*C.conn)(calloc(C.sizeof_conn)) // must use our calloc, not malloc: see calloc doc
-	conn.cconn.tptoken = C.YDB_NOTTP
+	conn.tptoken = &atomic.Uint64{}
+	conn.tptoken.Store(C.YDB_NOTTP)
 	// Create space for err
 	conn.cconn.errstr.buf_addr = (*C.char)(C.malloc(C.YDB_MAX_ERRORMSG))
 	conn.cconn.errstr.len_alloc = C.YDB_MAX_ERRORMSG
@@ -107,6 +113,19 @@ func NewConn() *Conn {
 	conn.cconn.value.len_alloc = C.uint(overalloc)
 	conn.cconn.value.len_used = 0
 	return conn
+}
+
+// Clone returns a new connection that operates with the same transaction-level token as the original connection conn.
+// This may be used if you absolutely must have activity within one transaction spread across multiple goroutines, in which case
+// each new goroutine will need a new connection that has the same transaction token as the original connection.
+// However, be aware that spreading transaction activity across multiple goroutines is not a recommended pattern.
+// Before doing so the programmer should first read and understand [Threads and Transaction Processing].
+//
+// [Threads and Transaction Processing]: https://docs.yottadb.com/MultiLangProgGuide/programmingnotes.html#threads-and-transaction-processing
+func (conn *Conn) CloneConn() *Conn {
+	new := NewConn()
+	new.tptoken = conn.tptoken // point to the original conn's tptoken
+	return new
 }
 
 // prepAPI initializes anything necessary before C API calls.
@@ -240,13 +259,13 @@ func (conn *Conn) Zwr2Str(zstr string) (string, error) {
 	}
 	cbuf := conn.setValue(zstr)
 	conn.prepAPI()
-	status := C.ydb_zwr2str_st(cconn.tptoken, &cconn.errstr, cbuf, cbuf)
+	status := C.ydb_zwr2str_st(C.uint64_t(conn.tptoken.Load()), &cconn.errstr, cbuf, cbuf)
 	if status == ydberr.INVSTRLEN {
 		// NOTE: this code will never run in the current design because setValue() above always allocates enough space
 		// Allocate more space and retry the call
 		conn.ensureValueSize(int(cconn.value.len_used))
 		conn.prepAPI()
-		status = C.ydb_zwr2str_st(cconn.tptoken, &cconn.errstr, cbuf, cbuf)
+		status = C.ydb_zwr2str_st(C.uint64_t(conn.tptoken.Load()), &cconn.errstr, cbuf, cbuf)
 	}
 	if status != YDB_OK {
 		return "", conn.lastError(status)
@@ -277,13 +296,13 @@ func (conn *Conn) Str2Zwr(str string) (string, error) {
 	}
 	cbuf := conn.setValue(str)
 	conn.prepAPI()
-	status := C.ydb_str2zwr_st(cconn.tptoken, &cconn.errstr, cbuf, cbuf)
+	status := C.ydb_str2zwr_st(C.uint64_t(conn.tptoken.Load()), &cconn.errstr, cbuf, cbuf)
 	if status == ydberr.INVSTRLEN {
 		// Allocate more space and retry the call
 		conn.ensureValueSize(int(cconn.value.len_used))
 		cbuf := conn.setValue(str)
 		conn.prepAPI()
-		status = C.ydb_str2zwr_st(cconn.tptoken, &cconn.errstr, cbuf, cbuf)
+		status = C.ydb_str2zwr_st(C.uint64_t(conn.tptoken.Load()), &cconn.errstr, cbuf, cbuf)
 	}
 	if status != YDB_OK {
 		return "", conn.lastError(status)
@@ -332,12 +351,12 @@ func (conn *Conn) KillLocalsExcept(exclusions ...string) {
 	names := stringArrayToAnyArray(exclusions)
 	if len(names) == 0 {
 		conn.prepAPI()
-		status = C.ydb_delete_excl_st(cconn.tptoken, &cconn.errstr, 0, nil)
+		status = C.ydb_delete_excl_st(C.uint64_t(conn.tptoken.Load()), &cconn.errstr, 0, nil)
 	} else {
 		// use a Node type just as a handy way to store exclusions strings as a ydb_buffer_t array
 		namelist := conn._Node(names[0], names[1:])
 		conn.prepAPI()
-		status = C.ydb_delete_excl_st(cconn.tptoken, &cconn.errstr, C.int(len(names)), namelist.cnode.buffers)
+		status = C.ydb_delete_excl_st(C.uint64_t(conn.tptoken.Load()), &cconn.errstr, C.int(len(names)), namelist.cnode.buffers)
 		runtime.KeepAlive(namelist) // ensure namelist sticks around until we've finished copying data from it's C allocation
 	}
 	if status != YDB_OK {
@@ -363,7 +382,7 @@ func (conn *Conn) Lock(timeout time.Duration, nodes ...*Node) bool {
 
 	// Add each parameter to the vararg list
 	conn.vpStart() // restart parameter list
-	conn.vpAddParam64(uint64(cconn.tptoken))
+	conn.vpAddParam64(conn.tptoken.Load())
 	conn.vpAddParam(uintptr(unsafe.Pointer(&cconn.errstr)))
 	conn.vpAddParam64(uint64(timeoutNsec))
 	conn.vpAddParam(uintptr(len(nodes)))
@@ -443,13 +462,13 @@ func (conn *Conn) Transaction(transID string, localsToRestore []string, callback
 	var status C.int
 	if len(names) == 0 {
 		conn.prepAPI()
-		status = C.ydb_tp_st(cconn.tptoken, &cconn.errstr, C.ydb_tpfnptr_t(C.tp_callback_wrapper), unsafe.Pointer(&handle),
+		status = C.ydb_tp_st(C.uint64_t(conn.tptoken.Load()), &cconn.errstr, C.ydb_tpfnptr_t(C.tp_callback_wrapper), unsafe.Pointer(&handle),
 			(*C.char)(unsafe.Pointer(unsafe.StringData(transID))), 0, nil)
 	} else {
 		// use a Node type just as a handy way to vars to restore as a ydb_buffer_t array
 		namelist := conn._Node(names[0], names[1:])
 		conn.prepAPI()
-		status = C.ydb_tp_st(cconn.tptoken, &cconn.errstr, C.ydb_tpfnptr_t(C.tp_callback_wrapper), unsafe.Pointer(&handle),
+		status = C.ydb_tp_st(C.uint64_t(conn.tptoken.Load()), &cconn.errstr, C.ydb_tpfnptr_t(C.tp_callback_wrapper), unsafe.Pointer(&handle),
 			(*C.char)(unsafe.Pointer(unsafe.StringData(transID))), C.int(len(names)), namelist.cnode.buffers)
 		runtime.KeepAlive(namelist) // ensure namelist sticks around until we've finished copying data from it's C allocation
 	}
@@ -479,7 +498,7 @@ func (conn *Conn) TransactionFast(localsToRestore []string, callback func() int)
 // from its inception and will be removed in a future version once there has been plenty of time to migrate all code to v2.
 // See [Conn.TransactionTokenSet]
 func (conn *Conn) TransactionToken() (tptoken uint64) {
-	return uint64(conn.cconn.tptoken)
+	return conn.tptoken.Load()
 }
 
 // TransactionTokenSet sets the transaction-level token being using by the given connection conn.
@@ -489,5 +508,5 @@ func (conn *Conn) TransactionToken() (tptoken uint64) {
 // from its inception and will be removed in a future version once there has been plenty of time to migrate all code to v2.
 // See [Conn.TransactionToken]
 func (conn *Conn) TransactionTokenSet(tptoken uint64) {
-	conn.cconn.tptoken = C.uint64_t(tptoken)
+	conn.tptoken.Store(tptoken)
 }

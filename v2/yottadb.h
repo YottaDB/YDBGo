@@ -14,7 +14,6 @@
 
 // Create a goroutine-specific 'connection' object for calling the YottaDB API.
 typedef struct conn {
-	uint64_t tptoken;	// place to store tptoken for thread-safe ydb_*_st() function calls
 	ydb_buffer_t errstr;	// space for YottaDB to return an error string
 	ydb_buffer_t value;	// temporary space to store in or out value for get/set
 

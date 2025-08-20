@@ -63,8 +63,8 @@ func TestConn(t *testing.T) {
 	_, lastErr = conn2.Str2Zwr(bigString)
 	assert.Contains(t, lastErr.Error(), "MAXSTRLEN")
 	// Alter tptoken in n2's conn -- ensure it also does not change the last message that's still stored in conn1
-	n2.Conn.cconn.tptoken++
-	assert.NotEqual(t, n1.Conn.cconn.tptoken, n2.Conn.cconn.tptoken)
+	n2.Conn.tptoken.Add(1)
+	assert.NotEqual(t, n1.Conn.tptoken.Load(), n2.Conn.tptoken.Load())
 
 	// Now ensure error buf of n1 has remained unchanged
 	lastErr = n1.Conn.lastError(n1.Conn.lastCode())

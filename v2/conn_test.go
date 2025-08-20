@@ -23,6 +23,40 @@ import (
 
 // ---- Tests
 
+func TestCloneConn(t *testing.T) {
+	// Make sure that a cloned conn points to the same tptoken as its parent
+	conn1 := NewConn()
+	original := conn1.TransactionToken()
+	conn2 := conn1.CloneConn()
+	conn2.TransactionTokenSet(original + 1)
+	assert.Equal(t, original+1, conn1.TransactionToken())
+
+	// Now create actual goroutines inside a transaction both using a cloned conn to make sure that works
+	conn := NewConn()
+	conn.TransactionFast([]string{}, func() int {
+		n := conn.Node("count")
+		done := make(chan struct{})
+		subfunc := func() {
+			subconn := conn.CloneConn()
+			// Create an error in subconn to make sure it doesn't clobber conn's error
+			_, err := subconn.Zwr2Str(`"X"_$C(1234`)
+			assert.NotNil(t, err)
+			n := subconn.Node("count")
+			n.Incr(1)
+			done <- struct{}{} // say I'm done
+		}
+		// Create two goroutines
+		go subfunc()
+		go subfunc()
+		<-done // wait for two goroutines to finish
+		<-done
+		// Make sure conn's last non-error was not clobbered by error strings in the subconns
+		assert.Equal(t, "", conn.getErrorString())
+		assert.Equal(t, 2, n.GetInt())
+		return YDB_OK
+	})
+}
+
 func TestEnsureValueSize(t *testing.T) {
 	conn := SetupTest(t)
 	assert.Panics(t, func() { conn.ensureValueSize(YDB_MAX_STR + 1) })
@@ -85,6 +119,7 @@ func TestKillLocalsExcept(t *testing.T) {
 	assert.Equal(t, multi(true, true, true), multi(n1.HasValueOnly(), n2.HasNone(), n3.HasBoth()))
 	conn.KillLocalsExcept()
 	assert.Equal(t, multi(true, true, true), multi(n1.HasNone(), n2.HasNone(), n3.HasNone()))
+	assert.Panics(t, func() { conn.KillLocalsExcept("$asdf") })
 
 	n1.Set("v1")
 	n2.Set("v2")
@@ -132,10 +167,9 @@ func TestLock(t *testing.T) {
 	assert.Equal(t, false, lockExists(fmt.Sprint(n2)))
 }
 
-func TestSetTpToken(t *testing.T) {
-	// Make sure that a cloned conn points to the same tptoken as its parent
+func TestTransactionTokenSet(t *testing.T) {
 	conn1 := NewConn()
 	original := conn1.TransactionToken()
 	conn1.TransactionTokenSet(original + 1)
-	assert.Equal(t, original+1, uint64(conn1.cconn.tptoken))
+	assert.Equal(t, original+1, conn1.tptoken.Load())
 }

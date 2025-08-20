@@ -185,7 +185,7 @@ func (conn *Conn) recoverMessage(status C.int) string {
 	}
 	// note: ydb_message_t() only looks at the absolute value of status so no need to negate it
 	conn.prepAPI()
-	rc := C.ydb_message_t(cconn.tptoken, nil, status, &cconn.errstr)
+	rc := C.ydb_message_t(C.uint64_t(conn.tptoken.Load()), nil, status, &cconn.errstr)
 	if rc != YDB_OK {
 		if rc == ydberr.UNKNOWNSYSERR {
 			panic(errorf(int(rc), "%%YDB-E-UNKNOWNSYSERR, [%d (0x%x) returned by ydb_* C API] does not correspond to a known YottaDB error code", status, status))

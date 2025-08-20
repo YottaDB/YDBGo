@@ -461,7 +461,7 @@ func (conn *Conn) Import(table string) (*MFunctions, error) {
 	handle := (*C.uintptr_t)(C.malloc(C.sizeof_uintptr_t))
 	defer C.free(unsafe.Pointer(handle))
 	conn.prepAPI()
-	status := C.ydb_ci_tab_open_t(cconn.tptoken, &cconn.errstr, cstr, handle)
+	status := C.ydb_ci_tab_open_t(C.uint64_t(conn.tptoken.Load()), &cconn.errstr, cstr, handle)
 	tbl.handle = *handle
 	if status != YDB_OK {
 		err := conn.lastError(status).(*Error)
@@ -515,7 +515,7 @@ func (conn *Conn) callM(routine *RoutineData, args []any) (any, error) {
 		oldhandle := (*C.uintptr_t)(C.malloc(C.sizeof_uintptr_t))
 		defer C.free(unsafe.Pointer(oldhandle))
 		conn.prepAPI()
-		status := C.ydb_ci_tab_switch_t(cconn.tptoken, &cconn.errstr, routine.Table.handle, oldhandle)
+		status := C.ydb_ci_tab_switch_t(C.uint64_t(conn.tptoken.Load()), &cconn.errstr, routine.Table.handle, oldhandle)
 		if status != YDB_OK {
 			return "", conn.lastError(status)
 		}
@@ -528,7 +528,7 @@ func (conn *Conn) callM(routine *RoutineData, args []any) (any, error) {
 
 	// Add each parameter to the vararg list required to call ydb_cip_t()
 	conn.vpStart() // restart parameter list
-	conn.vpAddParam64(uint64(cconn.tptoken))
+	conn.vpAddParam64(conn.tptoken.Load())
 	conn.vpAddParam(uintptr(unsafe.Pointer(&cconn.errstr)))
 	conn.vpAddParam(uintptr(unsafe.Pointer(routine.cinfo.nameDesc)))
 
