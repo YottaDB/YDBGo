@@ -423,9 +423,8 @@ type tpInfo struct {
 //   - Implement the required database logic taking into account key considerations for [Transaction Processing] code.
 //   - If there are database collisions, `callback` will be called repeatedly, rolling back the database before each call. On the
 //     fourth try, YottaDB will resort to calling it with other processes locked out to ensure its success.
-//   - Return YDB_OK on success
-//   - Return YDB_TP_RESTART to force a rollback plus restart
-//   - Return YDB_TP_ROLLBACK to roll back the database and return false to the caller of Transaction().
+//   - Call [Conn.Restart] if it needs to rollback and immediately restart the transaction function
+//   - Call [Conn.Rollback] if it needs to rollback and immediately exit the transaction function
 //
 // Transaction nesting level may be determined within the callback function by reading the special variable [$tlevel], and the number of restart
 // repetitions by [$trestart]. These things are documented in more detail in [Transaction Processing].
@@ -433,7 +432,7 @@ type tpInfo struct {
 // [Transaction Processing]: https://docs.yottadb.com/ProgrammersGuide/langfeat.html#transaction-processing
 // [$trestart]: https://docs.yottadb.com/ProgrammersGuide/isv.html#trestart
 // [$tlevel]: https://docs.yottadb.com/ProgrammersGuide/isv.html#tlevel
-func (conn *Conn) Transaction(transID string, localsToRestore []string, callback func() int) bool {
+func (conn *Conn) Transaction(transID string, localsToRestore []string, callback func()) bool {
 	recoveredCallback := func() (retval int) {
 		// defer a function that recovers from RESTART and ROLLBACK panics and returns them to YDB transaction processor instead
 		defer func() {
@@ -450,7 +449,8 @@ func (conn *Conn) Transaction(transID string, localsToRestore []string, callback
 				panic(err)
 			}
 		}()
-		return callback()
+		callback()
+		return YDB_OK // no rollback or restart
 	}
 
 	cconn := conn.cconn
@@ -487,8 +487,20 @@ func (conn *Conn) Transaction(transID string, localsToRestore []string, callback
 //   - Panics on errors because they are are all panic-worthy (e.g. invalid variable names). See [yottadb.Error] for rationale.
 //
 // [Transaction Processing]: https://docs.yottadb.com/ProgrammersGuide/langfeat.html#transaction-processing
-func (conn *Conn) TransactionFast(localsToRestore []string, callback func() int) bool {
+func (conn *Conn) TransactionFast(localsToRestore []string, callback func()) bool {
 	return conn.Transaction("BATCH", localsToRestore, callback)
+}
+
+// Rollback and exit a transaction immediately.
+func (conn *Conn) Rollback() {
+	// This panic is caught by [Conn.Transaction] to make it do a rollback and exit
+	panic(newError(YDB_TP_ROLLBACK, ""))
+}
+
+// Restart a transaction immediately (after first rolling back).
+func (conn *Conn) Restart() {
+	// This panic is caught by [Conn.Transaction] to make it do a restart
+	panic(newError(YDB_TP_RESTART, ""))
 }
 
 // TransactionToken sets the transaction-level token being using by the given connection conn.

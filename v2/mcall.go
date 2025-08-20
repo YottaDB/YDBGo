@@ -671,7 +671,7 @@ func (conn *Conn) callM(routine *RoutineData, args []any) (any, error) {
 	}
 
 	// vplist now contains the parameter list we want to send to ydb_cip_t(). But CGo doesn't permit us
-	// to call or even get a function pointer to ydb_cip_t(). So get it get it with getfunc_ydb_cip_t().
+	// to call or even get a function pointer to ydb_cip_t(). So call it via getfunc_ydb_cip_t().
 	status := conn.vpCall(C.getfunc_ydb_cip_t()) // call ydb_cip_t()
 	if status != YDB_OK {
 		return nil, conn.lastError(status)

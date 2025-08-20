@@ -51,7 +51,7 @@ func ExampleConn_TransactionToken() {
 	yottadbV1.ForceInit() // Tell v1 that v2 has done the initialization
 
 	conn := yottadbV2.NewConn()
-	conn.TransactionFast([]string{}, func() int {
+	conn.TransactionFast([]string{}, func() {
 		person := conn.Node("^person")
 		person.Set("Sally")
 
@@ -62,8 +62,35 @@ func ExampleConn_TransactionToken() {
 			panic(err)
 		}
 		fmt.Print(val)
-		return yottadbV2.YDB_OK
 	})
 	// Output:
 	// Sally
+}
+
+func ExampleConn_Restart() {
+	conn := yottadb.NewConn()
+	n := conn.Node("^activity")
+	n.Set(0)
+	restarts := 0
+	run := func() {
+		n.Incr(1)
+		if restarts < 2 {
+			restarts++
+			conn.Restart()
+		}
+		if restarts > 9 {
+			// Error condition
+			conn.Rollback()
+		}
+	}
+	normal := conn.TransactionFast([]string{}, run)
+	fmt.Printf("Database updated %d times; transaction restarted %d times then normal exit was: %v\n", n.GetInt(), restarts, normal)
+
+	// Run transaction again but give it an error condition so that it rolls back
+	restarts = 10
+	rollback := !conn.TransactionFast([]string{}, run)
+	fmt.Printf("Transaction rollback %v; restores database value n of 2 to %d\n", rollback, n.GetInt())
+	// Output:
+	// Database updated 1 times; transaction restarted 2 times then normal exit was: true
+	// Transaction rollback true; restores database value n of 2 to 1
 }

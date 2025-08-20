@@ -50,7 +50,7 @@ func BenchmarkMCallArgs(b *testing.B) {
 
 func BenchmarkV1MCallVoid(b *testing.B) {
 	var errstr v1.BufferT
-	table, err := v1.CallMTableOpenT(v1.NOTTP, &errstr, "test/calltab.ci")
+	table, err := v1.CallMTableOpenT(v1.NOTTP, &errstr, "test/v1calltab.ci")
 	panicIf(err)
 	_, err = table.CallMTableSwitchT(v1.NOTTP, &errstr)
 	panicIf(err)
@@ -63,7 +63,7 @@ func BenchmarkV1MCallVoid(b *testing.B) {
 
 func BenchmarkV1MCallArgs(b *testing.B) {
 	var errstr v1.BufferT
-	table, err := v1.CallMTableOpenT(v1.NOTTP, &errstr, "test/calltab.ci")
+	table, err := v1.CallMTableOpenT(v1.NOTTP, &errstr, "test/v1calltab.ci")
 	panicIf(err)
 	_, err = table.CallMTableSwitchT(v1.NOTTP, &errstr)
 	panicIf(err)

@@ -33,7 +33,7 @@ func TestCloneConn(t *testing.T) {
 
 	// Now create actual goroutines inside a transaction both using a cloned conn to make sure that works
 	conn := NewConn()
-	conn.TransactionFast([]string{}, func() int {
+	conn.TransactionFast([]string{}, func() {
 		n := conn.Node("count")
 		done := make(chan struct{})
 		subfunc := func() {
@@ -53,7 +53,6 @@ func TestCloneConn(t *testing.T) {
 		// Make sure conn's last non-error was not clobbered by error strings in the subconns
 		assert.Equal(t, "", conn.getErrorString())
 		assert.Equal(t, 2, n.GetInt())
-		return YDB_OK
 	})
 }
 
@@ -167,7 +166,8 @@ func TestLock(t *testing.T) {
 	assert.Equal(t, false, lockExists(fmt.Sprint(n2)))
 }
 
-func TestTransactionTokenSet(t *testing.T) {
+func TestTransactionToken(t *testing.T) {
+	// Make sure that a cloned conn points to the same tptoken as its parent
 	conn1 := NewConn()
 	original := conn1.TransactionToken()
 	conn1.TransactionTokenSet(original + 1)
