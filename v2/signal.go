@@ -232,10 +232,11 @@ func SignalWasFatal() bool {
 // When Ctrl-C is pressed the signal is (by default) passed to YottaDB which shuts down the database.
 // If goroutines are still running and access the database, they will panic with code ydberr.CALLINAFTERXIT.
 // To silence these many panics and have each goroutine simply exit gracefully, defer QuitAfterFatalSignal()
-// at the start of each goroutine. Then you will get just one panic from the Ctrl-C signal interrupt.
+// at the start of each goroutine. Then you will get just one panic from the Ctrl-C signal interrupt rather
+// than one CALLINAFTERXIT panic per goroutine.
 //
-// This deferred function will hide such panics, whether caused by Ctrl-C or by prematurely calling yottadb.Shutdown.
-// To avoid hiding these errors, you may wish to make your own version of this function that logs them.
+// Deferring this function will hide CALLINAFTERXIT panics when caused by YottaDB receiving a fatal signal.
+// If you don't wish to completely hiding these errors, you could make your own version of this function that logs them.
 //
 // See: [Shutdown], [SignalNotify], [SignalWasFatal]
 func QuitAfterFatalSignal() {
