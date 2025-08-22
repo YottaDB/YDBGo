@@ -752,3 +752,12 @@ func (conn *Conn) callM(routine *RoutineData, args []any) (any, error) {
 	runtime.KeepAlive(conn) // ensure conn sticks around until we've finished copying data from it's C paramblock
 	return retval, nil
 }
+
+// MustImport is the same as [Conn.Import] but panics on errors.
+func (conn *Conn) MustImport(table string) *MFunctions {
+	mfunctions, err := conn.Import(table)
+	if err != nil {
+		panic(err)
+	}
+	return mfunctions
+}

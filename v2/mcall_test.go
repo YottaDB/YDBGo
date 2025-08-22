@@ -23,10 +23,7 @@ import (
 
 func TestImport(t *testing.T) {
 	conn := SetupTest(t)
-	funcs, err := conn.Import("AddVerbose: string[1024] addVerbose^arithmetic(string, int64, int64)")
-	if err != nil {
-		panic(err)
-	}
+	funcs := conn.MustImport("AddVerbose: string[1024] addVerbose^arithmetic(string, int64, int64)")
 	strType := "ydb_buffer_t"
 	if internalDB.YDBRelease < 1.36 {
 		strType = "ydb_string_t"
@@ -47,14 +44,8 @@ func TestCallM(t *testing.T) {
 	s := "test"
 	n := 3
 	// Declare these in separate imports
-	m, err := conn.Import(table)
-	if err != nil {
-		panic(err)
-	}
-	m2, err := conn.Import("Sub: string[10] sub^arithmetic(int32, uint32)")
-	if err != nil {
-		panic(err)
-	}
+	m := conn.MustImport(table)
+	m2 := conn.MustImport("Sub: string[10] sub^arithmetic(int32, uint32)")
 
 	// Test AddVerbose with pointer and non-pointer types
 	result := m.Call("AddVerbose", &s, &n, 4, "100").(string)

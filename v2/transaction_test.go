@@ -106,10 +106,7 @@ func TestTransactionToken(t *testing.T) {
 // Do not test rollback via M because it does not work by design. See https://gitlab.com/YottaDB/DB/YDB/-/issues/1166#note_2704105725
 func TestMRestart(t *testing.T) {
 	conn := NewConn()
-	m, err := conn.Import(`trestart: trestart^trestart()`)
-	if err != nil {
-		panic(err)
-	}
+	m := conn.MustImport(`trestart: trestart^trestart()`)
 
 	n := conn.Node("^activity")
 	n.Set(0)

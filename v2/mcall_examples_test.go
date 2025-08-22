@@ -33,10 +33,7 @@ func ExampleConn_Import() {
 
 	// Import the call table
 	conn := yottadb.NewConn()
-	m, err := conn.Import(table)
-	if err != nil {
-		panic(err)
-	}
+	m := conn.MustImport(table)
 
 	// Call an imported function directly. Notice that the 'any' return type requires a type assertion
 	fmt.Printf("Double (5 + 11) is: %d\n", 2*m.Call("Add", 5, 11).(int))
@@ -63,10 +60,7 @@ func ExampleConn_Import() {
 
 	// Import a different table that invokes the same M routine sub(), but this time
 	// with a different Go function signature just for fun. YDBGo handles the type conversions.
-	m2, err := conn.Import("Sub: string[10] sub^arithmetic(int64, uint64)")
-	if err != nil {
-		panic(err)
-	}
+	m2 := conn.MustImport("Sub: string[10] sub^arithmetic(int64, uint64)")
 	// Test Sub() again but now with a different Go type signature
 	result = m2.Call("Sub", int64(5), uint64(11)).(string)
 	fmt.Printf("5 - 11 with negative sign removed is: %s\n", result[1:])

@@ -25,8 +25,7 @@ import (
 // Benchmark calling M numerical Sum repeatedly
 func BenchmarkMCallVoid(b *testing.B) {
 	conn := SetupTest(b)
-	funcs, err := conn.Import(`Noop: noop^arithmetic()`)
-	panicIf(err)
+	funcs := conn.MustImport(`Noop: noop^arithmetic()`)
 	noop := funcs.Wrap("Noop")
 
 	for range b.N {
@@ -36,8 +35,7 @@ func BenchmarkMCallVoid(b *testing.B) {
 
 func BenchmarkMCallArgs(b *testing.B) {
 	conn := SetupTest(b)
-	funcs, err := conn.Import(`Add: int64 add^arithmetic(int, int)`)
-	panicIf(err)
+	funcs := conn.MustImport(`Add: int64 add^arithmetic(int, int)`)
 	add := funcs.Wrap("Add")
 
 	for i := range b.N {
