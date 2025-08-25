@@ -35,6 +35,8 @@ func TestNode(t *testing.T) {
 	invalidNode := conn.Node("!@#$")
 	assert.Panics(t, func() { invalidNode.Set(3) })
 	assert.Panics(t, func() { invalidNode.Get() })
+	assert.Panics(t, func() { invalidNode.GetInt() })
+	assert.Panics(t, func() { invalidNode.GetFloat() })
 	assert.Panics(t, func() { invalidNode.HasValue() })
 	assert.Panics(t, func() { invalidNode.Kill() })
 	assert.Panics(t, func() { invalidNode.Clear() })
@@ -185,8 +187,10 @@ func TestIndex(t *testing.T) {
 
 	// Test that Index(...).Index(...) works
 	n = conn.Node("person")
-	n.Child(1, "name").Set("fred")
-	n.Child(2, "name").Set("daph")
+	n.Child(1, "name", "first").Set("fred")
+	n.Child(1, "name", "last").Set("jones")
+	n.Child(2, "name", "first").Set("daph")
+	n.Child(2, "name", "last").Set("williams")
 	n.Child(1, "address").Set("2 Rocklands Rd")
 	n.Child(2, "address").Set("5 Moonshine St")
 	n.Child(1, "address", "postcode").Set(1234)
@@ -195,10 +199,11 @@ func TestIndex(t *testing.T) {
 	n.Child(2, "age").Set(14)
 	age := map[string]int{}
 	for person := range n.Children() {
-		name := person.Index("name").Get()
-		age[name] = person.Index("age").GetInt()
+		first := person.Index("name", "first").Get()
+		last := person.Index("name", "last").Get()
+		age[first+" "+last] = person.Index("age").GetInt()
 	}
-	assert.Equal(t, map[string]int{"fred": 59, "daph": 14}, age)
+	assert.Equal(t, map[string]int{"fred jones": 59, "daph williams": 14}, age)
 
 	// Check that mutable node reallocation works when new subscript doesn't fit into mutable node
 	// Create fresh node without an indexed mutation attached
@@ -215,6 +220,14 @@ func TestIndex(t *testing.T) {
 	// This means depth-1 indexes last slightly longer than depth >1 but anyway programmers should not be counting
 	// on it lasting past the next use of index (per documentation), so their own fault if they depend on this fact.
 	assert.NotEqual(t, index1.String(), index3.String())
+
+	// Test the same now using a 2-subscript index to get full coverage (since Index() calls index1() for one subscript).
+	n = conn.Node("person")
+	n.Index(1, 2) // allocate mutable node with space for two subscripts
+	index1 = n.Index(1)
+	n.Index(1, bigSubscript) // force reallocation of second index to test that code path
+	index2 = n.Index(2)
+	assert.NotEqual(t, index1.String(), index2.String())
 
 	// Check that a sequence of using a longer-shorter-longer index depth doesn't require reallocation the second time
 	n = conn.Node("person")
@@ -408,6 +421,11 @@ func TestDump(t *testing.T) {
 	conn := NewConn()
 	conn.KillAllLocals()
 	n := conn.Node("tree", 1)
+	n.Child("name", "first").Set("fred")
+	n.Child("name", "last").Set("jones")
 	assert.Panics(t, func() { n.Dump(3, 4, 5) })
+	assert.Equal(t, true, strings.HasSuffix(n.Dump(0), "\n...\n"))
+	var nilN *Node
+	assert.Equal(t, "<nil>\n", nilN.Dump())
 	// The rest is tested in ExampleNode_Dump
 }

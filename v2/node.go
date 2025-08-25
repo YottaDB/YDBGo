@@ -665,6 +665,11 @@ func (n *Node) Index(subscripts ...any) *Node {
 	// the mutable node for depth 2 which will still have its person subscript set to its previous value because it
 	// was only incremented in the depth 1 mutable node.
 
+	// Speed up the common case where only one subscript is supplied.
+	// (faster partly because there's no need to create newsubs array for coverted strings)
+	if len(subscripts) == 1 {
+		return n.index1(subscripts[0])
+	}
 	if len(subscripts) == 0 {
 		panic(errorf(ydberr.SubscriptRequired, "Index() method requires at least one subscript as a parameter"))
 	}
@@ -676,82 +681,124 @@ func (n *Node) Index(subscripts ...any) *Node {
 	}
 
 	// Calculate depth of index from original parent node
-	var depth int // indexing depth: number of subscripts the mutation adds to the *original* node
 	original := n // originating parent node from which index was taken
 	if n.IsMutable() {
 		original = n.original
 	}
 	originalLen := int(original.cnode.len)
+	var depth int // indexing depth: number of subscripts the mutation adds to the *original* node
 	depth = int(n.cnode.len) - originalLen + len(newsubs)
 	if originalLen-1+depth > YDB_MAX_SUBS { // -1 for varname
 		panic(errorf(ydberr.InvalidSubscriptIndex, "attempt to Index() node %s exceeded YDB_MAX_SUBS", n))
 	}
 
 	// Check whether an existing mutation[0] node has space for these new subscripts -- or we need to reallocate
+	nLen := int(n.cnode.len)
+	if original.mutations == nil || original.mutations[0] == nil || original.mutations[0].cap < nLen+len(newsubs) {
+		return n.reallocateMutation(newsubs)
+	}
+	buffers := original.mutations[0].cnode.buffers
+	for i, sub := range newsubs {
+		space := int(bufferIndex(buffers, nLen+i).len_alloc)
+		if space < len(sub) {
+			return n.reallocateMutation(newsubs)
+		}
+	}
+	// No need to reallocate, so just store the new subscripts into the mutated node
+	for i, sub := range newsubs {
+		buffer := bufferIndex(buffers, nLen+i)
+		C.memcpy(unsafe.Pointer(buffer.buf_addr), unsafe.Pointer(unsafe.StringData(sub)), C.size_t(len(sub)))
+		buffer.len_used = C.uint(len(sub))
+	}
+	return original.mutations[depth-1]
+}
+
+// index1 is the same as Index except that it operates faster in the common case when only a single parameter is given.
+// It is automatically invoked by Index() when that case is true.
+func (n *Node) index1(subscript any) *Node {
+	// Cast new subscript to string
+	sub := anyToString(subscript)
+
+	// Calculate depth of index from original parent node
+	var depth int // indexing depth: number of subscripts the mutation adds to the *original* node
+	original := n // originating parent node from which index was taken
+	if n.IsMutable() {
+		original = n.original
+	}
+	originalLen := int(original.cnode.len)
+	depth = int(n.cnode.len) - originalLen + 1
+	if originalLen-1+depth > YDB_MAX_SUBS { // -1 for varname
+		panic(errorf(ydberr.InvalidSubscriptIndex, "attempt to Index() node %s exceeded YDB_MAX_SUBS", n))
+	}
+
+	// Check whether an existing mutation[0] node has space for this new subscript -- or we need to reallocate
+	nLen := int(n.cnode.len)
+	if original.mutations == nil || original.mutations[0] == nil || original.mutations[0].cap < nLen+1 {
+		return n.reallocateMutation([]string{sub})
+	}
+	buffers := original.mutations[0].cnode.buffers
+	space := int(bufferIndex(buffers, nLen).len_alloc)
+	if space < len(sub) {
+		return n.reallocateMutation([]string{sub})
+	}
+	// No need to reallocate, so just store the new subscript into the mutated node
+	buffer := bufferIndex(buffers, nLen)
+	C.memcpy(unsafe.Pointer(buffer.buf_addr), unsafe.Pointer(unsafe.StringData(sub)), C.size_t(len(sub)))
+	buffer.len_used = C.uint(len(sub))
+	return original.mutations[depth-1]
+}
+
+// reallocateMutation reallocates mutation0 when necessary for use by Index().
+// This is only called after determining that reallocation really is necessary
+func (n *Node) reallocateMutation(newsubs []string) *Node {
+	// See explanation of how this works in the comment at the beginning of Index()
+	original := n // originating parent node from which index was taken
+	if n.IsMutable() {
+		original = n.original
+	}
+	originalLen := int(original.cnode.len)
+	var depth int // indexing depth: number of subscripts the mutation adds to the *original* node
+	depth = int(n.cnode.len) - originalLen + len(newsubs)
 	if original.mutations == nil {
 		original.mutations = make([]*Node, 1, preallocMutationDepth)
 	}
 	mutation0 := original.mutations[0]
-	nLen := int(n.cnode.len)
-	reallocate := true // unless we find otherwise below
-	if mutation0 != nil && mutation0.cap >= nLen+len(newsubs) {
-		buffers := mutation0.cnode.buffers
-		reallocate = false
-		for i, sub := range newsubs {
-			space := bufferIndex(buffers, nLen+i).len_alloc
-			if int(space) < len(sub) {
-				reallocate = true
-				break
-			}
-		}
+	// calculate max # subscripts = nLen + any more used previously on this mutable node
+	maxDepth := depth
+	if mutation0 != nil {
+		maxDepth = max(maxDepth, mutation0.cap-originalLen)
 	}
-	// Reallocate mutation0 if necessary
-	if reallocate {
-		// calculate max # subscripts = nLen + any more used previously on this mutable node
-		maxDepth := depth
-		if mutation0 != nil {
-			maxDepth = max(maxDepth, mutation0.cap-originalLen)
-		}
-		subs := make([]any, 0, maxDepth)
-		// Add indexes that n has before newsubs
-		for i := originalLen; i < int(n.cnode.len); i++ {
-			subs = append(subs, n.Subscript(i)+preallocSubscript)
-		}
-		// Add new subscripts
-		for _, sub := range newsubs {
-			subs = append(subs, sub+preallocSubscript)
-		}
-		// Add any surplus indexes above newsubs that were previously used on mutation0 even though they are not needed for this particular indexing operation
-		// i.e. never shrink mutation0.cap
-		for len(subs) < maxDepth {
-			subs = append(subs, mutation0._subscript(originalLen+len(subs)))
-		}
-		mutation0 = n.Conn._Node(original, subs)
-		mutation0.original = original                // indicate new node is mutable
-		mutation0.cap = int(mutation0.cnode.len)     // actual buffer capacity of mutation0
-		mutation0.cnode.len = C.int(originalLen + 1) // shrink mutation[0] node to present just one index subscript (its index depth=1)
-		buffers := mutation0.cnode.buffers
-		// remove preallocSubscript over-allocation from the end of each subscript
-		for i := range depth {
-			bufferIndex(buffers, originalLen+i).len_used -= C.uint(len(preallocSubscript))
-		}
-		original.mutations[0] = mutation0 // store mutation0
-
-		// Re-point all stub buffers to the new mutation0 buffers
-		for i := 1; i < len(original.mutations); i++ {
-			original.mutations[i].cnode.buffers = buffers
-		}
-	} else { // if !reallocate, just store the new subscripts into mutated node
-		buffers := mutation0.cnode.buffers
-		for i, sub := range newsubs {
-			// append preallocSubscript to each allocated subscript so that we don't have to reallocate small increases
-			buffer := bufferIndex(buffers, nLen+i)
-			C.memcpy(unsafe.Pointer(buffer.buf_addr), unsafe.Pointer(unsafe.StringData(sub)), C.size_t(len(sub)))
-			buffer.len_used = C.uint(len(sub))
-		}
+	subs := make([]any, 0, maxDepth)
+	// Add indexes that n has before newsubs
+	for i := originalLen; i < int(n.cnode.len); i++ {
+		// append preallocSubscript to each allocated subscript so that we don't have to reallocate small increases
+		subs = append(subs, n.Subscript(i)+preallocSubscript)
+	}
+	// Add new subscripts
+	for _, sub := range newsubs {
+		// append preallocSubscript to each allocated subscript so that we don't have to reallocate small increases
+		subs = append(subs, sub+preallocSubscript)
+	}
+	// Add any surplus indexes above newsubs that were previously used on mutation0 even though they are not needed for this particular indexing operation
+	// i.e. never shrink mutation0.cap
+	for len(subs) < maxDepth {
+		subs = append(subs, mutation0._subscript(originalLen+len(subs)))
+	}
+	mutation0 = n.Conn._Node(original, subs)
+	mutation0.original = original                // indicate new node is mutable
+	mutation0.cap = int(mutation0.cnode.len)     // actual buffer capacity of mutation0
+	mutation0.cnode.len = C.int(originalLen + 1) // shrink mutation[0] node to present just one index subscript (its index depth=1)
+	buffers := mutation0.cnode.buffers
+	// remove preallocSubscript over-allocation from the end of each subscript
+	for i := range depth {
+		bufferIndex(buffers, originalLen+i).len_used -= C.uint(len(preallocSubscript))
+	}
+	original.mutations[0] = mutation0 // store mutation0
+	// Re-point all stub buffers to the new mutation0 buffers
+	for i := 1; i < len(original.mutations); i++ {
+		original.mutations[i].cnode.buffers = buffers
 	}
 	// Create any stubs needed up to depth
-	buffers := mutation0.cnode.buffers
 	for i := len(original.mutations); i < depth; i++ {
 		stub := n.Conn.stubNode(original, buffers, originalLen+i+1)
 		original.mutations = append(original.mutations, stub)
