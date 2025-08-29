@@ -14,6 +14,7 @@ package yottadb
 
 import (
 	"bytes"
+	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -21,7 +22,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	v1 "lang.yottadb.com/go/yottadb"
@@ -167,16 +167,9 @@ func _testMain(m *testing.M) int {
 	}
 
 	// Setup the log file, print to stdout if needed
-	verbose := false
-	coverage := false
-	for _, b := range os.Args {
-		if b == "-test.v=true" || b == "-test.v" {
-			verbose = true
-		}
-		if strings.HasPrefix(b, "-test.gocoverdir") {
-			coverage = true
-		}
-	}
+	flag.Parse()
+	verbose := testing.Verbose()
+	coverage := testing.CoverMode() != ""
 	logfile := setupLogger(testDir, verbose)
 	defer logfile.Close()
 	if coverage {
