@@ -17,6 +17,7 @@ package yottadb
 import (
 	"bytes"
 	"fmt"
+	"log"
 	"os"
 	"reflect"
 	"regexp"
@@ -447,7 +448,7 @@ func (conn *Conn) Import(table string) (*MFunctions, error) {
 		return nil, errorf(ydberr.ImportTemp, "could not open temporary call-in table file '%s': %s", f.Name(), err)
 	}
 	if debugMode >= 1 { // In debug modes retain YDB-format temporary file for later inspection
-		fmt.Fprintf(os.Stderr, "Temporary call-in table file is: %s\n", f.Name())
+		log.Printf("Temporary call-in table file is: %s\n", f.Name())
 	} else {
 		defer os.Remove(f.Name())
 	}

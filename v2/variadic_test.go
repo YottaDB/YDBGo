@@ -14,7 +14,9 @@ package yottadb
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
+	"os"
 	"regexp"
 	"strconv"
 	"testing"
@@ -25,13 +27,28 @@ import (
 // ---- Tests
 
 func TestVpdump(t *testing.T) {
-	tconn := SetupTest(t)
-	//~ 	n1 := tconn.Node("var", "sub1", "sub2")
-	//~ 	n2 := n1.Child("sub3", "sub4")
-	//~ 	Lock()
-	tconn.vpStart()
-	tconn.vpAddParam(1)
-	tconn.vpAddParam64(2)
+	conn := SetupTest(t)
+
+	// Detect vpDump of a nil vplist
+	assert.PanicsWithError(t, "could not dump nil vararg list", func() { conn.vpDump(os.Stdout) })
+
+	// Detect vpAddParam before vpStart
+	assert.PanicsWithError(t, "programmer forgot to call vpStart() before vpAddParam()", func() { conn.vpAddParam(1) })
+
+	// Test isLittleEndian
+	vals := []byte{0xe8, 0x03, 0xd0, 0x07, 0x12, 0x23, 0x34, 0x45}
+	assert.Equal(t, binary.LittleEndian.Uint64(vals) == binary.NativeEndian.Uint64(vals), isLittleEndian())
+
+	// Detect too many variadic parameters
+	conn.vpStart()
+	for i := range maxVariadicParams {
+		conn.vpAddParam(uintptr(i))
+	}
+	assert.Panics(t, func() { conn.vpAddParam(1) })
+
+	conn.vpStart()
+	conn.vpAddParam(1)
+	conn.vpAddParam64(2)
 
 	arm32 := strconv.IntSize != 64
 	arm32int := 0
@@ -45,9 +62,9 @@ func TestVpdump(t *testing.T) {
 		expected += "   Elem 2  Value: 0 (0x0)\n"
 	}
 	var b bytes.Buffer
-	tconn.vpDump(&b)
+	conn.vpDump(&b)
 	remove := regexp.MustCompile(`\(0x[0-9A-Fa-f]+\) Value:`)
 	output := remove.ReplaceAllString(b.String(), " Value:")
 	assert.Equal(t, expected, output)
-	tconn.cconn.vplist.n = 0 // Remove test params for any subsequent use of vplist
+	conn.cconn.vplist.n = 0 // Remove test params for any subsequent use of vplist
 }

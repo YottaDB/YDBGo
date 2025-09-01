@@ -29,7 +29,8 @@ import (
 // #include "libyottadb.h"
 import "C"
 
-const maxARM32RegParms uint32 = 4 // Max number of parms passed in registers in ARM32 (affects passing of 64 bit parms)
+const maxARM32RegParms uint32 = 4                // Max number of parms passed in registers in ARM32 (affects passing of 64 bit parms)
+const maxVariadicParams = C.MAX_GPARAM_LIST_ARGS // Make this constant available to tests
 
 // ---- Variadic parameter (vp) support for C (despite CGo not supporting it directly).
 
@@ -72,7 +73,7 @@ func (conn *Conn) vpAddParam(value uintptr) {
 	if n < 0 {
 		panic(errorf(ydberr.Variadic, "programmer forgot to call vpStart() before vpAddParam()"))
 	}
-	if n >= C.MAX_GPARAM_LIST_ARGS {
+	if n >= maxVariadicParams {
 		panic(errorf(ydberr.Variadic, "variadic parameter item count %d exceeds maximum count of %d", n+1, C.MAX_GPARAM_LIST_ARGS))
 	}
 	// Compute address of indexed element
