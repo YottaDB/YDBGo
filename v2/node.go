@@ -10,7 +10,7 @@
 //
 //////////////////////////////////////////////////////////////////
 
-// Define Node type for access YottaDB database
+// Define Node type for access to YottaDB database
 
 package yottadb
 

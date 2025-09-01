@@ -39,6 +39,7 @@ const (
 	CallbackWrongGoroutine       // Callback invoked from the wrong goroutine
 	Variadic                     // Programmer error in Variadic call
 	IncrementEmpty               // Cannot increment by the empty string
+	InvalidTimeoutAction         // Invalid action constant specified to TimeoutAction()
 	MCallNotFound                // M-call table does not contain the specified M routine
 	MCallNil                     // Tried to call a nil M routine
 	MCallWrongNumberOfParameters // Wrong number of parameters pass to M routine call

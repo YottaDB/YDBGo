@@ -108,6 +108,7 @@ func (conn *Conn) getErrorString() string {
 }
 
 // lastError returns, given error code, the ydb error message stored by the previous YottaDB call as an error type or nil if there was no error.
+// If you don't know the code, call lastCode()
 func (conn *Conn) lastError(code C.int) error {
 	if code == C.YDB_OK {
 		return nil
@@ -152,8 +153,8 @@ func (conn *Conn) lastCode() C.int {
 	}
 	code, err := strconv.ParseInt(msg[:index], 10, 64)
 	if err != nil {
-		// If msg is improperly formatted, panic it verbatim with an YDBMessageInvalid code (this should never happen with messages from YottaDB)
-		panic(errorf(ydberr.YDBMessageInvalid, "%s: %s", err, msg))
+		// If msg has no number, panic it verbatim with an YDBMessageInvalid code (this should never happen with messages from YottaDB)
+		panic(errorf(ydberr.YDBMessageInvalid, "could not recover error code from YottaDB error message: %s", msg))
 	}
 	return C.int(-code)
 }
@@ -188,7 +189,12 @@ func (conn *Conn) recoverMessage(status C.int) string {
 	rc := C.ydb_message_t(C.uint64_t(conn.tptoken.Load()), nil, status, &cconn.errstr)
 	if rc != YDB_OK {
 		if rc == ydberr.UNKNOWNSYSERR {
-			panic(errorf(int(rc), "%%YDB-E-UNKNOWNSYSERR, [%d (0x%x) returned by ydb_* C API] does not correspond to a known YottaDB error code", status, status))
+			panic(errorf(int(rc), "%%YDB-E-UNKNOWNSYSERR, [%d (%#x) returned by ydb_* C API] does not correspond to a known YottaDB error code", status, status))
+		}
+		if conn.getErrorString() == "" {
+			// Do not call lastError if there is no message because it will infinitely recurse back to here to get the message
+			//panic(errorf(int(rc), "%%YDB-E-UNKNOWNSYSERR, [%d (%#x) returned by ydb_* C API] does not correspond to a known YottaDB error code", status, status))
+			panic(errorf(int(rc), "ydb_message_t() returned YottaDB error code %d (%#x) when trying to get the message for error %d (%#x)", rc, rc, status, status))
 		}
 		err := conn.lastError(rc)
 		panic(newError(ydberr.YDBMessageRecoveryFailure, fmt.Sprintf("error %d when trying to recover error message for error %d using ydb_message_t()", int(rc), int(-status)), err))

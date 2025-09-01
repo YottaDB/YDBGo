@@ -10,7 +10,7 @@
 //
 //////////////////////////////////////////////////////////////////
 
-// Define Node type for access YottaDB database
+// Allow Go to perform YottaDB transactions
 
 package yottadb
 
@@ -18,6 +18,8 @@ import (
 	"runtime"
 	"runtime/cgo"
 	"unsafe"
+
+	"lang.yottadb.com/go/yottadb/v2/ydberr"
 )
 
 /* #include "libyottadb.h"
@@ -31,7 +33,8 @@ import "C"
 // tpInfo struct stores callback function and connection used by Transaction() to run transaction logic.
 type tpInfo struct {
 	conn     *Conn
-	callback func() int
+	callback func()
+	err      any // variable to store transaction panic errors during transition back through the CGo boundary
 }
 
 // Transaction processes database logic inside a database transaction.
@@ -58,29 +61,9 @@ type tpInfo struct {
 // [$trestart]: https://docs.yottadb.com/ProgrammersGuide/isv.html#trestart
 // [$tlevel]: https://docs.yottadb.com/ProgrammersGuide/isv.html#tlevel
 func (conn *Conn) Transaction(transID string, localsToRestore []string, callback func()) bool {
-	recoveredCallback := func() (retval int) {
-		// defer a function that recovers from RESTART and ROLLBACK panics and returns them to YDB transaction processor instead
-		defer func() {
-			if err := recover(); err != nil {
-				err, ok := err.(*Error)
-				if !ok {
-					panic(err)
-				}
-				code := err.Code
-				if code == YDB_TP_RESTART || code == YDB_TP_ROLLBACK {
-					retval = code
-					return
-				}
-				panic(err)
-			}
-		}()
-		callback()
-		return YDB_OK // no rollback or restart
-	}
-
 	cconn := conn.cconn
-	info := tpInfo{conn, recoveredCallback}
-	handle := cgo.NewHandle(info)
+	info := tpInfo{conn, callback, nil}
+	handle := cgo.NewHandle(&info)
 	defer handle.Delete()
 
 	names := stringArrayToAnyArray(localsToRestore)
@@ -90,17 +73,25 @@ func (conn *Conn) Transaction(transID string, localsToRestore []string, callback
 		status = C.ydb_tp_st(C.uint64_t(conn.tptoken.Load()), &cconn.errstr, C.ydb_tpfnptr_t(C.tp_callback_wrapper), unsafe.Pointer(&handle),
 			(*C.char)(unsafe.Pointer(unsafe.StringData(transID))), 0, nil)
 	} else {
-		// use a Node type just as a handy way to vars to restore as a ydb_buffer_t array
+		// use a Node type just as a ydb_buffer_t array (i.e. not pointing to a node) as a handy way to list varnames to restore
 		namelist := conn._Node(names[0], names[1:])
 		conn.prepAPI()
 		status = C.ydb_tp_st(C.uint64_t(conn.tptoken.Load()), &cconn.errstr, C.ydb_tpfnptr_t(C.tp_callback_wrapper), unsafe.Pointer(&handle),
 			(*C.char)(unsafe.Pointer(unsafe.StringData(transID))), C.int(len(names)), namelist.cnode.buffers)
 		runtime.KeepAlive(namelist) // ensure namelist sticks around until we've finished copying data from it's C allocation
 	}
+	// Propagate any panics that occurred during the transaction function and
+	// sent to me by tpCallbackWrapper in info.err to avoid panics crossing the CGo boundary.
+	if info.err != nil {
+		panic(info.err)
+	}
 	if status == YDB_TP_ROLLBACK {
 		return false
 	}
 	if status != YDB_OK {
+		// This line is not tested in coverage tests as I do not know how to make ydb_tp_st return an error that is not already
+		// handled or already returned by a ydb function inside the transaction and handled there.
+		// Nevertheless, this will handle it if it occurs.
 		panic(conn.lastError(status))
 	}
 	return true
@@ -114,6 +105,32 @@ func (conn *Conn) Transaction(transID string, localsToRestore []string, callback
 // [Transaction Processing]: https://docs.yottadb.com/ProgrammersGuide/langfeat.html#transaction-processing
 func (conn *Conn) TransactionFast(localsToRestore []string, callback func()) bool {
 	return conn.Transaction("BATCH", localsToRestore, callback)
+}
+
+// Constants used for TimeoutAction.
+// These just happen to all map to YDB error codes that do something but the new names have a more consistent naming scheme
+// and are more Goish.
+const (
+	TransactionCommit   = YDB_OK
+	TransactionRollback = YDB_TP_ROLLBACK
+	TransactionTimeout  = ydberr.TPTIMEOUT
+)
+
+// TimeoutAction sets the action that is performed when [conn.Transaction] times out.
+// The following actions are valid and performed the named function:
+//   - TransactionTimeout (default): rollback and panic with Error.Code = ydberr.TPTIMEOUT
+//   - TransactionRollback: rollback the transaction and return false from the transaction function
+//   - TransactionCommit: commit database activity that was done before the timeout
+//
+// Notes:
+//   - Timeout only occurs if YottaDB special variable $ZMAXTPTIME is set.
+//   - Although TimeoutAction is specific to the specified conn, $ZMAXTPTIME is global.
+//   - If TimeoutAction has not been called on this Conn, the default action is TransactionTimeout.
+func (conn *Conn) TimeoutAction(action int) {
+	if action != TransactionTimeout && action != TransactionRollback && action != TransactionCommit {
+		panic(errorf(ydberr.InvalidTimeoutAction, "invalid action constant %d passed to TimeoutAction()", action))
+	}
+	conn.timeoutAction = action
 }
 
 // Rollback and exit a transaction immediately.
@@ -158,5 +175,6 @@ func (conn *Conn) TransactionTokenSet(tptoken uint64) {
 func (conn *Conn) CloneConn() *Conn {
 	new := NewConn()
 	new.tptoken = conn.tptoken // point to the original conn's tptoken
+	conn.timeoutAction = TransactionTimeout
 	return new
 }

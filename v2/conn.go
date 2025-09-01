@@ -74,6 +74,8 @@ type Conn struct {
 	// It is a pointer and atomic so that Conn.Clone works.
 	// Note that on a 64-bit machine using atomic is not supposed to have any overhead.
 	tptoken *atomic.Uint64
+	// timeoutAction is the action to take on transaction timeout. See [conn.TimeoutAction]()
+	timeoutAction int
 }
 
 // _newConn is a subset of NewConn without initCheck and value space -- used by signals.init()
@@ -82,6 +84,7 @@ func _newConn() *Conn {
 	conn.cconn = (*C.conn)(calloc(C.sizeof_conn)) // must use our calloc, not malloc: see calloc doc
 	conn.tptoken = &atomic.Uint64{}
 	conn.tptoken.Store(C.YDB_NOTTP)
+	conn.timeoutAction = TransactionTimeout
 	// Create space for err
 	conn.cconn.errstr.buf_addr = (*C.char)(C.malloc(C.YDB_MAX_ERRORMSG))
 	conn.cconn.errstr.len_alloc = C.YDB_MAX_ERRORMSG

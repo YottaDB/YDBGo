@@ -27,16 +27,45 @@ import (
 // transactionCallbackWrapper lets Transaction() invoke a Go callback closure from C.
 //
 //export tpCallbackWrapper
-func tpCallbackWrapper(tptoken C.uint64_t, errstr *C.ydb_buffer_t, handle unsafe.Pointer) C.int {
+func tpCallbackWrapper(tptoken C.uint64_t, errstr *C.ydb_buffer_t, handle unsafe.Pointer) (retval C.int) {
 	h := *(*cgo.Handle)(handle)
-	info := h.Value().(tpInfo)
+	info := h.Value().(*tpInfo) // type assertion never panics because tpCallbackWrapper is only called by Transaction which sets this to tpInfo
 	conn := info.conn
 	cconn := conn.cconn
+
+	// Defer captures panics. Restart() and Rollback() panics are returned to the YDB transaction processor as the appropriate constants.
+	// Other panic error values are stored in info.err to cross the CGo boundary and are re-paniced later back in Conn.Transaction().
+	defer func() {
+		recovered := recover()
+		info.err = recovered
+		if recovered == nil {
+			retval = YDB_OK
+			return
+		}
+		err, isYDBError := recovered.(*Error)
+		if !isYDBError {
+			// non-YottaDB errors cause rollback and also return the error in info.err for re-panic
+			retval = YDB_TP_ROLLBACK
+			return
+		}
+		code := err.Code
+		if code == ydberr.TPTIMEOUT {
+			code = conn.timeoutAction
+		}
+		if code == YDB_TP_ROLLBACK || code == YDB_TP_RESTART || code == YDB_OK {
+			info.err = nil
+		}
+		// Handle any other error including YDB_TP_RESTART and YDB_TP_ROLLBACK
+		retval = C.int(code)
+	}()
+
 	saveToken := conn.tptoken.Swap(uint64(tptoken))
+	defer conn.tptoken.Store(saveToken)
+
 	if errstr != &cconn.errstr {
+		// This should not happen, so there's no way to coverage-test it.
 		panic(errorf(ydberr.CallbackWrongGoroutine, "YDBGo design fault: transaction callback from a different connection than the one that initiated the transaction; contact YottaDB support."))
 	}
-	retval := info.callback()
-	conn.tptoken.Store(saveToken)
-	return C.int(retval)
+	info.callback()
+	return YDB_OK // retval may be changed by deferred func
 }

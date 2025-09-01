@@ -29,7 +29,7 @@ endif
 coverdir ?= .
 
 test:
-	go test
+	go test -timeout 5s
 
 bench: benchmark
 benchmarks: benchmark
@@ -50,7 +50,7 @@ check: benchmark
 
 cover: coverage
 coverage:
-	go test -covermode=count -coverprofile "$(coverdir)/coverage.cov"
+	go test -timeout 5s -covermode=count -coverprofile "$(coverdir)/coverage.cov"
 	go tool cover -html="$(coverdir)/coverage.cov" -o $(coverdir)/coverage.html
 
 .PHONY: test bench benchmarks benchmark check cover coverage
