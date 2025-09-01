@@ -74,23 +74,6 @@ func TestTimeoutAction(t *testing.T) {
 	// true = use fast fakeTimeout below -- always do so here because the YottaDB timeout functionality has already been tested above
 	assert.PanicsWithError(t, "%YDB-E-TPTIMEOUT, Transaction timeout", func() { timeoutTransaction(true) })
 	assert.Equal(t, 0, index.GetInt()) // timeout also does a rollback, so should be 0
-
-	// Test that a panic using a non-YottaDB error also works inside a transaction
-	assert.PanicsWithError(t, "testPanic", func() { conn.TransactionFast([]string{}, func() { panic(errors.New("testPanic")) }) })
-	// Test that a panic using a string value also works inside a transaction
-	assert.PanicsWithValue(t, "testString", func() { conn.TransactionFast([]string{}, func() { panic("testString") }) })
-
-	// Test that a transaction with any other kind of YottaDB error creates a panic as it should.
-	// In this case we force a TPLOCK error by trying to unlock a lock that was locked outside the transaction.
-	n := conn.Node("testlock")
-	n.Lock()
-	// skip the unlock line below which causes BADLOCKNEXT error (it seems that the nexted unlock worked even though it gave an error)
-	// defer n.Unlock()
-	assert.PanicsWithError(t, "%YDB-E-TPLOCK, Cannot release LOCK(s) held prior to current TSTART", func() {
-		conn.TransactionFast([]string{}, func() {
-			n.Unlock()
-		})
-	})
 }
 
 func TestTransactionToken(t *testing.T) {
@@ -155,5 +138,27 @@ func TestCloneConn(t *testing.T) {
 		// Make sure conn's last non-error was not clobbered by error strings in the subconns
 		assert.Equal(t, "", conn.getErrorString())
 		assert.Equal(t, 2, n.GetInt())
+	})
+}
+
+// TestTransaction tests everything else not covered by the tests above and in transaction_examples_test.go
+func TestTransaction(t *testing.T) {
+	conn := NewConn()
+
+	// Test that a panic using a non-YottaDB error also works inside a transaction
+	assert.PanicsWithError(t, "testPanic", func() { conn.TransactionFast([]string{}, func() { panic(errors.New("testPanic")) }) })
+	// Test that a panic using a string value also works inside a transaction
+	assert.PanicsWithValue(t, "testString", func() { conn.TransactionFast([]string{}, func() { panic("testString") }) })
+
+	// Test that a transaction with any other kind of YottaDB error creates a panic as it should.
+	// In this case we force a TPLOCK error by trying to unlock a lock that was locked outside the transaction.
+	n := conn.Node("testlock")
+	n.Lock()
+	// skip the unlock line below which causes BADLOCKNEXT error (it seems that the nexted unlock worked even though it gave an error)
+	// defer n.Unlock()
+	assert.PanicsWithError(t, "%YDB-E-TPLOCK, Cannot release LOCK(s) held prior to current TSTART", func() {
+		conn.TransactionFast([]string{}, func() {
+			n.Unlock()
+		})
 	})
 }

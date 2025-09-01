@@ -71,9 +71,16 @@ func ExampleConn_Restart() {
 	conn := yottadb.NewConn()
 	n := conn.Node("^activity")
 	n.Set(0)
-	restarts := 0
+	// M locals to demonstrate restoration of M 'local' on restart or not
+	incr1 := conn.Node("incr1")
+	incr2 := conn.Node("incr2")
+	incr1.Set(0)
+	incr2.Set(0)
+	restarts := 0 // Go local
 	run := func() {
 		n.Incr(1)
+		incr1.Incr(1)
+		incr2.Incr(1)
 		if restarts < 2 {
 			restarts++
 			conn.Restart()
@@ -83,8 +90,9 @@ func ExampleConn_Restart() {
 			conn.Rollback()
 		}
 	}
-	normal := conn.TransactionFast([]string{}, run)
+	normal := conn.TransactionFast([]string{"incr1"}, run)
 	fmt.Printf("Database updated %d times; transaction restarted %d times then normal exit was: %v\n", n.GetInt(), restarts, normal)
+	fmt.Printf("M local 'incr1' was restored so became %d; 'incr2' became %d\n", incr1.GetInt(), incr2.GetInt())
 
 	// Run transaction again but give it an error condition so that it rolls back
 	restarts = 10
@@ -92,5 +100,6 @@ func ExampleConn_Restart() {
 	fmt.Printf("Transaction rollback %v; restores database value n of 2 to %d\n", rollback, n.GetInt())
 	// Output:
 	// Database updated 1 times; transaction restarted 2 times then normal exit was: true
+	// M local 'incr1' was restored so became 1; 'incr2' became 3
 	// Transaction rollback true; restores database value n of 2 to 1
 }
