@@ -120,7 +120,7 @@ func TestCloneConn(t *testing.T) {
 	conn := NewConn()
 	conn.TransactionFast([]string{}, func() {
 		n := conn.Node("count")
-		done := make(chan struct{})
+		done := make(chan struct{}, 2)
 		subfunc := func() {
 			subconn := conn.CloneConn()
 			// Create an error in subconn to make sure it doesn't clobber conn's error
