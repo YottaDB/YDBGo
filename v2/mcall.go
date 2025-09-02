@@ -218,7 +218,7 @@ var callingM sync.Mutex // Mutex for access to ydb_ci_tab_switch() so table does
 // Return typeSpec struct
 func parseType(typeStr string) (*typeSpec, error) {
 	typeStr = regexp.MustCompile(`\s*`).ReplaceAllString(typeStr, "") // remove spaces, e.g., between <type> and '*'
-	pattern := regexp.MustCompile(`(\*?)([\w_]*)(\*?)(.*)`)
+	pattern := regexp.MustCompile(`^(\*?)(\w*)(\*?)([0-9\[\]]*)$`)
 	m := pattern.FindStringSubmatch(typeStr)
 	if m == nil {
 		return nil, errorf(ydberr.MCallTypeUnhandled, "does not match a YottaDB call-in table type specification")
@@ -250,7 +250,7 @@ func parseType(typeStr string) (*typeSpec, error) {
 		preallocation = 0 // default to zero if not supplied
 	}
 	if _, ok := typeMapper[typ]; !ok {
-		return nil, errorf(ydberr.MCallTypeUnknown, "unknown type")
+		return nil, errorf(ydberr.MCallTypeUnknown, "invalid type")
 	}
 	kind := typeMapper[typ].kind
 	return &typeSpec{pointer, preallocation, typ, kind}, nil
@@ -287,13 +287,13 @@ func parsePrototype(line string) (*RoutineData, error) {
 
 	// Check for a valid M entrypoint. It contain only %^@+ and alphanumeric characters.
 	// Here I only check valid characters. YottaDB will produce an error in case of incorrect positioning of those characters
-	if !regexp.MustCompile(`[%^@+0-9a-zA-Z]+`).MatchString(entrypoint) {
+	if !regexp.MustCompile(`^[%^@+0-9a-zA-Z]+$`).MatchString(entrypoint) {
 		return nil, errorf(ydberr.MCallEntrypointInvalid, "entrypoint (%s) to call M must contain only alphanumeric and %%^@+ characters", entrypoint)
 	}
 
 	// Create list of types for return value and then each parameter
 	_retType := retType
-	if _retType != "" {
+	if _retType != "" && !strings.Contains(retType, "*") {
 		// treat retType as if it were a pointer type since it has to receive back a value
 		_retType = "*" + _retType
 	}
@@ -309,17 +309,18 @@ func parsePrototype(line string) (*RoutineData, error) {
 		return nil, errorf(ydberr.MCallTypeMismatch, "return type (%s) must not be a pointer type", retType)
 	}
 	types := []typeSpec{*typ}
-	// Now iterate each parameter
-	for i, typeStr := range regexp.MustCompile(`[^,\)]+`).FindAllString(params, -1) {
-		typ, err = parseType(typeStr)
-		if err != nil {
-			err.(*Error).Message = fmt.Sprintf("parameter %d (%s) %s", i+1, retType, err)
-			return nil, err
+	if len(strings.TrimSpace(params)) > 0 { // because Go's Split function awkwardly yields a single string if the input is empty
+		for i, typeStr := range regexp.MustCompile(`[,\)]`).Split(params, -1) {
+			typ, err = parseType(typeStr)
+			if err != nil {
+				err.(*Error).Message = fmt.Sprintf("parameter %d (%s) %s", i+1, typeStr, err)
+				return nil, err
+			}
+			if typ.typ == "" {
+				return nil, errorf(ydberr.MCallTypeMissing, "parameter %d is empty but should contain a type on", i+1)
+			}
+			types = append(types, *typ)
 		}
-		if typ.typ == "" {
-			return nil, errorf(ydberr.MCallTypeMissing, "parameter %d is empty but should contain a type", i+1)
-		}
-		types = append(types, *typ)
 	}
 
 	// Iterate types again to calculate total preallocation.
@@ -339,13 +340,14 @@ func parsePrototype(line string) (*RoutineData, error) {
 	nameDesc := (*C.ci_name_descriptor)(calloc(C.sizeof_ci_name_descriptor)) // must use our calloc, not malloc: see calloc doc
 	nameDesc.rtn_name.address = C.CString(name)                              // Allocates new memory (released by AddCleanup above
 	nameDesc.rtn_name.length = C.ulong(len(name))
-	routine := RoutineData{name, entrypoint, types, preallocation, nil, routineCInfo{nameDesc}}
+	cinfo := routineCInfo{nameDesc}
+	routine := RoutineData{name, entrypoint, types, preallocation, nil, cinfo}
 	// Queue the cleanup function to free it
-	runtime.AddCleanup(&routine, func(cinfo *routineCInfo) {
+	runtime.AddCleanup(&cinfo, func(nameDesc *C.ci_name_descriptor) {
 		// free string data in namedesc first
-		C.free(unsafe.Pointer(cinfo.nameDesc.rtn_name.address))
-		C.free(unsafe.Pointer(cinfo.nameDesc))
-	}, &routine.cinfo)
+		C.free(unsafe.Pointer(nameDesc.rtn_name.address))
+		C.free(unsafe.Pointer(nameDesc))
+	}, cinfo.nameDesc)
 
 	return &routine, nil
 }
@@ -402,7 +404,7 @@ func (conn *Conn) Import(table string) (*MFunctions, error) {
 		routine, err := parsePrototype(string(line))
 		if err != nil {
 			err := err.(*Error)
-			return nil, newError(err.Code, fmt.Sprintf("%s line %d", err, i+1), newError(ydberr.ImportParse, "")) // wrap ImportError under err
+			return nil, newError(err.Code, fmt.Sprintf("%s line %d: %s", err, i+1, bytes.TrimSpace(line)), newError(ydberr.ImportParse, "")) // wrap ImportError under err
 		}
 		if routine == nil {
 			continue
@@ -419,13 +421,15 @@ func (conn *Conn) Import(table string) (*MFunctions, error) {
 		for i, typ := range routine.Types {
 			ydbType := typeMapper[typ.typ].ydbType
 			if typ.typ == "string" && internalDB.YDBRelease < 1.36 {
-				// Make ydb <1.36 always use 'ydb_string_', since it doesn't have 'ydb_buffer_t'.
-				// It doesn't work as well because output length cannot be longer than input value,
+				// Make ydb <1.36 always use 'ydb_string_t', since it doesn't have 'ydb_buffer_t'.
+				// It doesn't work as well for IO parameters because output length cannot be longer than input value,
 				// but at least it will maintain backward compatibility for any apps that previously used YDB <1.36
 				ydbType = "ydb_string_t*"
 			}
 			// Add * for pointer types unless the ydb type already inherently has a * (e.g. strings)
 			if typ.pointer && !strings.HasSuffix(ydbType, "*") {
+				// Coverage tests will not run this line because typeMapper currently always maps to pointer types
+				// to keep the logic simple. But leave this line here in case someone changes typeMapper in future.
 				ydbType = ydbType + "*"
 			}
 			// Add IO: or I: for all parameters (not for retval, though).
@@ -445,6 +449,7 @@ func (conn *Conn) Import(table string) (*MFunctions, error) {
 	// Now create a ydb version of the call-in table without any preallocation specs (which YDB doesn't currently support)
 	f, err := os.CreateTemp("", "YDBGo_callins_*.ci")
 	if err != nil {
+		// Not in coverage test because it should never fail since we've just written the file
 		return nil, errorf(ydberr.ImportTemp, "could not open temporary call-in table file '%s': %s", f.Name(), err)
 	}
 	if debugMode >= 1 { // In debug modes retain YDB-format temporary file for later inspection
@@ -455,6 +460,7 @@ func (conn *Conn) Import(table string) (*MFunctions, error) {
 	_, err = f.WriteString(tbl.YDBTable)
 	f.Close()
 	if err != nil {
+		// Not in coverage test because it should never fail
 		return nil, errorf(ydberr.ImportTemp, "could not write temporary call-in table file '%s': %s", f.Name(), err)
 	}
 
@@ -467,6 +473,7 @@ func (conn *Conn) Import(table string) (*MFunctions, error) {
 	status := C.ydb_ci_tab_open_t(C.uint64_t(conn.tptoken.Load()), &cconn.errstr, cstr, handle)
 	tbl.handle = *handle
 	if status != YDB_OK {
+		// Not in coverage test because it should never fail since Import creates a valid call-in table
 		err := conn.lastError(status).(*Error)
 		return nil, newError(err.Code, fmt.Sprintf("%s while processing call-in table:\n%s\n", err, tbl.YDBTable), newError(ydberr.ImportOpen, ""))
 	}
@@ -494,8 +501,8 @@ func (conn *Conn) paramAlloc() unsafe.Pointer {
 
 // callM calls M routines.
 //   - args are the parameters to pass to the M routine. In the current version, they are converted to
+//     strings using fmt.Sprintf("%v") but this may change in future for improved efficiency.
 //
-// strings using fmt.Sprintf("%v") but this may change in future for improved efficiency.
 // Return value is nil if the routine is not defined to return anything.
 func (conn *Conn) callM(routine *RoutineData, args []any) (any, error) {
 	if routine == nil {
@@ -520,12 +527,13 @@ func (conn *Conn) callM(routine *RoutineData, args []any) (any, error) {
 		conn.prepAPI()
 		status := C.ydb_ci_tab_switch_t(C.uint64_t(conn.tptoken.Load()), &cconn.errstr, routine.Table.handle, oldhandle)
 		if status != YDB_OK {
+			// Not in coverage test because it's hard to know how to make it fail
 			return "", conn.lastError(status)
 		}
 		// On return, restore table handle since we changed it. Ignore errors.
-		// This is commented out because it triggers a YottaDB bug (still present in r2.01) which complains
-		// if environment variable ydb_ci/CTMCI is not set even if it has already called the relevant M routine
-		// and thus already has table data for it.
+		// This is commented out because it triggers a YottaDB bug which complains if environment variable
+		// ydb_ci/CTMCI is not set even if it has already called the relevant M routine and thus already has
+		// table data for it. The bug is slated for fixing in YDB r2.06, cf. https://gitlab.com/YottaDB/DB/YDB/-/issues/1160
 		//defer C.ydb_ci_tab_switch_t(cconn.tptoken, &cconn.errstr, *oldhandle, oldhandle)
 	}
 
@@ -561,8 +569,8 @@ func (conn *Conn) callM(routine *RoutineData, args []any) (any, error) {
 	allotStr := func(alloc, length int) {
 		length = min(alloc, length)
 		if internalDB.YDBRelease < 1.36 {
-			// Make ydb <1.36 always use 'ydb_string_', since it doesn't have 'ydb_buffer_t'.
-			// It doesn't work as well because output length cannot be longer than input value,
+			// Make ydb <1.36 always use 'ydb_string_t', since it doesn't have 'ydb_buffer_t'.
+			// It doesn't work as well for IO parameters because output length cannot be longer than input value,
 			// but at least it will maintain backward compatibility for any apps that previously used YDB <1.36
 			str := (*C.ydb_string_t)(param)
 			str.length = C.ulong(length)
@@ -594,6 +602,7 @@ func (conn *Conn) callM(routine *RoutineData, args []any) (any, error) {
 			if typ.kind == kind && typ.pointer == pointer {
 				return
 			}
+			// The following lines not in coverage test because the current design uses pointer types for all return values.
 			asterisk := ""
 			if typ.pointer {
 				asterisk = "*"
@@ -684,8 +693,8 @@ func (conn *Conn) callM(routine *RoutineData, args []any) (any, error) {
 	param = paramBlock
 	fetchStr := func() string {
 		if internalDB.YDBRelease < 1.36 {
-			// Make ydb <1.36 always use 'ydb_string_', since it doesn't have 'ydb_buffer_t'.
-			// It doesn't work as well because output length cannot be longer than input value,
+			// Make ydb <1.36 always use 'ydb_string_t', since it doesn't have 'ydb_buffer_t'.
+			// It doesn't work as well for IO parameters because output length cannot be longer than input value,
 			// but at least it will maintain backward compatibility for any apps that previously used YDB <1.36
 			str := (*C.ydb_string_t)(param)
 			return C.GoStringN(str.address, C.int(str.length))
@@ -711,7 +720,8 @@ func (conn *Conn) callM(routine *RoutineData, args []any) (any, error) {
 			ptr := (*C.ydb_double_t)(param)
 			retval = float64(*ptr)
 		default:
-			panic(errorf(ydberr.MCallTypeUnhandled, "unhandled type (%s) in return of return value; report bug in YDBGo", typ.typ))
+			// Not in coverage test because it should never fail
+			panic(errorf(ydberr.MCallTypeUnhandled, "unhandled type (%s) in return of return value; contact YottaDB support", typ.typ))
 		}
 		param = unsafe.Add(param, paramSize)
 	}
@@ -747,7 +757,8 @@ func (conn *Conn) callM(routine *RoutineData, args []any) (any, error) {
 				*val = float64(*ptr)
 			case string, int, uint, int32, uint32, int64, uint64, float32, float64:
 			default:
-				panic(errorf(ydberr.MCallTypeUnhandled, "unhandled type (%s) in parameter %d; report bug in YDBGo", reflect.TypeOf(val), i+1))
+				// Not in coverage test because it should never fail
+				panic(errorf(ydberr.MCallTypeUnhandled, "unhandled type (%s) in parameter %d; contact YottaDB support", reflect.TypeOf(val), i+1))
 			}
 		}
 		param = unsafe.Add(param, paramSize)

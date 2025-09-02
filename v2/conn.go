@@ -252,6 +252,7 @@ func (conn *Conn) Zwr2Str(zstr string) (string, error) {
 		status = C.ydb_zwr2str_st(C.uint64_t(conn.tptoken.Load()), &cconn.errstr, cbuf, cbuf)
 	}
 	if status != YDB_OK {
+		// This error shouldn't happen so hard to test code coverage
 		return "", conn.lastError(status)
 	}
 	val := conn.getValue()

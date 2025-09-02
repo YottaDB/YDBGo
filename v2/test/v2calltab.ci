@@ -1,0 +1,4 @@
+// YDBGo v2 format calltable
+
+Add: int64 add^arithmetic(int, int)
+Noop: noop^arithmetic()

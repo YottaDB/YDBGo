@@ -140,7 +140,7 @@ func Init() (*DB, error) {
 	// Verify we are running with the minimum YottaDB version or later
 	runningYDBRelease, err := strconv.ParseFloat(releaseMajorStr+"."+releaseMinorStr, 64)
 	if err != nil {
-		panic(newError(ydberr.Init, "programmer error; contact YottaDB support", err)) // shouldn't happen due to check above
+		panic(newError(ydberr.Init, "YDBGo wrapper error validating YottaDB version; contact YottaDB support", err)) // shouldn't happen due to check above
 	}
 	minYDBRelease, err := strconv.ParseFloat(MinYDBRelease[1:], 64)
 	if err != nil {

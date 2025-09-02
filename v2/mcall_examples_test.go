@@ -75,8 +75,8 @@ func ExampleConn_Import() {
 	// Half (5 - 11) is: -3
 	// 5.5 + 1.2 is: 6.7
 	//
-	// Result = test:107
-	// s = test:
+	// Result = :test:107
+	// s = :test:
 	// n+1 = 108
 	//
 	// 5 - 11 with negative sign removed is: 6

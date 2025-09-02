@@ -193,7 +193,7 @@ func (conn *Conn) recoverMessage(status C.int) string {
 		}
 		if conn.getErrorString() == "" {
 			// Do not call lastError if there is no message because it will infinitely recurse back to here to get the message
-			//panic(errorf(int(rc), "%%YDB-E-UNKNOWNSYSERR, [%d (%#x) returned by ydb_* C API] does not correspond to a known YottaDB error code", status, status))
+			// Pretty hard to work out how to coverage-test this error
 			panic(errorf(int(rc), "ydb_message_t() returned YottaDB error code %d (%#x) when trying to get the message for error %d (%#x)", rc, rc, status, status))
 		}
 		err := conn.lastError(rc)
