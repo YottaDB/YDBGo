@@ -14,6 +14,7 @@ package yottadb
 
 import (
 	"errors"
+	"flag"
 	"testing"
 	"time"
 
@@ -139,6 +140,30 @@ func TestCloneConn(t *testing.T) {
 		assert.Equal(t, "", conn.getErrorString())
 		assert.Equal(t, 2, n.GetInt())
 	})
+}
+
+// Set up custom flag to allow user to specify deadlock test
+var testDeadlock bool
+
+func init() {
+	flag.BoolVar(&testDeadlock, "deadlock", false, "test that a transaction using the wrong tptimeout causes a deadlock")
+}
+
+// TestDeadlock checks that a panic instead of an error occurs if an invalid Conn is used inside a transaction
+func TestDeadlock(t *testing.T) {
+	// Run this test with: go test -timeout 2s -run Deadlock -deadlock=true >/dev/null || echo Successfully deadlocked
+	if !testDeadlock {
+		return
+	}
+
+	conn := NewConn()
+	n := conn.Node("^testdeadlock")
+	tptoken := conn.TransactionToken()
+	success := conn.TransactionFast([]string{}, func() {
+		conn.TransactionTokenSet(tptoken) // use the wrong (outer) tptoken
+		n.Get()
+	})
+	assert.Equal(t, false, success)
 }
 
 // TestTransaction tests everything else not covered by the tests above and in transaction_examples_test.go
