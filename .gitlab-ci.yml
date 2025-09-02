@@ -57,6 +57,8 @@ before_script: |-
       ls m_routines  &>/dev/null && cp -r m_routines  $CI_PROJECT_DIR/artifacts/go$ver
       find $CI_PROJECT_DIR/artifacts/go$ver
     done
+    # Verify that bench tests run (avoids adding erroneous benchmarks) -- it's unnecessary to run them against every Go version in the loop above
+    go$ver test -bench . -short -timeout 60s -benchtime 0.1s
   artifacts:
     paths:
       - artifacts
