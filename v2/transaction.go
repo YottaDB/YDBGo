@@ -175,6 +175,6 @@ func (conn *Conn) TransactionTokenSet(tptoken uint64) {
 func (conn *Conn) CloneConn() *Conn {
 	new := NewConn()
 	new.tptoken = conn.tptoken // point to the original conn's tptoken
-	conn.timeoutAction = TransactionTimeout
+	new.timeoutAction = TransactionTimeout
 	return new
 }
