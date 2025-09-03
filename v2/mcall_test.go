@@ -100,11 +100,12 @@ func TestCallM(t *testing.T) {
 	assert.Equal(t, 107, n)
 
 	// Temporarily set YDBRelease to 1.34 to test that special ydb_string_t handling for that verison works
+	prealloc := 10
 	func() {
 		originalRelease := internalDB.YDBRelease
 		internalDB.YDBRelease = 1.34
 		defer func() { internalDB.YDBRelease = originalRelease }()
-		m := conn.MustImport("AddVerbose: string[1024] addVerbose^arithmetic(*string[10], *int, int, string)")
+		m := conn.MustImport(fmt.Sprintf("AddVerbose: string[1024] addVerbose^arithmetic(*string[%d], *int, int, string)", prealloc))
 		s, n := "test", 3
 		result := m.Call("AddVerbose", &s, &n, 4, "100").(string)
 		assert.Equal(t, ":test:107", result)
@@ -114,7 +115,7 @@ func TestCallM(t *testing.T) {
 	}()
 
 	// Test CallErr returning an error: create an error by having AddVerbose append to a max-sized string
-	bigString := strings.Repeat("A", YDB_MAX_STR)
+	bigString := strings.Repeat("A", prealloc)
 	ret, err = m.CallErr("AddVerbose", &bigString, &n, 4, "100")
 	assert.NotNil(t, err)
 	// Test that Wrap panics on error
@@ -125,9 +126,11 @@ func TestCallM(t *testing.T) {
 	assert.Panics(t, func() { m.WrapRetFloat("Undefined") })
 
 	// Test code path where all concatenated return parameters may not fit into YDB_MAX_STR
-	m3 := conn.MustImport(fmt.Sprintf("Add: int add^arithmetic(*string[%d], *string[%d])", YDB_MAX_STR, YDB_MAX_STR))
-	big1 := "1" + strings.Repeat(" ", YDB_MAX_STR)
-	big2 := "2" + strings.Repeat(" ", YDB_MAX_STR)
+	big1 := "1" + strings.Repeat(" ", YDB_MAX_STR-1)
+	big2 := "2" + strings.Repeat(" ", YDB_MAX_STR-1)
+	m3 := conn.MustImport("Add: int add^arithmetic(string, string)")
+	assert.Equal(t, 3, m3.Call("Add", big1, big2).(int))
+	m3 = conn.MustImport(fmt.Sprintf("Add: int add^arithmetic(*string[%d], *string[%d])", YDB_MAX_STR, YDB_MAX_STR))
 	assert.Equal(t, 3, m3.Call("Add", &big1, &big2).(int))
 
 	// Test the various arithmetic functions with various types

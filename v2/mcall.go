@@ -549,6 +549,7 @@ func (conn *Conn) callM(routine *RoutineData, args []any) (any, error) {
 		switch val := arg.(type) {
 		case string:
 			preallocation += len(val)
+			// Note: *string case is already pre-allocated and included in routine.preallocation
 		}
 	}
 
@@ -557,11 +558,11 @@ func (conn *Conn) callM(routine *RoutineData, args []any) (any, error) {
 	paramBlock := conn.paramAlloc() // allocated in conn for in subsequent calls
 	var prealloc unsafe.Pointer
 	// Use statically-available connection space if prealloction fits within its maximum; otherwise malloc
-	if routine.preallocation < YDB_MAX_STR {
-		conn.ensureValueSize(routine.preallocation)
+	if preallocation < YDB_MAX_STR {
+		conn.ensureValueSize(preallocation)
 		prealloc = unsafe.Pointer(cconn.value.buf_addr)
 	} else {
-		prealloc = C.malloc(C.size_t(routine.preallocation)) // must use our calloc, not malloc: see calloc doc
+		prealloc = C.malloc(C.size_t(preallocation)) // no need to use calloc as it is only for string data: see calloc doc
 		defer C.free(prealloc)
 	}
 
@@ -617,8 +618,13 @@ func (conn *Conn) callM(routine *RoutineData, args []any) (any, error) {
 		case *string:
 			pointer = true
 			typeAssert(val, reflect.String)
-			C.memcpy(prealloc, unsafe.Pointer(unsafe.StringData(*val)), C.size_t(min(typ.alloc, len(*val))))
-			allotStr(typ.alloc, len(*val))
+			length := len(*val)
+			// Produce error rather than truncate if string does not fit into preallocated space
+			if length > typ.alloc {
+				return nil, errorf(ydberr.InvalidStringLength, "parameter %d (%d bytes) is larger than the preallocation size of %d", i+1, length, typ.alloc)
+			}
+			C.memcpy(prealloc, unsafe.Pointer(unsafe.StringData(*val)), C.size_t(length))
+			allotStr(typ.alloc, length)
 		case int:
 			typeAssert(val, reflect.Int)
 			*(*C.ydb_long_t)(param) = C.ydb_long_t(val)
