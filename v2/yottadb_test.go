@@ -173,7 +173,7 @@ func _testMain(m *testing.M) int {
 	logfile := setupLogger(testDir, verbose)
 	defer logfile.Close()
 	if coverage {
-		debugMode = 100 // cover every possible code path
+		debugMode.Store(100) // cover every possible code path
 	}
 
 	// Create test database if necessary.

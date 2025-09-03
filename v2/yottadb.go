@@ -20,6 +20,7 @@ package yottadb
 // go 1.19 required for sync/atomic -- safer than previous options
 
 import (
+	"sync/atomic"
 	"time"
 	"unsafe"
 
@@ -72,7 +73,7 @@ var (
 // debugMode=0: no debug logging (default)
 // debugMode=1: log at entrypoint of M functions or Go signal callbacks; and don't remove temporary callback table file
 // debugMode=2: in addition, log extra signal processing info
-var debugMode int = 0 // increasing values 1, 2 or 3 for increasing log output
+var debugMode atomic.Int64 // increasing values 1, 2 or 3 for increasing log output
 
 // ---- Utility functions
 

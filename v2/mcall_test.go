@@ -59,12 +59,12 @@ func TestImport(t *testing.T) {
 	assert.Equal(t, ydberr.ImportRead, importer("test/v2calltab-does-not-exist.ci"))
 
 	// Test that import removes the temporary call-in file works in both debug modes -- for coverage tests
-	originalDebugMode := debugMode
-	debugMode = 0
+	originalDebugMode := debugMode.Load()
+	debugMode.Store(0)
 	conn.MustImport("name: name^name()")
-	debugMode = 1
+	debugMode.Store(1)
 	conn.MustImport("name: name^name()")
-	debugMode = originalDebugMode
+	debugMode.Store(originalDebugMode)
 }
 
 func TestCallM(t *testing.T) {

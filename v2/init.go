@@ -213,7 +213,7 @@ func Shutdown(handle *DB) error {
 		return nil
 	}
 
-	if debugMode >= 2 {
+	if debugMode.Load() >= 2 {
 		log.Println("Exit(): YDB Engine shutdown started")
 	}
 	// When we run ydb_exit(), set up a timer that will pop if ydb_exit() gets stuck in a deadlock or whatever. We could
@@ -252,7 +252,7 @@ func Shutdown(handle *DB) error {
 		// We don't really care at this point what the return code is as we're just trying to run things down the
 		// best we can as this is the end of using the YottaDB engine in this process.
 	case <-time.After(exitWait):
-		if debugMode >= 2 {
+		if debugMode.Load() >= 2 {
 			log.Println("Shutdown(): Wait for ydb_exit() expired")
 		}
 		if !ydbSigPanicCalled.Load() {
