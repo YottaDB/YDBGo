@@ -39,7 +39,7 @@ if echo "$skipextensions" | grep -q -w "$(echo "$file" | awk -F . '{print $NF}')
 fi
 
 # Below is a list of specific files that do not have a copyright so ignore them
-skiplist="COPYING README.md error_codes.go error_codes.h v2/ydbconst.go v2/ydbconst.h v2/ydberr/errorcodes.go v2/ydberr/errorcodes.h"
+skiplist="COPYING COPYING.LESSER LICENSE README.md error_codes.go error_codes.h v2/ydbconst.go v2/ydbconst.h v2/ydberr/errorcodes.go v2/ydberr/errorcodes.h"
 if echo "$skiplist" | grep -q -w "$file"; then
 	exit 1
 fi
