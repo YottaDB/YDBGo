@@ -89,9 +89,11 @@ race_detector:
     # Test v1
     go get -t
     go test -v -race
+    go test -v -asan
     # Test v2
     go get -C v2 -t
     go test -C v2 -v -race
+    go test -C v2 -v -asan
 
 
 # ~~~ Coverage tests

@@ -21,6 +21,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"runtime/debug"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -138,14 +139,15 @@ func validateYDBSignal(sig os.Signal) *sigInfo {
 }
 
 // SignalNotify relays incoming signals to notifyChan specifically for signals used by YottaDB.
-// After calling SignalNotify, the user is then responsible to call [NotifyYDB]() at the start or end of their own handler
-// to allow YottaDB to process the signal. The user can revert behaviour to the YDBGo default
-// with [SignalReset](), after which YDBGo will once again call [NotifyYDB]().
+// If SignalNotify is used on a specific signal, the user is then responsible to call [NotifyYDB]() at the start or end
+// of their own handler to allow YottaDB to process the signal. The user can revert behaviour to the YDBGo default
+// with [SignalReset](), after which YDBGo will once again call [NotifyYDB]() itself.
 //   - Users may opt to use the standard library's [Signal.Notify]() instead of this function to be notified of signals, but
 //     this will notify them in parallel with YottaDB. However, they must not call Signal.Stop() (see below).
 //   - Do not call [Signal.Stop](), [Signal.Ignore]() or [Signal.Reset]() for any of the YottaDB-specific signals
 //     unless you understand that it will prevent [NotifyYDB]() from being called, and will affect YottaDB timers
 //     or other functionality.
+//   - Using SignalNotify to capture SIGSEGV is unreliable. Instead, see standard library function [debug.SetPanicOnFault](true)
 //
 // YottaDB-specific signals are listed in the source in [YDBSignals].
 //
@@ -153,6 +155,9 @@ func validateYDBSignal(sig os.Signal) *sigInfo {
 //
 // [YottaDB signals]: https://docs.yottadb.com/MultiLangProgGuide/programmingnotes.html#signals
 func SignalNotify(notifyChan chan os.Signal, signals ...os.Signal) {
+	// Do-nothing hack purely to prevent goimport from removing runtime/debug from imports since it's required for the docstring above
+	debug.SetPanicOnFault(debug.SetPanicOnFault(false))
+
 	// Although this routine itself does not interact with the YottaDB runtime, use of this routine has an expectation that
 	// the runtime is going to handle signals so let's make sure it is initialized.
 	initCheck()

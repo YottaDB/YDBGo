@@ -16,6 +16,7 @@ package yottadb
 
 import (
 	"log"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
@@ -182,7 +183,7 @@ func initCheck() {
 // If Shutdown() is not called prior to process termination, steps must be taken to ensure database integrity as documented in [Database Integrity]
 // and unreleased locks may cause small subsequent delays (see [relevant LKE documentation]).
 //
-// It is recommended defer [Shutdown]() immediately after calling [Init]() in the main routine, and then for the
+// It is recommended to defer [Shutdown]() immediately after calling [Init]() in the main routine, and then for the
 // main routine to confirm that all goroutines have stopped or have completely finished accessing the database before exiting.
 //
 // Cautions:
@@ -190,7 +191,8 @@ func initCheck() {
 //     finished using the database before it calls yottadb.Shutdown(). Calling Shutdown() before they are done will cause problems.
 //   - Avoid Go's os.Exit() function because it bypasses any defers (it is a low-level OS call).
 //   - Care must be taken with any signal notifications (see [Go Using Signals]) to prevent them from causing premature exit.
-//   - Note that Go *will* run defers on panic, but not on fatal signals such as SIGSEGV.
+//   - Note that Go *will* run defers on panic, but not on fatal signals, so you may wish to capture fatal signals with [SignalNotify] or
+//     capture SIGSEGV to a panic by calling standard library function [debug.SetPanicOnFault](true) in every goroutine that might segfault.
 //
 // Shutdown() must be called exactly once for each time [Init]() was called, and shutdown will not occur until the last time.
 // Return ShutdownBypassError if it has to wait longer than MaxNormalExitWait for signal handling goroutines to exit.
@@ -202,6 +204,9 @@ func initCheck() {
 //
 // [exceptions]: https://github.com/golang/go/issues/20713#issuecomment-1518197679
 func Shutdown(handle *DB) error {
+	// Do-nothing hack purely to prevent goimport from removing runtime/debug from imports since it's required for the docstring above
+	debug.SetPanicOnFault(debug.SetPanicOnFault(false))
+
 	// use the same mutex as Init because we don't want either to run simultaneously
 	inInit.Lock()         // One goroutine at a time through here else we can get DATA-RACE warnings accessing wgexit wait group
 	defer inInit.Unlock() // Release lock when we leave this routine
