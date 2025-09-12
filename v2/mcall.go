@@ -208,8 +208,8 @@ type RoutineData struct {
 	Types         []typeSpec // stores type specification for the routine's return value and each parameter
 	preallocation int        // sum of all types.preallocation -- avoids having to calculate this in callM()
 	// metadata:
-	Table *CallTable   // call table used to find this routine name
-	cinfo routineCInfo // stores YottaDB's C descriptors for the routine
+	Table *CallTable    // call table used to find this routine name
+	cinfo *routineCInfo // stores YottaDB's C descriptors for the routine
 }
 
 var callingM sync.Mutex // Mutex for access to ydb_ci_tab_switch() so table doesn't switch again before fetching ci_name_descriptor routine info
@@ -341,7 +341,7 @@ func parsePrototype(line string) (*RoutineData, error) {
 	nameDesc.rtn_name.address = C.CString(name)                              // Allocates new memory (released by AddCleanup above
 	nameDesc.rtn_name.length = C.ulong(len(name))
 	cinfo := routineCInfo{nameDesc}
-	routine := RoutineData{name, entrypoint, types, preallocation, nil, cinfo}
+	routine := RoutineData{name, entrypoint, types, preallocation, nil, &cinfo}
 	// Queue the cleanup function to free it
 	runtime.AddCleanup(&cinfo, func(nameDesc *C.ci_name_descriptor) {
 		// free string data in namedesc first
