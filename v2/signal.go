@@ -40,7 +40,7 @@ var ydbShutdownCheck = make(chan struct{}) // Flag that a channel has been shut 
 var shutdownSigGoroutines bool             // Flag that we have completed shutdownSignalGoroutines()
 var shutdownSigGoroutinesMutex sync.Mutex  // Serialize access to shutdownSignalGoroutines()
 
-// YDBSignals lists all the signals that YottaDB requires to be notified of.
+// YDBSignals lists all the signals that YottaDB must be notified of.
 var YDBSignals = []os.Signal{
 	syscall.SIGABRT,
 	syscall.SIGALRM,
