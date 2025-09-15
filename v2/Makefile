@@ -15,6 +15,7 @@
 tests=.
 benchtime?=1s
 short=-short
+flags=
 BENCH=
 
 perflock?=$(shell command -v perflock >/dev/null && echo perflock)
@@ -29,12 +30,12 @@ endif
 coverdir ?= .
 
 test:
-	go test -timeout 5s
+	go test -run ($tests) -timeout 5s $(flags)
 
 bench: benchmark
 benchmarks: benchmark
 benchmark:
-	$(perflock) go test -bench $(tests) $(short) -timeout 5s -benchtime $(benchtime) $(BENCH)
+	$(perflock) go test -bench $(tests) $(short) -timeout 5s -benchtime $(benchtime) $(BENCH) $(flags)
 
 diff: benchtime=5s
 diff: short=
@@ -50,7 +51,17 @@ check: benchmark
 
 cover: coverage
 coverage:
-	go test -timeout 5s -covermode=count -coverprofile "$(coverdir)/coverage.cov"
+	mkdir -p coverage
+	rm -f coverage/*
+	go build -cover -o test/fatalsignal test/fatalsignal.go
+	@# Run standalone program to capture coverage of fatal signal effect
+	GOCOVERDIR=coverage test/fatalsignal || true
+	@# Run the rest of the tests
+	test/test -test.timeout=5s -test.gocoverdir=coverage
+	go tool covdata textfmt -i=./coverage -o coverage.cov
 	go tool cover -html="$(coverdir)/coverage.cov" -o $(coverdir)/coverage.html
+
+clean:
+	rm -rf coverage test/*.o test/fatalsignal
 
 .PHONY: test bench benchmarks benchmark check cover coverage

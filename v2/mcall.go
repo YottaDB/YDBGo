@@ -452,7 +452,7 @@ func (conn *Conn) Import(table string) (*MFunctions, error) {
 		// Not in coverage test because it should never fail since we've just written the file
 		return nil, errorf(ydberr.ImportTemp, "could not open temporary call-in table file '%s': %s", f.Name(), err)
 	}
-	if debugMode.Load() >= 1 { // In debug modes retain YDB-format temporary file for later inspection
+	if DebugMode.Load() >= 1 { // In debug modes retain YDB-format temporary file for later inspection
 		log.Printf("Temporary call-in table file is: %s\n", f.Name())
 	} else {
 		defer os.Remove(f.Name())

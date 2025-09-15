@@ -70,10 +70,11 @@ var (
 
 // ---- Debug settings
 
-// debugMode=0: no debug logging (default)
-// debugMode=1: log at entrypoint of M functions or Go signal callbacks; and don't remove temporary callback table file
-// debugMode=2: in addition, log extra signal processing info
-var debugMode atomic.Int64 // increasing values 1, 2 or 3 for increasing log output
+// DebugMode greater than zero (1, 2, or 3) increases logging output
+//   - DebugMode=0: no debug logging (default)
+//   - DebugMode=1: log at entrypoint of M functions or Go signal callbacks; and don't remove temporary callback table file
+//   - DebugMode=2: in addition, log extra signal processing info
+var DebugMode atomic.Int64 // increasing values 1, 2 or 3 for increasing log output
 
 // ---- Utility functions
 

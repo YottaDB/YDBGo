@@ -26,3 +26,4 @@
 go.work
 go.work.sum
 coverage.*
+v2/coverage

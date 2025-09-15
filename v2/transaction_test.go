@@ -150,8 +150,8 @@ func init() {
 }
 
 // TestDeadlock checks that a panic instead of an error occurs if an invalid Conn is used inside a transaction
+// Run this test with: go test -timeout 2s -run Deadlock -deadlock=true >/dev/null || echo Successfully deadlocked
 func TestDeadlock(t *testing.T) {
-	// Run this test with: go test -timeout 2s -run Deadlock -deadlock=true >/dev/null || echo Successfully deadlocked
 	if !testDeadlock {
 		return
 	}

@@ -13,6 +13,7 @@
 package yottadb
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"runtime/debug"
@@ -46,6 +47,7 @@ func TestSigSegv(t *testing.T) {
 
 var testSignals []os.Signal
 
+// Copies all YDBSignals into testSignals except for the ones for which YDBGo does not support notification since they cause hangs.
 func init() {
 	for _, sig := range YDBSignals {
 		switch sig {
@@ -189,8 +191,34 @@ func testSignal(sig os.Signal, tellYDB bool) {
 	}
 }
 
+// Set up custom flag to allow user to specify fatal signal test
+var testFatalSignal, testSyslog bool
+
+func init() {
+	flag.BoolVar(&testFatalSignal, "fatalsignal", false, "test that a fatal signal exits properly")
+	flag.BoolVar(&testSyslog, "syslog", false, "test that program can output a syslog entry")
+}
+
 // TestSyslogEntry checks that we can write an INFO-level message to syslog.
 // Verification that the message is actually in syslog must be done by an external program.
+// Note: requires an external helper program to run the test with flags: -run Syslog -syslog
 func TestSyslogEntry(t *testing.T) {
+	if !testSyslog {
+		return
+	}
 	syslogEntry("Test of syslog functionality")
+}
+
+// TestFatalSignal checks that a fatal signal exits and shuts down cleanly.
+// This forces a database shutdown so it should be run stand-alone, not with other tests.
+// Note: requires an external helper program to provide flags: -run FatalSignal -fatalsignal
+// and to check that stdout says "shutdownSignalGoroutines: Channel closings complete"
+// (cf. shutdownSignalGoroutines)
+func TestFatalSignal(t *testing.T) {
+	if !testFatalSignal {
+		return
+	}
+	DebugMode.Store(2)                             // switch on output of completion message in shutdownSignalGoroutines()
+	syscall.Kill(syscall.Getpid(), syscall.SIGINT) // Send ourselves a SIGINT
+
 }
