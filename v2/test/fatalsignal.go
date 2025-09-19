@@ -15,7 +15,6 @@ package main
 import (
 	"fmt"
 	"syscall"
-	"time"
 
 	"lang.yottadb.com/go/yottadb/v2"
 )
@@ -38,7 +37,7 @@ func main() {
 			fmt.Printf("No panic occurred\n")
 		}
 	}()
-	yottadb.DebugMode.Store(2) // switch on output of completion message in shutdownSignalGoroutines()
+	yottadb.DebugMode.Store(2) // turn on output of completion message in shutdownSignalGoroutines()
 	//syscall.Kill(syscall.Getpid(), syscall.SIGINT) // Send ourselves a SIGINT
 	yottadb.SignalExitCallback(syscall.SIGINT)
 	time.Sleep(time.Second) // allow time for signal to be heard

@@ -27,7 +27,7 @@ func TestImport(t *testing.T) {
 	conn := SetupTest(t)
 	funcs := conn.MustImport("AddVerbose: string[1024] addVerbose^arithmetic(string, int64, int64)")
 	strType := "ydb_buffer_t"
-	if internalDB.YDBRelease < 1.36 {
+	if dbHandle.YDBRelease < 1.36 {
 		strType = "ydb_string_t"
 	}
 	assert.Equal(t, fmt.Sprintf("AddVerbose: %s* addVerbose^arithmetic(I:%s*, I:ydb_int64_t*, I:ydb_int64_t*)", strType, strType), funcs.Table.YDBTable)
@@ -102,9 +102,9 @@ func TestCallM(t *testing.T) {
 	// Temporarily set YDBRelease to 1.34 to test that special ydb_string_t handling for that verison works
 	prealloc := 10
 	func() {
-		originalRelease := internalDB.YDBRelease
-		internalDB.YDBRelease = 1.34
-		defer func() { internalDB.YDBRelease = originalRelease }()
+		originalRelease := dbHandle.YDBRelease
+		dbHandle.YDBRelease = 1.34
+		defer func() { dbHandle.YDBRelease = originalRelease }()
 		m := conn.MustImport(fmt.Sprintf("AddVerbose: string[1024] addVerbose^arithmetic(*string[%d], *int, int, string)", prealloc))
 		s, n := "test", 3
 		result := m.Call("AddVerbose", &s, &n, 4, "100").(string)

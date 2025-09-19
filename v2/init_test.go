@@ -34,6 +34,6 @@ func TestInitCheck(t *testing.T) {
 	saved := initCount.Load()
 	initCount.Store(0)
 	assert.Panics(t, func() { initCheck() })
-	assert.Panics(t, func() { Shutdown(internalDB) }) // Shutdown called when not initialized
+	assert.Panics(t, func() { Shutdown(dbHandle) }) // Shutdown called when not initialized
 	initCount.Store(saved)
 }

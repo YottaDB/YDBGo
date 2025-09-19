@@ -36,7 +36,8 @@ type DB struct {
 	YDBRelease float64 // release version of the installed YottaDB
 }
 
-var internalDB = &DB{} // make this a single instance per app because we can: so that e.g. mcall can check YDBRelease without having access to a particular DB instance
+// dbHandle is the global handle used to access database metadata
+var dbHandle = &DB{} // make this a single instance per app because we can: so that e.g. mcall can check YDBRelease without having access to a particular DB instance
 
 // Init and Exit globals
 var wgexit sync.WaitGroup
@@ -53,7 +54,7 @@ func MustInit() *DB {
 	return db
 }
 
-// Init initializes the YottaDB engine and set up signal handling.
+// Init initializes the YottaDB engine and sets up signal handling.
 // Init may be called multiple times (e.g. by different goroutines) but [Shutdown]() must be called exactly once
 // for each time Init() was called. See [Shutdown] for more detail on the fallout from incorrect usage.
 // Although Init could have been made to happen automatically, this more explicit approach clarifies that
@@ -80,7 +81,7 @@ func Init() (*DB, error) {
 	inInit.Lock()
 	defer inInit.Unlock()     // Release lock when we leave this routine
 	if initCount.Add(1) > 1 { // Must increment this before calling NewConn() below or it will fail initCheck()
-		return internalDB, nil // already initialized
+		return dbHandle, nil // already initialized
 	}
 
 	// Init YottaDB engine/runtime
@@ -164,8 +165,8 @@ func Init() (*DB, error) {
 	}
 	// Now wait for the goroutine to initialize and get signals all set up. When that is done, we can return
 	wgSigInit.Wait()
-	internalDB = &DB{runningYDBRelease}
-	return internalDB, nil
+	dbHandle = &DB{runningYDBRelease}
+	return dbHandle, nil
 }
 
 // initCheck Panics if Init() has not been called
@@ -176,44 +177,75 @@ func initCheck() {
 }
 
 // Shutdown invokes YottaDB's rundown function ydb_exit() to shut down the database properly.
-// It MUST be called prior to process termination by any application that modifies the database.
-// This is necessary particularly in Go because Go does not call the C atexit() handler (unless building with certain test options),
+// It MUST be called prior to process termination by any application that calls [Init]().
+// It is recommended to defer Shutdown() immediately after calling [Init]() in the main routine.
+// You should also defer [ShutdownOnPanic]() from new goroutines to ensure shutdown occurs if they panic.
+//
+// This is necessary, particularly in Go, because Go does not call the C atexit() handler (unless building with certain test options),
 // so YottaDB itself cannot automatically ensure correct rundown of the database.
 //
-// If Shutdown() is not called prior to process termination, steps must be taken to ensure database integrity as documented in [Database Integrity]
-// and unreleased locks may cause small subsequent delays (see [relevant LKE documentation]).
+// If Shutdown() is not called prior to process termination, steps must be taken to ensure database integrity, as documented
+// in [Database Integrity] and unreleased locks may cause small subsequent delays (see [relevant LKE documentation]).
 //
-// It is recommended to defer [Shutdown]() immediately after calling [Init]() in the main routine, and then for the
-// main routine to confirm that all goroutines have stopped or have completely finished accessing the database before exiting.
+// Deferring Shutdown() has the side benefit of exiting silently on ydberr.CALLINAFTERXIT panics if they come from
+// a fatal signal panic that has already occurred in another goroutine.
 //
-// Cautions:
-//   - If goroutines that access the database are spawned, it is the main routine's responsibility to ensure that all such goroutines have
-//     finished using the database before it calls yottadb.Shutdown(). Calling Shutdown() before they are done will cause problems.
-//   - Avoid Go's os.Exit() function because it bypasses any defers (it is a low-level OS call).
-//   - Care must be taken with any signal notifications (see [Go Using Signals]) to prevent them from causing premature exit.
-//   - Note that Go *will* run defers on panic, but not on fatal signals, so you may wish to capture fatal signals with [SignalNotify] or
-//     capture SIGSEGV to a panic by calling standard library function [debug.SetPanicOnFault](true) in every goroutine that might segfault.
+// Notes:
+//   - It is the main routine's responsibility to ensure that any goroutines have finished using the database before it calls
+//     yottadb.Shutdown(). Otherwise they will receive ydberr.CALLINAFTERXIT errors from YDBGo.
+//   - Avoid Go's [os.Exit]() function because it bypasses any defers (it is a low-level OS call).
+//   - Shutdown() must be called exactly once for each time [Init]() was called, and shutdown will not occur until the last time.
 //
-// Shutdown() must be called exactly once for each time [Init]() was called, and shutdown will not occur until the last time.
-// Return ShutdownBypassError if it has to wait longer than MaxNormalExitWait for signal handling goroutines to exit.
+// Returns [ydberr.ShutdownIncomplete] if it has to wait longer than MaxNormalExitWait for signal handling goroutines to exit.
 // No other errors are returned. Panics if Shutdown is called more than Init.
 //
 // [Database Integrity]: https://docs.yottadb.com/MultiLangProgGuide/goprogram.html#database-integrity
 // [relevant LKE documentation]: https://docs.yottadb.com/AdminOpsGuide/mlocks.html#introduction
-// [Go Using Signals]: https://docs.yottadb.com/MultiLangProgGuide/goprogram.html#go-using-signals
 //
+// [Go Using Signals]: https://docs.yottadb.com/MultiLangProgGuide/goprogram.html#go-using-signals
 // [exceptions]: https://github.com/golang/go/issues/20713#issuecomment-1518197679
 func Shutdown(handle *DB) error {
+	return _shutdown(handle, false)
+}
+
+// ShutdownHard shuts down immediately even if it has not yet been called as many times as Init.
+// It is used before a fatal exit like panic or fatals signals.
+// ShutdownHard may be called any number of times without ill effect (e.g. by different goroutines during an application shutdown).
+func ShutdownHard(handle *DB) error {
+	return _shutdown(handle, true)
+}
+
+// _shutdown is the core of Shutdown.
+// If force is true, Shutdown now even if it has not yet been called as many times as Init.
+func _shutdown(handle *DB, force bool) error {
 	// Do-nothing hack purely to prevent goimport from removing runtime/debug from imports since it's required for the docstring above
 	debug.SetPanicOnFault(debug.SetPanicOnFault(false))
+
+	// Defer a func that exits silently (after shutting down) if it was a fatal signal that caused the shutdown,
+	// (which would have happened  in another goroutine).
+	defer func() {
+		if err := recover(); err != nil {
+			// Quit if fatal signal caused the shutdown
+			quitAfterFatalSignal(err)
+			// Otherwise re-panic
+			panic(err)
+		}
+	}()
 
 	// use the same mutex as Init because we don't want either to run simultaneously
 	inInit.Lock()         // One goroutine at a time through here else we can get DATA-RACE warnings accessing wgexit wait group
 	defer inInit.Unlock() // Release lock when we leave this routine
+	if force {
+		if initCount.Load() == 0 {
+			// Skip coverage-test of the next line: it would need a separate goroutine that calls ShutdownHard() while Shutdown() is already running. Tricky timing.
+			return nil // already done
+		}
+		initCount.Store(1)
+	}
 	if initCount.Load() == 0 {
 		panic(errorf(ydberr.Shutdown, "Shutdown() called more times than Init()"))
 	}
-	if initCount.Add(-1) > 0 {
+	if !force && initCount.Add(-1) > 0 {
 		// Don't shutdown if some other goroutine is still using the dbase
 		return nil
 	}

@@ -192,11 +192,12 @@ func testSignal(sig os.Signal, tellYDB bool) {
 }
 
 // Set up custom flag to allow user to specify fatal signal test
-var testFatalSignal, testSyslog bool
+var fatalTest string
+var testSyslog bool
 
 func init() {
-	flag.BoolVar(&testFatalSignal, "fatalsignal", false, "test that a fatal signal exits properly")
-	flag.BoolVar(&testSyslog, "syslog", false, "test that program can output a syslog entry")
+	flag.StringVar(&fatalTest, "fataltest", "none", `test a fatal signal code path; if set "real" to use syscall.Kill or "fake" to call exit handler directly`)
+	flag.BoolVar(&testSyslog, "syslog", false, "check that program can output a syslog entry")
 }
 
 // TestSyslogEntry checks that we can write an INFO-level message to syslog.
@@ -209,16 +210,71 @@ func TestSyslogEntry(t *testing.T) {
 	syslogEntry("Test of syslog functionality")
 }
 
-// TestFatalSignal checks that a fatal signal exits and shuts down cleanly.
+// TestFatal checks that a fatal signal exits and shuts down cleanly.
 // This forces a database shutdown so it should be run stand-alone, not with other tests.
-// Note: requires an external helper program to provide flags: -run FatalSignal -fatalsignal
+// Note: requires an external helper program to provide flags: -run Fatal -fataltest=fake, etc
 // and to check that stdout says "shutdownSignalGoroutines: Channel closings complete"
 // (cf. shutdownSignalGoroutines)
-func TestFatalSignal(t *testing.T) {
-	if !testFatalSignal {
+// Set -fataltest to:
+//   - "real" to send the signal with syscall.Kill
+//   - "fake" to call the SignalExitCallback directly
+//   - "shutdownpanic" to test that path
+//
+// Only the "fake" form saves coverage data in the coverage file.
+// The "real" form doesn't because YottaDB calls os.Exit() before Go saves the coverage data.
+// This means you have to call both forms: one to test coverage, and one to test that the signal actually works
+func TestFatalTest(t *testing.T) {
+	if fatalTest == "none" {
 		return
 	}
-	DebugMode.Store(2)                             // switch on output of completion message in shutdownSignalGoroutines()
-	syscall.Kill(syscall.Getpid(), syscall.SIGINT) // Send ourselves a SIGINT
 
+	DebugMode.Store(2) // turn on output of completion message in shutdownSignalGoroutines()
+
+	recoverer := func() {
+		err := recover()
+		if err != nil {
+			fmt.Printf("Recovered from: %s\n", err)
+		} else {
+			fmt.Printf("No panic occurred2\n")
+		}
+	}
+	defer recoverer()
+
+	switch fatalTest {
+	case "real":
+		syscall.Kill(syscall.Getpid(), syscall.SIGINT) // Send ourselves a SIGINT
+		time.Sleep(time.Second)                        // Give signal time be picked up by goroutine
+	case "fake":
+		// Only the "fake" form saves coverage data in the coverage file because in the "real" form YDB exits before Go saves the coverage data.
+		ydbSigPanicCalled.Store(true) // fake this, too
+		SignalExitCallback(syscall.SIGINT)
+	case "goroutine":
+		ch := make(chan os.Signal, 1) // Create signal notify and signal ack channels
+		SignalNotify(ch, syscall.SIGINT)
+		go func() {
+			defer recoverer()
+			defer ShutdownOnPanic()
+			for {
+				sig := <-ch
+				fmt.Printf("\nSignal %d (%s) received.\n", sig, sig)
+				NotifyYDB(sig)
+			}
+		}()
+		syscall.Kill(syscall.Getpid(), syscall.SIGINT) // Send ourselves a SIGINT
+		time.Sleep(time.Second)                        // Give signal time be picked up by goroutine
+	case "shutdownpanic":
+		ydbSigPanicCalled.Store(true) // fake this to test its code path
+		MaxPanicExitWait = 10 * time.Millisecond
+		fallthrough
+	case "shutdownpanic2":
+		MaxNormalExitWait = 10 * time.Millisecond
+		go func() {
+			defer recoverer()
+			defer ShutdownOnPanic()
+			wgexit.Add(1) // kludgy way to force code coverage of shutdown MaxNormalExitWait timeout path
+			panic("test panic")
+		}()
+		time.Sleep(100 * time.Millisecond) // Give goroutine time to finish up
+	}
+	fmt.Printf("No panic occurred1\n")
 }

@@ -32,6 +32,8 @@ func ExampleSignalNotify() {
 	signals := atomic.Int64{}
 
 	go func(ch chan os.Signal) {
+		defer yottadb.ShutdownOnPanic() // essential to ensure proper shutdown if there is a panic
+
 		for {
 			sig := <-ch
 

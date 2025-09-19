@@ -149,6 +149,8 @@ func validateYDBSignal(sig os.Signal) *sigInfo {
 //     or other functionality.
 //   - Using SignalNotify to capture SIGSEGV is unreliable. Instead, see standard library function [debug.SetPanicOnFault](true)
 //
+// Goroutines used to handle signals should defer [ShutdownOnPanic](). YDBGo's own signal handlers already do so.
+//
 // YottaDB-specific signals are listed in the source in [YDBSignals].
 //
 // See [YottaDB signals].
@@ -228,32 +230,46 @@ func NotifyYDB(sig os.Signal) bool {
 }
 
 // FatalSignalPanic returns whether the currently unwinding panic was caused by a fatal signal like Ctrl-C.
-// May be used in a deferred function like [QuitAfterFatalSignal] to check whether a fatal signal caused the current exit procedure.
+// May be used in a deferred function like [ShutdownOnPanic] to check whether a fatal signal caused the current exit procedure.
 func SignalWasFatal() bool {
 	return ydbSigPanicCalled.Load()
 }
 
-// QuitAfterFatalSignal may be deferred by goroutines to prevent goroutine errors after Ctrl-C is pressed.
+// ShutdownOnPanic should be deferred at the start of every goroutine to ensure that the database is shut down on panic.
+// Otherwise a panic that occurs within that goroutine will call [os.Exit] without properly shutting down the database,
+// and MUPIP RUNDOWN will need to be run.
+//
+// Deferring this function has the side benefit of exiting its goroutine silently on ydberr.CALLINAFTERXIT panics if they come from
+// a fatal signal panic that has already occurred in another goroutine.
+//
+//   - YDBGo's signal handlers already ensure shutdown is called if they panic (i.e. they defer [ShutdownOnPanic]).
+//
+// See: [Shutdown], [SignalWasFatal]
+func ShutdownOnPanic() {
+	err := recover()
+	if err != nil {
+		log.Printf("ShutdownOnPanic called for error: %v\n", err)
+		// Quit if fatal signal caused the shutdown
+		quitAfterFatalSignal(err)
+		// Ensure database is shut down before panicing to avoid having to run MUPIP RUNDOWN after shutdown
+		ShutdownHard(dbHandle)
+		// re-panic the err
+		panic(err)
+	}
+}
+
+// quitAfterFatalSignal deferred, prevents ydberr.CALLINAFTERXIT errors from every goroutine after Ctrl-C is pressed.
 // When Ctrl-C is pressed the signal is (by default) passed to YottaDB which shuts down the database.
 // If goroutines are still running and access the database, they will panic with code ydberr.CALLINAFTERXIT.
-// To silence these many panics and have each goroutine simply exit gracefully, defer QuitAfterFatalSignal()
+// To silence these many panics and have each goroutine simply exit gracefully, defer quitAfterFatalSignal()
 // at the start of each goroutine. Then you will get just one panic from the Ctrl-C signal interrupt rather
 // than one CALLINAFTERXIT panic per goroutine.
-//
-// Deferring this function will hide CALLINAFTERXIT panics when caused by YottaDB receiving a fatal signal.
-// If you don't wish to completely hiding these errors, you could make your own version of this function that logs them.
-//
-// See: [Shutdown], [SignalNotify], [SignalWasFatal]
-func QuitAfterFatalSignal() {
-	if err := recover(); err != nil {
-		if err, ok := err.(error); !ok {
-			panic(err)
-		}
-		if ErrorIs(err.(error), ydberr.CALLINAFTERXIT) {
-			runtime.Goexit() // Silently and gracefully exit the goroutine
-		} else {
-			panic(err)
-		}
+// This is automatically deferred if the user defers [SignalWasFatal].
+func quitAfterFatalSignal(err any) {
+	if ErrorIs(err, ydberr.CALLINAFTERXIT) && SignalWasFatal() {
+		// Silently and gracefully exit the goroutine
+		// This prevents each and every goroutine from panicing when just one receives a fatals signal.
+		runtime.Goexit()
 	}
 }
 
@@ -262,6 +278,7 @@ func QuitAfterFatalSignal() {
 // in which case it will notify the user who must call NotifyYDB().
 // info specifies the signal to be handled by this particular goroutine.
 func handleSignal(info *sigInfo) {
+	defer ShutdownOnPanic()
 	sig := info.signal
 
 	// We only need one of each type of signal so buffer depth is 1, but let it queue one additional signal.
@@ -410,7 +427,7 @@ func signalExitCallback(sigNum C.int) {
 	panic(errorf(ydberr.SignalFatal, "Fatal signal %d (%v) occurred", sig, sig))
 }
 
-// SignalExitCallback is an exported version of signalExitCallback() for use only by test/fatalsignal.go
+// SignalExitCallback is an exported version of signalExitCallback() for use only by FatalSignal test
 func SignalExitCallback(sigNum os.Signal) {
 	signalExitCallback(C.int(sigNum.(syscall.Signal)))
 }

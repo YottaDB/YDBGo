@@ -74,8 +74,9 @@ func (err *Error) Is(target error) bool {
 //	if errors.Is(err, &Error{Code: ydberr.INVSTRLEN}) {
 //
 // It differs from a simple type test using yottadb.Error.Code in that it searches for a match in the entire chain of wrapped errors
-func ErrorIs(err error, code int) bool {
-	return errors.Is(err, &Error{Code: code})
+func ErrorIs(err any, code int) bool {
+	err2, ok := err.(error)
+	return ok && errors.Is(err2, &Error{Code: code})
 }
 
 // newError returns error code and message as a [yottadb.Error] error type.

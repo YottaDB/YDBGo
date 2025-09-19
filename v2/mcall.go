@@ -420,7 +420,7 @@ func (conn *Conn) Import(table string) (*MFunctions, error) {
 		var ydbTypes []string
 		for i, typ := range routine.Types {
 			ydbType := typeMapper[typ.typ].ydbType
-			if typ.typ == "string" && internalDB.YDBRelease < 1.36 {
+			if typ.typ == "string" && dbHandle.YDBRelease < 1.36 {
 				// Make ydb <1.36 always use 'ydb_string_t', since it doesn't have 'ydb_buffer_t'.
 				// It doesn't work as well for IO parameters because output length cannot be longer than input value,
 				// but at least it will maintain backward compatibility for any apps that previously used YDB <1.36
@@ -569,7 +569,7 @@ func (conn *Conn) callM(routine *RoutineData, args []any) (any, error) {
 	param := paramBlock // start param at beginning of paramBlock
 	allotStr := func(alloc, length int) {
 		length = min(alloc, length)
-		if internalDB.YDBRelease < 1.36 {
+		if dbHandle.YDBRelease < 1.36 {
 			// Make ydb <1.36 always use 'ydb_string_t', since it doesn't have 'ydb_buffer_t'.
 			// It doesn't work as well for IO parameters because output length cannot be longer than input value,
 			// but at least it will maintain backward compatibility for any apps that previously used YDB <1.36
@@ -698,7 +698,7 @@ func (conn *Conn) callM(routine *RoutineData, args []any) (any, error) {
 	// Go through the parameters again to locate the pointer parameters and copy their values back into Go space
 	param = paramBlock
 	fetchStr := func() string {
-		if internalDB.YDBRelease < 1.36 {
+		if dbHandle.YDBRelease < 1.36 {
 			// Make ydb <1.36 always use 'ydb_string_t', since it doesn't have 'ydb_buffer_t'.
 			// It doesn't work as well for IO parameters because output length cannot be longer than input value,
 			// but at least it will maintain backward compatibility for any apps that previously used YDB <1.36
