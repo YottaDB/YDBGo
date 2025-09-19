@@ -173,6 +173,10 @@ func testSignal(sig os.Signal, tellYDB bool) {
 		panic("signal not received before timeout")
 	case got := <-ch:
 		if got != sig {
+			if sig == syscall.SIGURG {
+				// We expect to get this signal just randomly
+				return
+			}
 			panic(fmt.Errorf("received signal %d (%s) when expecting %d (%s)", got, got, sig, sig))
 		}
 		if testing.Verbose() {
