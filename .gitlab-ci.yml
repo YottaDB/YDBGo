@@ -98,7 +98,31 @@ race_detector:
 
 # ~~~ Coverage tests
 
-.coverage:
+v2_coverage:
+  stage: test
+  variables:
+    TEST_VERSION: v2
+    COVERDIR: ${CI_PROJECT_DIR}/cover/${TEST_VERSION}
+  script: |-
+    make -C ${TEST_VERSION} coverage
+    # Visualization instructions: https://docs.gitlab.com/ci/testing/code_coverage/?tab=Go
+    go get github.com/boumenot/gocover-cobertura
+    go install github.com/boumenot/gocover-cobertura
+    (cd ${TEST_VERSION} && gocover-cobertura < ${COVERDIR}/coverage.cov > ${COVERDIR}/coverage.xml)
+  # Capture output of go test `-covermode` switch above
+  #   cf. https://docs.gitlab.com/ci/yaml/#coverage
+  coverage: '/coverage: \d+(?:\.\d+)?/'
+  artifacts:
+    paths:
+      - cover/${TEST_VERSION}/coverage.cov
+      - cover/${TEST_VERSION}/coverage.html
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: ${COVERDIR}/coverage.xml
+    expire_in: 2 years  # default is 1 week but YDBGo can exist for a long time without change
+
+v1_coverage:
   stage: test
   variables:
     # Set version to . to test v1
@@ -123,19 +147,8 @@ race_detector:
     reports:
       coverage_report:
         coverage_format: cobertura
-        path: cover/${TEST_VERSION}/coverage.xml
+        path: $CI_PROJECT_DIR/cover/${TEST_VERSION}/coverage.xml
     expire_in: 2 years  # default is 1 week but YDBGo can exist for a long time without change
-
-v2_coverage:
-  extends: .coverage
-  variables:
-    TEST_VERSION: v2
-
-v1_coverage:
-  extends: .coverage
-  variables:
-    # Set version to . to test v1
-    TEST_VERSION: .
 
 
 commit-verify:

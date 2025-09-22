@@ -27,10 +27,10 @@ else
   perflock:=$(perflock) $(PERFLAGS)
 endif
 
-coverdir ?= .
+COVERDIR ?= coverage
 
 test:
-	go test -run ($tests) -timeout 5s $(flags)
+	go test -run $(tests) -timeout 5s $(flags)
 
 bench: benchmark
 benchmarks: benchmark
@@ -51,26 +51,26 @@ check: benchmark
 
 cover: coverage
 coverage:
-	mkdir -p coverage
-	rm -f coverage/*
+	mkdir -p $(COVERDIR)
+	rm -f $(COVERDIR)/*
 	@# The following commented-out lines are if we need to build a non-test executable to perform part of the test.
 	@#go build -covermode=count -o test/fatalsignal test/fatalsignal.go
 	@#@# Run standalone program to capture coverage of fatal signal effect
-	@##GOCOVERDIR=coverage test/fatalsignal || true
+	@##GOCOVERDIR=$(COVERDIR) test/fatalsignal || true
 	go test -c -covermode=count -o test/test
 	@# Capture coverage for several different exit tests
 	@# Run multiple times for the different tests: real=SIGINT; fake=SignalExitCallback() to capture coverage data for real; shutdownpanic test
 	for i in real fake goroutine shutdownpanic shutdownpanic2; do \
-		test/test -test.timeout=5s -test.gocoverdir=coverage -test.run Fatal -fataltest=$$i -test.v 2>&1 \
+		test/test -test.timeout=5s -test.gocoverdir=$(COVERDIR) -test.run Fatal -fataltest=$$i -test.v 2>&1 \
 		| grep "shutdownSignalGoroutines: Channel closings complete"; \
 	done
 	@# Run the rest of the tests
-	test/test -test.timeout=5s -test.gocoverdir=coverage
-	go tool covdata textfmt -i=coverage -o coverage.cov
-	go tool covdata percent -i=coverage
-	go tool cover -html="$(coverdir)/coverage.cov" -o $(coverdir)/coverage.html
+	test/test -test.timeout=5s -test.gocoverdir=$(COVERDIR)
+	go tool covdata textfmt -i=$(COVERDIR) -o $(COVERDIR)/coverage.cov
+	go tool covdata percent -i=$(COVERDIR)
+	go tool cover -html="$(COVERDIR)/coverage.cov" -o $(COVERDIR)/coverage.html
 
 clean:
-	rm -rf coverage test/*.o test/fatalsignal test/test
+	rm -f $(COVERDIR)/* test/*.o test/fatalsignal test/test
 
 .PHONY: test bench benchmarks benchmark check cover coverage
