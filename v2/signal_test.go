@@ -138,10 +138,6 @@ func TestSignalNotify(t *testing.T) {
 	testSignal(syscall.SIGUSR1, true)
 	// Now test the rest (fatal signals), not passing on the signal to YDB (because that exits the test)
 	for _, sig := range testSignals {
-		// Skip signals which often occur naturally during the test because they would produce a incorrect-trigger failure
-		if sig == syscall.SIGALRM || sig == syscall.SIGURG {
-			continue
-		}
 		testSignal(sig, false)
 	}
 
@@ -167,30 +163,33 @@ func testSignal(sig os.Signal, tellYDB bool) {
 		fmt.Printf(" Testing signal %d (%s): ", sig, sig)
 	}
 	syscall.Kill(syscall.Getpid(), sig.(syscall.Signal))
-
-	select {
-	case <-time.After(MaxSigShutdownWait):
-		panic("signal not received before timeout")
-	case got := <-ch:
-		if got != sig {
-			if sig == syscall.SIGURG {
-				// We expect to get this signal just randomly
-				return
+	timeout := time.After(MaxSigShutdownWait)
+	for {
+		select {
+		case <-timeout:
+			panic("signal not received before timeout")
+		case got := <-ch:
+			if got != sig {
+				// Skip signals which often occur naturally during the test because they would produce a incorrect-trigger failure
+				if got == syscall.SIGALRM || got == syscall.SIGURG {
+					continue
+				}
+				panic(fmt.Errorf("received signal %d (%s) when expecting %d (%s)", got, got, sig, sig))
 			}
-			panic(fmt.Errorf("received signal %d (%s) when expecting %d (%s)", got, got, sig, sig))
-		}
-		if testing.Verbose() {
-			fmt.Print("received")
-		}
-		if tellYDB {
 			if testing.Verbose() {
-				fmt.Printf("; calling YottaDB handler\n")
+				fmt.Print("received")
 			}
-			NotifyYDB(got)
-		} else {
-			if testing.Verbose() {
-				fmt.Println()
+			if tellYDB {
+				if testing.Verbose() {
+					fmt.Printf("; calling YottaDB handler\n")
+				}
+				NotifyYDB(got)
+			} else {
+				if testing.Verbose() {
+					fmt.Println()
+				}
 			}
+			return
 		}
 	}
 }
