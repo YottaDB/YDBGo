@@ -28,7 +28,7 @@ cd ydb-example
 go mod init example.com/yottadb-example
 ```
 
-4. Create a Go program (e.g. `ydb.go`) containing your main program with an import of `lang.yottadb.com/go/yottadb`, e.g. the [example script in the YDBGo documentation](https://pkg.go.dev/lang.yottadb.com/go/yottadb/v2/#pkg-overview).
+4. Create a Go program (e.g. `ydb.go`) containing your main program with an import of `lang.yottadb.com/go/yottadb/v2`, e.g. the [example script in the YDBGo documentation](https://pkg.go.dev/lang.yottadb.com/go/yottadb/v2/#pkg-overview).
 
 ```go
 package main
