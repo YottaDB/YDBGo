@@ -61,9 +61,11 @@ coverage:
 	@# Capture coverage for several different exit tests
 	@# Run multiple times for the different tests: real=SIGINT; fake=SignalExitCallback() to capture coverage data for real; shutdownpanic test
 	for i in real fake goroutine shutdownpanic shutdownpanic2; do \
-		test/test -test.timeout=5s -test.gocoverdir=$(COVERDIR) -test.run Fatal -fataltest=$$i -test.v 2>&1 \
+		test/test -test.timeout=5s -test.gocoverdir=$(COVERDIR) -test.v -test.run TestFatal -fataltest=$$i 2>&1 \
 		| grep "shutdownSignalGoroutines: Channel closings complete"; \
 	done
+	@# Test that YDBGo creates proper errors when it cannot Init()
+	test/test -test.timeout=5s -test.gocoverdir=$(COVERDIR) -test.v -test.run TestNoInit -noinit
 	@# Run the rest of the tests
 	test/test -test.timeout=5s -test.gocoverdir=$(COVERDIR)
 	go tool covdata textfmt -i=$(COVERDIR) -o $(COVERDIR)/coverage.cov

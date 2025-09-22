@@ -34,8 +34,8 @@ import "C"
 // ---- Release version constants - be sure to change all of them appropriately
 
 // MinYDBRelease - (string) Minimum YottaDB release name required by this wrapper.
-// This is checked on init.
-const MinYDBRelease string = "r1.34"
+// This is checked on init. It is a var rather than a const so we can change it purely to verify logic that parses it
+var MinYDBRelease string = "r1.34"
 
 // WrapperRelease - (string) The Go wrapper release version for YottaDB SimpleAPI. Note the third piece of this version
 // will be even for a production release and odd for a development release. When released, depending

@@ -185,15 +185,18 @@ func _testMain(m *testing.M) int {
 		testDir = createDatabase(testDir)
 	}
 
-	db, err := Init()
-	if err != nil {
-		panic(err)
-	}
-	defer Shutdown(db)
-	v1.ForceInit() // Tell v1 that v2 has done the initialization
+	if !noInit {
+		db, err := Init()
+		if err != nil {
+			panic(err)
+		}
+		defer Shutdown(db)
+		v1.ForceInit() // Tell v1 that v2 has done the initialization
 
-	initRandstr()
-	setPath()
+		initRandstr()
+		setPath()
+	}
+
 	ret := m.Run()
 
 	// Print result of BenchmarkDiff, if it was run

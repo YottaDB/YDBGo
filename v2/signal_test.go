@@ -45,19 +45,7 @@ func TestSigSegv(t *testing.T) {
 	assert.Panics(t, func() { fmt.Println(*badPointer) })
 }
 
-var testSignals []os.Signal
-
-// Copies all YDBSignals into testSignals except for the ones for which YDBGo does not support notification since they cause hangs.
-func init() {
-	for _, sig := range YDBSignals {
-		//~ 		switch sig {
-		//~ 		case syscall.SIGTSTP, syscall.SIGTTIN, syscall.SIGTTOU:
-		//~ 			// Skip signals which cause hangs and are therefore not supported by YDBGo
-		//~ 			continue
-		//~ 		}
-		testSignals = append(testSignals, sig)
-	}
-}
+var testSignals []os.Signal = YDBSignals
 
 // TestSignalNotify tests that all YDB signals are correctly received under load per issue YDBGo#34.
 func TestSignalReset(t *testing.T) {
@@ -97,8 +85,9 @@ func TestSignalReset(t *testing.T) {
 
 // TestSignalNotify tests that all YDB signals are correctly received under load per issue YDBGo#34.
 func TestSignalNotify(t *testing.T) {
-	// Check that an non-YDB signal panics
+	// Check that a non-YDB signal panics
 	assert.Panics(t, func() { SignalNotify(make(chan os.Signal), syscall.SIGPIPE) })
+	assert.Panics(t, func() { NotifyYDB(syscall.SIGPIPE) })
 
 	// Wait group so we know when all goroutines are started or finished and when the signal is received/processed
 	var starting, running sync.WaitGroup
@@ -205,7 +194,7 @@ func init() {
 
 // TestSyslogEntry checks that we can write an INFO-level message to syslog.
 // Verification that the message is actually in syslog must be done by an external program.
-// Note: requires an external helper program to run the test with flags: -run Syslog -syslog
+// Note: requires an external helper program to run the test with flags: -run TestSyslog -syslog
 func TestSyslogEntry(t *testing.T) {
 	if !testSyslog {
 		return
@@ -215,7 +204,7 @@ func TestSyslogEntry(t *testing.T) {
 
 // TestFatal checks that a fatal signal exits and shuts down cleanly.
 // This forces a database shutdown so it should be run stand-alone, not with other tests.
-// Note: requires an external helper program to provide flags: -run Fatal -fataltest=fake, etc
+// Note: requires an external helper program to provide flags: -run TestFatal -fataltest=fake, etc
 // and to check that stdout says "shutdownSignalGoroutines: Channel closings complete"
 // (cf. shutdownSignalGoroutines)
 // Set -fataltest to:
@@ -237,6 +226,9 @@ func TestFatalTest(t *testing.T) {
 		err := recover()
 		if err != nil {
 			fmt.Printf("Recovered from: %s\n", err)
+			// This is purely to cover code path where NotifyYDB receives a CALLINAFTERXIT error from YDB.
+			// It is expected to do nothing except shut down the signal goroutines (again).
+			NotifyYDB(syscall.SIGCONT)
 		} else {
 			fmt.Printf("No panic occurred2\n")
 		}
@@ -253,7 +245,7 @@ func TestFatalTest(t *testing.T) {
 		SignalExitCallback(syscall.SIGINT)
 	case "goroutine":
 		ch := make(chan os.Signal, 1) // Create signal notify and signal ack channels
-		SignalNotify(ch, syscall.SIGINT)
+		SignalNotify(ch, syscall.SIGQUIT)
 		go func() {
 			defer recoverer()
 			defer ShutdownOnPanic()
@@ -263,10 +255,11 @@ func TestFatalTest(t *testing.T) {
 				NotifyYDB(sig)
 			}
 		}()
-		syscall.Kill(syscall.Getpid(), syscall.SIGINT) // Send ourselves a SIGINT
-		time.Sleep(time.Second)                        // Give signal time be picked up by goroutine
+		syscall.Kill(syscall.Getpid(), syscall.SIGQUIT) // Send ourselves a SIGINT
+		time.Sleep(time.Second)                         // Give signal time be picked up by goroutine
 	case "shutdownpanic":
-		ydbSigPanicCalled.Store(true) // fake this to test its code path
+		ydbSigPanicCalled.Store(true)    // fake this to test its code path
+		assert.True(t, SignalWasFatal()) // take the opportunity of a fatal signal condition to coverage-test this function
 		MaxPanicExitWait = 10 * time.Millisecond
 		fallthrough
 	case "shutdownpanic2":

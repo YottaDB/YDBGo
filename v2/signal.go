@@ -67,7 +67,7 @@ var YDBSignals = []os.Signal{
 type sigInfo struct {
 	updating     sync.Mutex     // Indicate this struct is being modified
 	signal       os.Signal      // signal number for this entry
-	notifyChan   chan os.Signal // user-supplied channel notify of incoming signal
+	notifyChan   chan os.Signal // user-supplied channel to notify of incoming signal
 	shutdownNow  chan struct{}  // Channel used to shutdown signal handling goroutine
 	shutdownDone atomic.Bool    // indicate that goroutine shutdown is complete
 	servicing    atomic.Bool    // indicate signal handler is active
@@ -211,6 +211,7 @@ func NotifyYDB(sig os.Signal) bool {
 	case YDB_DEFER_HANDLER:
 		// Signal was deferred for some reason
 		// Not an error, but the fact is logged
+		// Hard to test code coverage for this as I don't know how to make YDB produce this condition
 		if DebugMode.Load() >= 2 {
 			log.Printf("goroutine-sighandler: YottaDB deferred signal %d (%v)\n", sig, sig)
 		}
@@ -219,6 +220,7 @@ func NotifyYDB(sig os.Signal) bool {
 		// If CALLINAFTERXIT, we're done - exit goroutine
 		shutdownSignalGoroutine(info)
 	default: // Some sort of error occurred during signal handling
+		// Hard to test code coverage for this as I don't know how to make YDB produce this condition. It is an undocumented function.
 		err := _conn.lastError(rc)
 		panic(newError(ydberr.SignalHandling, fmt.Sprintf("goroutine_sighandler: error from ydb_sig_dispatch() of signal %d (%v)", sig, sig), err))
 	}
@@ -254,7 +256,7 @@ func ShutdownOnPanic() {
 	}
 }
 
-// quitAfterFatalSignal deferred, prevents ydberr.CALLINAFTERXIT errors from every goroutine after Ctrl-C is pressed.
+// quitAfterFatalSignal deferred, suppresses ydberr.CALLINAFTERXIT error messages from every goroutine after Ctrl-C is pressed.
 // When Ctrl-C is pressed the signal is (by default) passed to YottaDB which shuts down the database.
 // If goroutines are still running and access the database, they will panic with code ydberr.CALLINAFTERXIT.
 // To silence these many panics and have each goroutine simply exit gracefully, defer quitAfterFatalSignal()
@@ -264,7 +266,7 @@ func ShutdownOnPanic() {
 func quitAfterFatalSignal(err any) {
 	if ErrorIs(err, ydberr.CALLINAFTERXIT) && SignalWasFatal() {
 		// Silently and gracefully exit the goroutine
-		// This prevents each and every goroutine from panicing when just one receives a fatals signal.
+		// This prevents each and every goroutine from panicing when just one receives a fatal signal.
 		runtime.Goexit()
 	}
 }
@@ -347,7 +349,8 @@ func shutdownSignalGoroutine(info *sigInfo) {
 func shutdownSignalGoroutines() {
 	printEntry("shutdownSignalGoroutines")
 	shutdownSigGoroutinesMutex.Lock()
-	if shutdownSigGoroutines { // Nothing to do if already done
+	if shutdownSigGoroutines { // Nothing to do if already doing this
+		// Hard to coverage-test this because it would require calling shutdownSignalGoroutines() while it's already running, which is a small window
 		shutdownSigGoroutinesMutex.Unlock()
 		if DebugMode.Load() >= 2 {
 			log.Println("shutdownSignalGoroutines: Bypass shutdownSignalGoroutines as it has already run")

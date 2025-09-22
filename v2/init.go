@@ -15,6 +15,7 @@
 package yottadb
 
 import (
+	"fmt"
 	"log"
 	"runtime/debug"
 	"strconv"
@@ -54,6 +55,9 @@ func MustInit() *DB {
 	return db
 }
 
+// getZYRelease function pointer allows TestInit to monkey-patch it for testing of release parsing logic in Init()
+var getZYRelease func(conn *Conn) string = func(conn *Conn) string { return conn.Node("$ZYRELEASE").Get() }
+
 // Init initializes the YottaDB engine and sets up signal handling.
 // Init may be called multiple times (e.g. by different goroutines) but [Shutdown]() must be called exactly once
 // for each time Init() was called. See [Shutdown] for more detail on the fallout from incorrect usage.
@@ -83,6 +87,7 @@ func Init() (*DB, error) {
 	if initCount.Add(1) > 1 { // Must increment this before calling NewConn() below or it will fail initCheck()
 		return dbHandle, nil // already initialized
 	}
+	defer initCount.Add(-1) // decrement it again in case there is an error return (successful return below increments it an extra time to compensate)
 
 	// Init YottaDB engine/runtime
 	// In Go, instead of ydb_init(), use ydb_main_lang_init() which lets us pass an exit handler for YDB to call on fatal signals.
@@ -92,14 +97,15 @@ func Init() (*DB, error) {
 
 	conn := NewConn()              // temporary conn used purely during Init() to fetch version info from YDB
 	ydbSigPanicCalled.Store(false) // Since running ydb_main_lang_init, ydb_exit() has not been called by a signal
-	status := C.ydb_main_lang_init(C.YDB_MAIN_LANG_GO, C.ydb_signal_exit_callback)
+	// Note: ydb_init returns positive rather than negative status unlike all other API functions, so negate it here.
+	status := -C.ydb_main_lang_init(C.YDB_MAIN_LANG_GO, C.ydb_signal_exit_callback)
 	if status != YDB_OK {
 		dberror := newError(int(status), conn.recoverMessage(status))
 		return nil, newError(ydberr.Init, "YottaDB initialization failed", dberror)
 	}
 
 	var releaseMajorStr, releaseMinorStr string
-	releaseInfoString := conn.Node("$ZYRELEASE").Get()
+	releaseInfoString := getZYRelease(conn)
 
 	// The returned output should have the YottaDB version as the 2nd token in the form rX.YY[Y] where:
 	//   - 'r' is a fixed character
@@ -142,7 +148,8 @@ func Init() (*DB, error) {
 	// Verify we are running with the minimum YottaDB version or later
 	runningYDBRelease, err := strconv.ParseFloat(releaseMajorStr+"."+releaseMinorStr, 64)
 	if err != nil {
-		panic(newError(ydberr.Init, "YDBGo wrapper error validating YottaDB version; contact YottaDB support", err)) // shouldn't happen due to check above
+		// Cannot coverage-test this as it should never occur
+		panic(newError(ydberr.Init, fmt.Sprintf("YDBGo wrapper error validating YottaDB version (%s); contact YottaDB support", releaseMajorStr+"."+releaseMinorStr), err)) // shouldn't happen due to check above
 	}
 	minYDBRelease, err := strconv.ParseFloat(MinYDBRelease[1:], 64)
 	if err != nil {
@@ -153,7 +160,7 @@ func Init() (*DB, error) {
 			MinYDBRelease, releaseMajorStr, releaseMinorStr)
 	}
 
-	// Start up a goroutine for each signal we want to be notified of. This is so that if one signal is in process,
+	// Start up a goroutine to handle signals for each signal we want to be notified of. This is so that if one signal is in process,
 	// we can still catch a different signal and deliver it appropriately (probably to the same goroutine). For each signal,
 	// bump our wait group counter so we don't proceed until all of these goroutines are initialized.
 	// If you need to handle any more or fewer signals, alter YDBSignals at the top of this module.
@@ -166,6 +173,9 @@ func Init() (*DB, error) {
 	// Now wait for the goroutine to initialize and get signals all set up. When that is done, we can return
 	wgSigInit.Wait()
 	dbHandle = &DB{runningYDBRelease}
+
+	// Increment this once more in the case of success since there is a defer that decrements it for error cases
+	initCount.Add(1)
 	return dbHandle, nil
 }
 
