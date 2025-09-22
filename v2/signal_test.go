@@ -50,11 +50,11 @@ var testSignals []os.Signal
 // Copies all YDBSignals into testSignals except for the ones for which YDBGo does not support notification since they cause hangs.
 func init() {
 	for _, sig := range YDBSignals {
-		switch sig {
-		case syscall.SIGTSTP, syscall.SIGTTIN, syscall.SIGTTOU:
-			// Skip signals which cause hangs and are therefore not supported by YDBGo
-			continue
-		}
+		//~ 		switch sig {
+		//~ 		case syscall.SIGTSTP, syscall.SIGTTIN, syscall.SIGTTOU:
+		//~ 			// Skip signals which cause hangs and are therefore not supported by YDBGo
+		//~ 			continue
+		//~ 		}
 		testSignals = append(testSignals, sig)
 	}
 }
@@ -136,7 +136,7 @@ func TestSignalNotify(t *testing.T) {
 	testSignal(syscall.SIGCONT, true)
 	testSignal(syscall.SIGHUP, true)
 	testSignal(syscall.SIGUSR1, true)
-	// Now test the rest (fatal signals), not passing on the signal to YDB (because that exits the test)
+	// Now test all signals but without passing them on to YDB because they are designed to cause either exit or hang, which would stop our tests.
 	for _, sig := range testSignals {
 		testSignal(sig, false)
 	}

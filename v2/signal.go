@@ -125,16 +125,12 @@ func lookupYDBSignal(sig os.Signal) *sigInfo {
 // validateYDBSignal verifies that the specified signal is valid for SignalNotify()/SignalReset()
 func validateYDBSignal(sig os.Signal) *sigInfo {
 	// Verify the supplied signal is one that we support with this function. This list contains all of the signals
-	// that the wrapper traps in Init() except those signals that cause problems if handlers other than
-	// YottaDB's handler is driven (SIGTSTP, SIGTTIN, etc).
+	// that the wrapper traps in Init().
 	// It is up to the user to know which signals are duplicates of others so if separate handlers
 	// are set for say SIGABRT and SIGIOT, whichever handler was set last is the one that gets both signals
-	// (because both constants are the the same signal).
+	// (because both constants are for the same signal).
 
 	info := lookupYDBSignal(sig)
-	if sig == syscall.SIGTSTP || sig == syscall.SIGTTIN || sig == syscall.SIGTTOU {
-		panic(errorf(ydberr.SignalUnsupported, "handling signal %d (%v) hangs, so handling it is not supported", sig, sig))
-	}
 	return info
 }
 
