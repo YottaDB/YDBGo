@@ -533,7 +533,7 @@ func (conn *Conn) callM(routine *RoutineData, args []any) (any, error) {
 		// On return, restore table handle since we changed it. Ignore errors.
 		// This is commented out because it triggers a YottaDB bug which complains if environment variable
 		// ydb_ci/CTMCI is not set even if it has already called the relevant M routine and thus already has
-		// table data for it. The bug is slated for fixing in YDB r2.06, cf. https://gitlab.com/YottaDB/DB/YDB/-/issues/1160
+		// table data for it. The bug is slated for fixing in YDB at https://gitlab.com/YottaDB/DB/YDB/-/issues/1160
 		//defer C.ydb_ci_tab_switch_t(cconn.tptoken, &cconn.errstr, *oldhandle, oldhandle)
 	}
 
