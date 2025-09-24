@@ -235,8 +235,8 @@ func _shutdown(handle *DB, force bool) error {
 	// (which would have happened  in another goroutine).
 	defer func() {
 		if err := recover(); err != nil {
-			// Quit if fatal signal caused the shutdown
-			quitAfterFatalSignal(err)
+			// Quit rather than error if Ctrl-C signal caused the shutdown
+			quitAfterSIGINT(err)
 			// Otherwise re-panic
 			panic(err)
 		}

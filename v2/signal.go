@@ -246,9 +246,8 @@ func SignalWasFatal() bool {
 func ShutdownOnPanic() {
 	err := recover()
 	if err != nil {
-		log.Printf("ShutdownOnPanic called for error: %v\n", err)
 		// Quit if fatal signal caused the shutdown
-		quitAfterFatalSignal(err)
+		quitAfterSIGINT(err)
 		// Ensure database is shut down before panicing to avoid having to run MUPIP RUNDOWN after shutdown
 		ShutdownHard(dbHandle)
 		// re-panic the err
@@ -256,14 +255,14 @@ func ShutdownOnPanic() {
 	}
 }
 
-// quitAfterFatalSignal deferred, suppresses ydberr.CALLINAFTERXIT error messages from every goroutine after Ctrl-C is pressed.
+// quitAfterSIGINT deferred, suppresses ydberr.CALLINAFTERXIT error messages from every goroutine after Ctrl-C is pressed.
 // When Ctrl-C is pressed the signal is (by default) passed to YottaDB which shuts down the database.
 // If goroutines are still running and access the database, they will panic with code ydberr.CALLINAFTERXIT.
-// To silence these many panics and have each goroutine simply exit gracefully, defer quitAfterFatalSignal()
+// To silence these many panics and have each goroutine simply exit gracefully, defer quitAfterSIGINT()
 // at the start of each goroutine. Then you will get just one panic from the Ctrl-C signal interrupt rather
 // than one CALLINAFTERXIT panic per goroutine.
 // This is automatically deferred if the user defers [SignalWasFatal].
-func quitAfterFatalSignal(err any) {
+func quitAfterSIGINT(err any) {
 	if ErrorIs(err, ydberr.CALLINAFTERXIT) && SignalWasFatal() {
 		// Silently and gracefully exit the goroutine
 		// This prevents each and every goroutine from panicing when just one receives a fatal signal.
