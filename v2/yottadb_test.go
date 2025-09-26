@@ -27,6 +27,21 @@ import (
 	v1 "lang.yottadb.com/go/yottadb"
 )
 
+// Set up custom `go test` options to allow user to specify fatal signal test
+var fatalTest string // Run a specific fatal-exit test that needs to exit the test process, so no other tests will be run after this one
+var testSyslog bool  // Run a specific test that outputs a syslog entry. Not on by default because syslog may not be set up (as in the CI pipeline)
+var testNoDB bool    // Run without creating a test database (use the default specified by environment variable ydb_gbldir)
+var testLog string   // Specify path to store test logging - defaults to /tmp/ydbgotest-*/output.log")
+var testDB string    // Specify path of database global directory file - otherwise creates /tmp/ydbgotest-*/mumps.{gld,dat}
+
+func init() {
+	flag.StringVar(&fatalTest, "fataltest", "none", `test a fatal signal code path; if set "real" to use syscall.Kill or "fake" to call exit handler directly`)
+	flag.BoolVar(&testSyslog, "syslog", false, "check that program can output a syslog entry")
+	flag.BoolVar(&testNoDB, "nodb", false, "run without creating a test database (use the default specified by ydb_gbldir)")
+	flag.StringVar(&testLog, "log", "", "Specify file path to append test logging -- defaults to /tmp/ydbgotest-*/output.log")
+	flag.StringVar(&testDB, "testdb", "", "Specify path of database global directory file - otherwise creates /tmp/ydbgotest-*/mumps.{gld,dat}")
+}
+
 // ---- Utility functions for tests
 
 var randstrArray = make([]string, 0, 1000000) // Array of random strings for use in testing
@@ -99,10 +114,13 @@ func Benchmark________________________________(b *testing.B) {
 }
 
 func setupLogger(testDir string, verbose bool) *os.File {
-	testLogFile := filepath.Join(testDir, "output.log")
+	testLogFile := testLog
+	if testLogFile == "" {
+		testLogFile = filepath.Join(testDir, "output.log")
+	}
 	f, err := os.OpenFile(testLogFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
-		log.Fatal(err)
+		log.Panic(err)
 	}
 	multi := io.MultiWriter(f)
 	if verbose {
@@ -114,15 +132,19 @@ func setupLogger(testDir string, verbose bool) *os.File {
 	return f
 }
 
-func createDatabase(testDir string) string {
-	// Setup environment variables
-	log.Printf("Test directory is %s", testDir)
+// setupDatabase sets environment variable ydb_gbldir and creates database if necessary
+func setupDatabase(testDir string) {
+	if testDB != "" {
+		log.Printf("Using test database %s\n", testDB)
+		os.Setenv("ydb_gbldir", testDB)
+		return
+	}
 	ydbGbldir := filepath.Join(testDir, "mumps.gld")
 	ydbDatfile := filepath.Join(testDir, "mumps.dat")
 	os.Setenv("ydb_gbldir", ydbGbldir)
 	ydbDist := os.Getenv("ydb_dist")
 	if ydbDist == "" {
-		panic("ydb_dist must be set")
+		panic("ydb_dist must be set to create a temporary database")
 	}
 	mumpsExe := filepath.Join(ydbDist, "mumps")
 	mupipExe := filepath.Join(ydbDist, "mupip")
@@ -133,7 +155,7 @@ func createDatabase(testDir string) string {
 	output, err := cmd.CombinedOutput()
 	log.Printf("%s\n", output)
 	if err != nil {
-		log.Fatal(err)
+		log.Panic(err)
 	}
 
 	// Create database itself
@@ -141,14 +163,8 @@ func createDatabase(testDir string) string {
 	output, err = cmd.CombinedOutput()
 	log.Printf("%s\n", output)
 	if err != nil {
-		log.Fatal(err)
+		log.Panic(err)
 	}
-	return testDir
-}
-
-func cleanupDatabase(testDir string) {
-	log.Printf("Cleaning up test directory")
-	os.RemoveAll(testDir)
 }
 
 func setPath() {
@@ -163,7 +179,7 @@ func _testMain(m *testing.M) int {
 	// Get a temporary directory to put the database and logfile in
 	testDir, err := os.MkdirTemp("", "ydbgotest-")
 	if err != nil {
-		log.Fatal(err)
+		log.Panic(err)
 	}
 
 	// Setup the log file, print to stdout if needed
@@ -172,18 +188,14 @@ func _testMain(m *testing.M) int {
 	coverage := testing.CoverMode() != ""
 	logfile := setupLogger(testDir, verbose)
 	defer logfile.Close()
+	log.Printf("Test directory is %s", testDir)
+
 	if coverage {
-		DebugMode.Store(100) // cover every possible code path
+		DebugMode.Store(100)
 	}
 
-	// Create test database if necessary.
-	// Determine if this is an invocation of "go test" from the YDBTest repo (YottaDB test system).
-	// If so, skip temporary database setup as test system sets up databases with random parameters
-	// (qdbrundown, replication etc.) and will get more coverage using that database than this on-the-fly database.
-	_, isYDBTestInvocation := os.LookupEnv("tst_working_dir")
-	if !isYDBTestInvocation {
-		testDir = createDatabase(testDir)
-	}
+	// Create test database if necessary
+	setupDatabase(testDir)
 
 	if !noInit {
 		db, err := Init()
@@ -206,8 +218,9 @@ func _testMain(m *testing.M) int {
 	}
 
 	// Cleanup the temp directory, but leave it if we are in verbose mode or the test failed
-	if !isYDBTestInvocation && !verbose && ret == 0 {
-		cleanupDatabase(testDir)
+	if !testNoDB && !verbose && ret == 0 {
+		log.Printf("Cleaning up test directory")
+		os.RemoveAll(testDir)
 	}
 	return ret
 }

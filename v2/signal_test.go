@@ -13,7 +13,6 @@
 package yottadb
 
 import (
-	"flag"
 	"fmt"
 	"os"
 	"runtime/debug"
@@ -181,15 +180,6 @@ func testSignal(sig os.Signal, tellYDB bool) {
 			return
 		}
 	}
-}
-
-// Set up custom flag to allow user to specify fatal signal test
-var fatalTest string
-var testSyslog bool
-
-func init() {
-	flag.StringVar(&fatalTest, "fataltest", "none", `test a fatal signal code path; if set "real" to use syscall.Kill or "fake" to call exit handler directly`)
-	flag.BoolVar(&testSyslog, "syslog", false, "check that program can output a syslog entry")
 }
 
 // TestSyslogEntry checks that we can write an INFO-level message to syslog.
