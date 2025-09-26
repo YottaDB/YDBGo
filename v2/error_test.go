@@ -43,7 +43,11 @@ func TestRecoverMessage(t *testing.T) {
 	assert.NotNil(t, err)
 	lastCode := conn.lastCode()
 	assert.Equal(t, "%YDB-E-MAXSTRLEN", conn.recoverMessage(lastCode)[:16])
-	// Limit string length to exercise another failure code path in recoverMessage()
+	// Limit string length to exercise another failure code path in recoverMessage():
+	// specifically, test recoverMessage will get error 150375522 (Invalid string length)
+	// because the error is too long to fit into errstr (since we shorten errstr here).
+	// It will panic with a generic error since it cannot fetch recover messages
+	// with ydb_message_t() under these circumstances.
 	conn.cconn.errstr.len_alloc = 47
 	assert.Panics(t, func() { conn.recoverMessage(lastCode) })
 }
@@ -69,15 +73,28 @@ func TestLastError(t *testing.T) {
 	lastCode := conn.lastCode()
 	assert.Equal(t, err.Error(), conn.lastError(lastCode).Error())
 
-	// Test code path when invalid message is returned
+	// Test code path when invalid message is returned;
+	// create invalid message by artificially shortening the last error message to 2 chars.
 	conn.cconn.errstr.len_used = 2
-	assert.Equal(t, ydberr.YDBMessageInvalid, conn.lastError(lastCode).(*Error).Code)
+	//assert.Equal(t, ydberr.YDBMessageInvalid, conn.lastError(lastCode).(*Error).Code)
+	//err2 := conn.lastError(lastCode)
+	var err2 error
+	func() {
+		defer func() { err2 = recover().(error) }()
+		conn.lastError(lastCode)
+	}()
+	assert.Equal(t, ydberr.YDBMessageInvalid, err2.(*Error).Code)
 	assert.Panics(t, func() { conn.lastCode() })
+	// Create an invalid errstr starting with comma
 	*conn.cconn.errstr.buf_addr = ','
 	assert.Panics(t, func() { conn.lastCode() })
 
 	// Clear the returned error to test code paths where that is the case
 	conn.cconn.errstr.len_used = 0
-	assert.Equal(t, 0, int(conn.lastCode()))
+	// lastCode() shouild return YDB_OK if there is no message in errstr
+	assert.Equal(t, YDB_OK, int(conn.lastCode()))
+	// lastError() should take lastCode (that we saved above) and recover the message related to that.
+	//~ 	fmt.Println("recovered message=", conn.recoverMessage(lastCode))
+	//~ 	fmt.Println("err.Error()      =", err.Error())
 	assert.Equal(t, err.Error(), conn.lastError(lastCode).Error())
 }

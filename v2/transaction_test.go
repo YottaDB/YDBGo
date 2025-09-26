@@ -44,6 +44,7 @@ func TestTimeoutAction(t *testing.T) {
 	assert.Equal(t, true, success)
 
 	// Function to create a transaction timeout.
+	index.Kill()
 	timeoutTransaction := func(fakeTimeout bool) bool {
 		return conn.TransactionFast([]string{}, func() {
 			for i := range 2000 {

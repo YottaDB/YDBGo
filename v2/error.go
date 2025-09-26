@@ -128,13 +128,17 @@ func (conn *Conn) lastError(code C.int) error {
 		return newError(int(code), conn.recoverMessage(code))
 	}
 
-	pattern := ",(SimpleThreadAPI),"
-	index := strings.Index(msg, pattern)
-	if index == -1 {
-		// If msg is improperly formatted, return it verbatim as an error with code YDBMessageInvalid (this should never happen with messages from YottaDB)
-		return errorf(ydberr.YDBMessageInvalid, "could not parse YottaDB error message: %s", msg)
+	fields := strings.SplitN(msg, ",", 3)
+	if len(fields) < 3 {
+		// If msg is improperly formatted, panic it verbatim with code YDBMessageInvalid (this should never happen with messages from YottaDB)
+		panic(errorf(ydberr.YDBMessageInvalid, "contact YottaDB support: improperly formatted YottaDB error message: %s", msg))
 	}
-	text := msg[index+len(pattern):]
+	// code := fields[0]
+	entryref, text := fields[1], fields[2]
+	// Hide entryref since it is always the same "(SimpleThreadAPI)" unless returning an error from within an M call
+	if entryref != "(SimpleThreadAPI)" {
+		text = text + " at M entryref " + entryref
+	}
 	return newError(int(code), text)
 }
 
@@ -150,12 +154,12 @@ func (conn *Conn) lastCode() C.int {
 	index := strings.Index(msg, ",")
 	if index == -1 {
 		// If msg is improperly formatted, panic it verbatim with an YDBMessageInvalid code (this should never happen with messages from YottaDB)
-		panic(errorf(ydberr.YDBMessageInvalid, "could not parse YottaDB error message: %s", msg))
+		panic(errorf(ydberr.YDBMessageInvalid, "contact YottaDB support: could not parse YottaDB error message: %s", msg))
 	}
 	code, err := strconv.ParseInt(msg[:index], 10, 64)
 	if err != nil {
 		// If msg has no number, panic it verbatim with an YDBMessageInvalid code (this should never happen with messages from YottaDB)
-		panic(errorf(ydberr.YDBMessageInvalid, "could not recover error code from YottaDB error message: %s", msg))
+		panic(errorf(ydberr.YDBMessageInvalid, "contact YottaDB support: could not recover error code from YottaDB error message: %s", msg))
 	}
 	return C.int(-code)
 }
@@ -189,16 +193,13 @@ func (conn *Conn) recoverMessage(status C.int) string {
 	conn.prepAPI()
 	rc := C.ydb_message_t(C.uint64_t(conn.tptoken.Load()), nil, status, &cconn.errstr)
 	if rc != YDB_OK {
+		// Handle UNKNOWNSYSERR specially with a friendly message as it is the most likely error when ydb_message_t can't find the message
 		if rc == ydberr.UNKNOWNSYSERR {
 			panic(errorf(int(rc), "%%YDB-E-UNKNOWNSYSERR, [%d (%#x) returned by ydb_* C API] does not correspond to a known YottaDB error code", status, status))
 		}
-		if conn.getErrorString() == "" {
-			// Do not call lastError if there is no message because it will infinitely recurse back to here to get the message
-			// Pretty hard to work out how to coverage-test this error
-			panic(errorf(int(rc), "ydb_message_t() returned YottaDB error code %d (%#x) when trying to get the message for error %d (%#x)", rc, rc, status, status))
-		}
-		err := conn.lastError(rc)
-		panic(newError(ydberr.YDBMessageRecoveryFailure, fmt.Sprintf("error %d when trying to recover error message for error %d using ydb_message_t()", int(rc), int(-status)), err))
+		// Do not call lastError if there is no message because it will infinitely recurse back to here to get the message
+		// Pretty hard to work out how to coverage-test this error
+		panic(errorf(ydberr.YDBMessageRecoveryFailure, "ydb_message_t() returned YottaDB error code %d (%#x) when trying to get the message for error %d (%#x)", rc, rc, status, status))
 	}
 	return conn.getErrorString()
 }

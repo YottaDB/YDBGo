@@ -10,7 +10,7 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;Arithmetic routine to test M calls from YDBLua
+;Arithmetic routine to test M calls from YDBGo
 
 addVerbose(message,n1,n2,n3)
  set n1=n1+n2+n3
@@ -22,6 +22,10 @@ add(n1,n2)
 
 sub(n1,n2)
  quit n1-n2
+
+err()
+ s x=undefined ;Create LVUNDEF error
+ quit
 
 noop()
  quit

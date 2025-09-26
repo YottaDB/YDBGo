@@ -222,7 +222,7 @@ func NotifyYDB(sig os.Signal) bool {
 	default: // Some sort of error occurred during signal handling
 		// Hard to test code coverage for this as I don't know how to make YDB produce this condition. It is an undocumented function.
 		err := _conn.lastError(rc)
-		panic(newError(ydberr.SignalHandling, fmt.Sprintf("goroutine_sighandler: error from ydb_sig_dispatch() of signal %d (%v)", sig, sig), err))
+		panic(newError(ydberr.SignalHandling, fmt.Sprintf("goroutine_sighandler: error from ydb_sig_dispatch() of signal %d (%v): %s", sig, sig, err), err))
 	}
 	return true
 }

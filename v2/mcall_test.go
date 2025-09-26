@@ -73,8 +73,9 @@ func TestCallM(t *testing.T) {
 
 	table := `
 		AddVerbose: string[1024] addVerbose^arithmetic(*string[10], *int, int, string)
-		Add: int64 add^arithmetic(int64, int64)
-		Sub: int64 sub^arithmetic(int64, int64)
+		Add: int add^arithmetic(int, int)
+		Sub: int sub^arithmetic(int, int)
+		Err: int err^arithmetic()
 		AddFloat32: float64 add^arithmetic(float32, float32)
 		AddFloat: float64 add^arithmetic(float64, float64)
 		Noop: noop^arithmetic()
@@ -83,6 +84,14 @@ func TestCallM(t *testing.T) {
 	// Declare these in separate imports
 	m := conn.MustImport(table)
 	assert.PanicsWithError(t, "3 parameters supplied whereas the M-call table specifies 2", func() { m.Call("Add", 3, 4, 5) })
+
+	// Check that error messages get propagated from M to Go
+	etrap := conn.Node("$ETRAP")
+	ecode := conn.Node("$ECODE")
+	defer etrap.Set(etrap.Get())
+	etrap.Set("") // Suppress divide by zero error message
+	assert.PanicsWithError(t, "%YDB-E-LVUNDEF, Undefined local variable: undefined at M entryref err+1^arithmetic", func() { m.Call("Err") })
+	ecode.Set("") // Clear M error -- otherwise subsequent tests fail, e.g. TestTimeoutAction() fails when using ZMAXTPTIME
 
 	// Test AddVerbose with pointer and non-pointer types
 	s, n := "test", 3
@@ -160,13 +169,13 @@ func TestCallM(t *testing.T) {
 	// Make sure calling original table funcs still works even after using other table
 	assert.Equal(t, 6.7, m.Call("AddFloat", 5.5, 1.2).(float64))
 	assert.Equal(t, 6.7, m.Call("AddFloat32", float32(5.5), float32(1.2)).(float64))
-	assert.Equal(t, int64(-6), m.Call("Sub", int64(5), int64(11)).(int64))
+	assert.Equal(t, -6, m.Call("Sub", 5, 11).(int))
 
 	// Test creation of function that do the calling
 	addFloat := m.Wrap("AddFloat")
 	assert.Equal(t, 6.7, addFloat(5.5, 1.2).(float64))
 	add := m.Wrap("Add")
-	assert.Equal(t, int64(-6), add(int64(5), int64(-11)).(int64))
+	assert.Equal(t, -6, add(5, -11).(int))
 	sub := m2.Wrap("Sub")
 	assert.Equal(t, "-100", sub(int32(5), uint32(105)).(string))
 	// Test WrapRetString
