@@ -4,7 +4,7 @@
 
 # Deprecation Warning
 
-[YDBGo v2](pkg/lang.yottadb.com/go/yottadb/v2) is in alpha testing. YDBGo v1 will be deprecated once v2 has reached v2.0.2 production release, however v1 applications will continue to operate without change due to Go version management.
+The [YDBGo v2](pkg/lang.yottadb.com/go/yottadb/v2) API is in field test. If you use the v1 API rest assured that it remains fully supported. Please refer to [Migrating v1 to v2](v2/README.md#migrating-v1-to-v2) for details on migration and on applications that simultaneously use v1 and v2 APIs during migration.
 
 # Usage (Writing a YDBGo Client application)
 
