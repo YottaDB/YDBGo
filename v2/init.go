@@ -198,7 +198,7 @@ func initCheck() {
 // in [Database Integrity] and unreleased locks may cause small subsequent delays (see [relevant LKE documentation]).
 //
 // Deferring Shutdown() has the side benefit of exiting silently on ydberr.CALLINAFTERXIT panics if they come from
-// a fatal signal panic that has already occurred in another goroutine.
+// a Ctrl-C (SIGINT) panic that has already occurred in another goroutine.
 //
 // Notes:
 //   - It is the main routine's responsibility to ensure that any goroutines have finished using the database before it calls

@@ -21,30 +21,21 @@ To aid migration of YDBGo v1 to v2, it is possible to use [both in one applicati
 
 	package main
 
+	import "fmt"
 	import "lang.yottadb.com/go/yottadb/v2"
 
 	func main() {
 		defer yottadb.Shutdown(yottadb.MustInit())
 		conn := yottadb.NewConn()
 
-		n := conn.Node("person", "name")
-		n.Child("first").Set("Joe")
-		n.Child("last").Set("Bloggs")
-		for x := range n.Children() {
-			println(x.String(), "=", x.Get())
-		}
-
-		// Store unicode greeting into global node ^hello("world")
+		// Store unicode greeting into node ^hello("world")
 		greeting := conn.Node("^hello", "world")
 		greeting.Set("สวัสดี") // Sawadee (hello in Thai)
-		println(greeting.Get(), n.Child("first").Get(), n.Child("last").Get())
+		fmt.Println(greeting.Get())
+
+		// Output:
+		// สวัสดี
 	}
-
-Output:
-
-	person("name","first") = Joe
-	person("name","last") = Bloggs
-	สวัสดี Joe Bloggs
 
 # Prerequisites
 

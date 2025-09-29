@@ -65,9 +65,9 @@ const overalloc = 1024 // Initial size (may be enlarged).
 
 // Conn represents a goroutine-specific 'connection' object for calling the YottaDB API.
 // You must use a different connection for each goroutine.
-//
-// Conn type wraps C.conn in a Go struct so Go can add methods to it.
 type Conn struct {
+	// Conn type wraps C.conn in a Go struct so Go can add methods to it.
+
 	// Pointer to C.conn rather than the item itself so we can malloc it and point to it from C without Go moving it.
 	cconn *C.conn
 	// tptoken is a place to store tptoken for thread-safe ydb_*_st() function calls
