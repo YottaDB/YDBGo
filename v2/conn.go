@@ -357,7 +357,7 @@ func (conn *Conn) KillAllLocals() {
 }
 
 // Lock releases all existing locks and attempt to acquire locks matching all supplied nodes, waiting up to timeout for availability.
-//   - Equivalent to the M `LOCK` command. See [Node.Grab]() and [Node.Release]() methods for single-lock usage.
+//   - Equivalent to the M `LOCK` command. See [Node.Lock]() and [Node.Unlock]() methods for single-lock usage.
 //   - A timeout of zero means try only once.
 //   - Return true if lock was acquired; otherwise false.
 //   - Panics with error TIME2LONG if the timeout exceeds YDB_MAX_TIME_NSEC or on other panic-worthy errors (e.g. invalid variable names).

@@ -13,7 +13,10 @@
 package yottadb
 
 import (
+	"bytes"
 	"fmt"
+	"os"
+	"os/exec"
 	"strings"
 	"testing"
 	"time"
@@ -103,7 +106,7 @@ func TestLock(t *testing.T) {
 	assert.Equal(t, true, n.Lock(100*time.Millisecond))
 
 	// Check that lock now exists
-	lockpath := fmt.Sprint(n)
+	lockpath := n.String()
 	assert.Equal(t, true, lockExists(lockpath))
 
 	// Decrement 3 times and each time check whether lock exists
@@ -118,17 +121,37 @@ func TestLock(t *testing.T) {
 	n2 := conn.Node("^var2")
 	n.Lock()
 	n2.Lock()
-	assert.Equal(t, true, lockExists(fmt.Sprint(n)))
-	assert.Equal(t, true, lockExists(fmt.Sprint(n2)))
+	assert.Equal(t, true, lockExists(n.String()))
+	assert.Equal(t, true, lockExists(n2.String()))
 	assert.Equal(t, true, conn.Lock(0)) // Release all locks
-	assert.Equal(t, false, lockExists(fmt.Sprint(n)))
-	assert.Equal(t, false, lockExists(fmt.Sprint(n2)))
+	assert.Equal(t, false, lockExists(n.String()))
+	assert.Equal(t, false, lockExists(n2.String()))
 
 	// Now lock both using Lock() and make sure they get locked and unlocked
 	assert.Equal(t, true, conn.Lock(100*time.Millisecond, n, n2)) // Release all locks
-	assert.Equal(t, true, lockExists(fmt.Sprint(n)))
-	assert.Equal(t, true, lockExists(fmt.Sprint(n2)))
+	assert.Equal(t, true, lockExists(n.String()))
+	assert.Equal(t, true, lockExists(n2.String()))
 	assert.Equal(t, true, conn.Lock(time.Duration(0))) // Release all locks
-	assert.Equal(t, false, lockExists(fmt.Sprint(n)))
-	assert.Equal(t, false, lockExists(fmt.Sprint(n2)))
+	assert.Equal(t, false, lockExists(n.String()))
+	assert.Equal(t, false, lockExists(n2.String()))
+}
+
+// lockExists return whether a lock exists using YottaDB's LKE utility.
+func lockExists(lockpath string) bool {
+	const debug = false // set true to print output of LKE command
+	var outbuff bytes.Buffer
+
+	// Run LKE and scan result
+	cmd := exec.Command(os.Getenv("ydb_dist")+"/lke", "show", "-all", "-wait")
+	cmd.Stdout = &outbuff
+	cmd.Stderr = &outbuff
+	err := cmd.Run()
+	if err != nil {
+		panic(err)
+	}
+	output := outbuff.Bytes()
+	if debug {
+		fmt.Printf("finding '%s' in:\n%s\n", lockpath+" Owned", string(output))
+	}
+	return bytes.Contains(output, []byte(lockpath+" Owned"))
 }

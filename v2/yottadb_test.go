@@ -13,7 +13,6 @@
 package yottadb
 
 import (
-	"bytes"
 	"flag"
 	"fmt"
 	"io"
@@ -83,26 +82,6 @@ func panicIf(err error) {
 	if err != nil {
 		panic(err)
 	}
-}
-
-// lockExists return whether a lock exists using YottaDB's LKE utility.
-func lockExists(lockpath string) bool {
-	const debug = false // set true to print output of LKE command
-	var outbuff bytes.Buffer
-
-	// Run LKE and scan result
-	cmd := exec.Command(os.Getenv("ydb_dist")+"/lke", "show", "-all", "-wait")
-	cmd.Stdout = &outbuff
-	cmd.Stderr = &outbuff
-	err := cmd.Run()
-	if err != nil {
-		panic(err)
-	}
-	output := outbuff.Bytes()
-	if debug {
-		fmt.Printf("finding '%s' in:\n%s\n", lockpath+" Owned", string(output))
-	}
-	return bytes.Contains(output, []byte(lockpath+" Owned"))
 }
 
 // ---- Initialize test system

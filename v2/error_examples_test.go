@@ -31,7 +31,7 @@ func ExampleErrorIs() {
 	fmt.Println("Wrapped error is still INVSTRLEN:", yottadb.ErrorIs(wrapper, ydberr.INVSTRLEN))
 
 	fmt.Println()
-	fmt.Println("Or you can Grab the error with Error.As():")
+	fmt.Println("Or you can grab the error with Error.As():")
 	var e *yottadb.Error
 	fmt.Println("Error is type yottadb.Error:", errors.As(err, &e))
 	if errors.As(err, &e) {
@@ -48,7 +48,7 @@ func ExampleErrorIs() {
 	//  or using longform: true
 	// Wrapped error is still INVSTRLEN: true
 	//
-	// Or you can Grab the error with Error.As():
+	// Or you can grab the error with Error.As():
 	// Error is type yottadb.Error: true
 	//   and the error is: string too long
 	// Error is type yottadb.Error: false
