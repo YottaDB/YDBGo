@@ -280,10 +280,12 @@ To **build the Docker container** run:
 docker build . -t ydbgo
 ```
 
-To **use the container to develop** YDBGo:
+To **use the container to develop** a YDBGo project in your `~/goprojects` directory, from the `YDBGo` directory, run:
 
 ```sh
-docker run --rm -it -v ~/goprojects:/goprojects -v ~/work/gitlab/YDBGo:/YDBGo -v ${PWD}/data:/data -w /goprojects ydbgo bash
+docker run --rm -it -v ~/goprojects:/goprojects -v .:/YDBGo -w /goprojects ydbgo bash
 ```
 
 Then follow the instructions for usage and setting up for development above.
+
+Alternatively, may be able to use your local YDBGo directory from within the docker container. But you might have to add `-e ydb_chset=UTF-8 ` to the  docker command line to match docker's expectations of the files built in your local YDBGo directory.

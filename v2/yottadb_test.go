@@ -150,19 +150,18 @@ func setupDatabase(testDir string) {
 	mupipExe := filepath.Join(ydbDist, "mupip")
 
 	// Create global directory
-	cmd := exec.Command(mumpsExe, "-run", "^GDE",
-		"change -seg DEFAULT -file="+ydbDatfile)
+	cmd := exec.Command(mumpsExe, "-run", "^GDE", "change -seg DEFAULT -file="+ydbDatfile)
 	output, err := cmd.CombinedOutput()
-	log.Printf("%s\n", output)
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "%s\n", output)
 		log.Panic(err)
 	}
 
 	// Create database itself
 	cmd = exec.Command(mupipExe, "create")
 	output, err = cmd.CombinedOutput()
-	log.Printf("%s\n", output)
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "%s\n", output)
 		log.Panic(err)
 	}
 }
