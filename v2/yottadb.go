@@ -92,3 +92,4 @@ func calloc(size C.size_t) unsafe.Pointer {
 }
 
 //go:generate ../scripts/gen_error_codes.sh ydberr/errorcodes ydbconst ydberr
+//go:generate bash -c "cd .. && scripts/gen_error_codes.sh error_codes"

@@ -114,3 +114,4 @@ var ydbSigPanicCalled uint32 // Atomic: True when our exit is panic driven due t
 var inInit uint32            // Atomic: We are in initializeYottaDB() so don't force re-init in ValE()
 
 //go:generate ./scripts/gen_error_codes.sh error_codes
+//go:generate bash -c "cd v2 && ../scripts/gen_error_codes.sh ydberr/errorcodes ydbconst ydberr"
