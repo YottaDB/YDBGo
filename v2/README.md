@@ -169,10 +169,10 @@ import v1 "lang.yottadb.com/go/yottadb"
 You must remove any calls to v1 `Init()` and `Exit()` and instead add the following line immediately after calling v2 `Init()`:
 
 ```go
-v1.ForceInit()  // only available in v1.2.8
+v1.ForceInit()  // only available from v1.2.8
 ```
 
-This will let v1 know that v2 has already done the initialization. You will need to upgrade your `go.mod` to specify v1.2.8 for yottadb v1:
+This will let v1 know that v2 has already done the initialization. You will need to upgrade your `go.mod` to specify at least v1.2.8 for yottadb v1:
 
 ```
 require lang.yottadb.com/go/yottadb v1.2.8

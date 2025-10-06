@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	//
+// Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -79,23 +79,24 @@ func ErrorCode(err error) int {
 // NewError is a function to create a new YDBError and return it. Note that we use ydb_zstatus() instead of
 // using (for example) GetE() to fetch $ZSTATUS because ydb_zstatus does not require a tptoken. This means
 // that we don't need to pass tptoken to all the data access methods (For example, ValStr()).
-//
 func NewError(tptoken uint64, errstr *BufferT, errnum int) error {
 	var msgptr *C.char
 	var errmsg string
 	var err error
 
+	// Check for non-error constants for which MessageT cannot provide a message from YottaDB (since they are not errors).
+	// These also provide shortcuts performance-sensitive return codes.
 	if YDB_TP_RESTART == errnum {
-		// Shortcut for this performance sensitive error - not a user error
 		return &YDBError{errnum, "TPRESTART"}
 	}
 	if YDB_ERR_NODEEND == errnum {
-		// Another common "error" that needs no message
 		return &YDBError{errnum, "NODEEND"}
 	}
 	if YDB_TP_ROLLBACK == errnum {
-		// Our 3rd and final quickie-check that needs no message
 		return &YDBError{errnum, "ROLLBACK"}
+	}
+	if YDB_LOCK_TIMEOUT == errnum {
+		return &YDBError{errnum, "YDB_LOCK_TIMEOUT"}
 	}
 	if (nil != errstr) && (nil != errstr.getCPtr()) {
 		errmsg = C.GoString((*C.char)(errstr.getCPtr().buf_addr))
