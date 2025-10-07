@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	//
+// Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -270,8 +270,8 @@ func LockE(tptoken uint64, errstr *BufferT, timeoutNsec uint64, namesnsubs ...in
 			if nil != err {
 				panic(fmt.Sprintf("YDB: Error fetching PARAMINVALID: %s", err))
 			}
-			errmsg = strings.Replace(errmsg, "!AD", "%v", -1)
-			errmsg = fmt.Sprintf(errmsg, newVarname, "LockE()")
+			errmsg = strings.Replace(errmsg, "!AD", fmt.Sprintf("%v", namesnsubs[i]), 1) // Replace first with varname
+			errmsg = strings.Replace(errmsg, "!AD", "LockE()", -1)                       // Replace second with function name
 			return &YDBError{(int)(YDB_ERR_PARAMINVALID), errmsg}
 		}
 		// Pull in the next subscript array and verify it is an array of strings
@@ -281,8 +281,8 @@ func LockE(tptoken uint64, errstr *BufferT, timeoutNsec uint64, namesnsubs ...in
 			if nil != err {
 				panic(fmt.Sprintf("YDB: Error fetching PARAMINVALID: %s", err))
 			}
-			errmsg = strings.Replace(errmsg, "!AD", "%v", -1)
-			errmsg = fmt.Sprintf(errmsg, newVarname, "LockE()")
+			errmsg = strings.Replace(errmsg, "!AD", fmt.Sprintf("%v", namesnsubs[i+1]), 1) // Replace first with varname
+			errmsg = strings.Replace(errmsg, "!AD", "LockE()", -1)                         // Replace second with function name
 			return &YDBError{(int)(YDB_ERR_PARAMINVALID), errmsg}
 		}
 		newKey := new(KeyT)
@@ -680,11 +680,14 @@ func SubPrevE(tptoken uint64, errstr *BufferT, varname string, subary []string) 
 //
 // tptoken  - the token used to identify nested transaction; start with yottadb.NOTTP.
 // tpfn     - the closure which will be run during the transaction. This closure may get invoked multiple times if a
-//            transaction fails for some reason (concurrent changes, for example), so should not change any data outside of
-//            the database.
+//
+//	transaction fails for some reason (concurrent changes, for example), so should not change any data outside of
+//	the database.
+//
 // transid  - See docs for ydb_tp_s() in the MLPG.
 // varnames - a list of local YottaDB variables to reset should the transaction be restarted; if this is an array of 1 string
-//            with a value of "*" all YDB local variables get reset after a TP_RESTART.
+//
+//	with a value of "*" all YDB local variables get reset after a TP_RESTART.
 func TpE(tptoken uint64, errstr *BufferT, tpfn func(uint64, *BufferT) int32, transid string, varnames []string) error {
 	var vnames BufferTArray
 	var maxvarnmlen, varnmcnt, varnmlen uint32
