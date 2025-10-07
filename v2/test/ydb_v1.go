@@ -10,6 +10,11 @@
 //
 //////////////////////////////////////////////////////////////////
 
+// This example program grabs a list of random user data from https://randomuser.me,
+// then adds each users to the current YottaDB database.
+// Each user is added within a transaction to ensure that duplicate names do not conflict.
+// Each user is added from a separate goroutine to demonstrate concurrency.
+
 package main
 
 import (
