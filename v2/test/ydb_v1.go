@@ -1,14 +1,27 @@
+//////////////////////////////////////////////////////////////////
+//
+// Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.
+// All rights reserved.
+//
+//	This source code contains the intellectual property
+//	of its copyright holder(s), and is made available
+//	under a license.  If you do not know the terms of
+//	the license, please stop and do not read further.
+//
+//////////////////////////////////////////////////////////////////
+
 package main
 
 import (
-	"lang.yottadb.com/go/yottadb"
-	"fmt"
-	"net/http"
-	"io/ioutil"
 	"encoding/json"
-	"time"
+	"fmt"
+	"io/ioutil"
+	"net/http"
 	"strconv"
 	"sync"
+	"time"
+
+	"lang.yottadb.com/go/yottadb"
 )
 
 // https://mholt.github.io/json-to-go/
@@ -78,71 +91,71 @@ type randomusers struct {
 }
 
 func ec(err error, errstr yottadb.BufferT) {
-    if err != nil {
-	    errval, _ := errstr.ValStr(yottadb.NOTTP, nil)
-	    fmt.Printf("Error encountered! %s\n", errval)
-	    panic(errval)
-    }
+	if err != nil {
+		errval, _ := errstr.ValStr(yottadb.NOTTP, nil)
+		fmt.Printf("Error encountered! %s\n", errval)
+		panic(errval)
+	}
 }
 
 func main() {
-    defer yottadb.Exit()
-    var errstr yottadb.BufferT
-    defer errstr.Free()
+	defer yottadb.Exit()
+	var errstr yottadb.BufferT
+	defer errstr.Free()
 
-    errstr.Alloc(255)
-    tptoken := yottadb.NOTTP
-    resp, err := http.Get("https://randomuser.me/api/?results=5000")
-    if err != nil {
-        panic(err)
-    }
-    defer resp.Body.Close()
+	errstr.Alloc(255)
+	tptoken := yottadb.NOTTP
+	resp, err := http.Get("https://randomuser.me/api/?results=5000")
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
 
-    fmt.Println("Response status:", resp.Status)
+	fmt.Println("Response status:", resp.Status)
 
-    body, err := ioutil.ReadAll(resp.Body)
-    if err != nil {
-        panic(err)
-    }
-    
-    //fmt.Printf("%s\n", body)
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		panic(err)
+	}
 
-    var users randomusers
-    err = json.Unmarshal(body, &users)
-    //fmt.Printf("%+v\n", users)
-    var wg sync.WaitGroup
-    for i, _ := range users.Results {
-	    wg.Add(1)
-	    go saveV(&users, i, &wg)
-    }
-    wg.Wait()
+	//fmt.Printf("%s\n", body)
 
-    fmt.Println("--- Final Report ---")
-    key_number := "" 
-    for {
-	    // $Order
-	    key_number, err = yottadb.SubNextE(tptoken, &errstr, "^users", []string{key_number})
-	    // End of loop
-	    if err != nil {
-		    break
-	    }
-	    // We got to the index
-	    if _, err := strconv.Atoi(key_number); err != nil {
-		    break
-	    }
-	    
-	    name, _ := yottadb.ValE(tptoken, &errstr, "^users", []string{key_number, "name"})
-	    gender, _ := yottadb.ValE(tptoken, &errstr, "^users", []string{key_number, "gender"})
-	    dob, _ := yottadb.ValE(tptoken, &errstr, "^users", []string{key_number, "dob"})
-	    id, _ := yottadb.ValE(tptoken, &errstr, "^users", []string{key_number, "id"})
-	    address, _ := yottadb.ValE(tptoken, &errstr, "^users", []string{key_number, "address"})
-	    city, _ := yottadb.ValE(tptoken, &errstr, "^users", []string{key_number, "city"})
-	    state, _ := yottadb.ValE(tptoken, &errstr, "^users", []string{key_number, "state"})
-	    country, _ := yottadb.ValE(tptoken, &errstr, "^users", []string{key_number, "country"})
-	    postcode, _ := yottadb.ValE(tptoken, &errstr, "^users", []string{key_number, "postcode"})
-	    line := key_number + ": " + name + " " + gender + " " + dob + " " + id + " " + address + " " + city + " " + state + " " + country + " " + postcode 
-	    fmt.Println(line)
-    }
+	var users randomusers
+	err = json.Unmarshal(body, &users)
+	//fmt.Printf("%+v\n", users)
+	var wg sync.WaitGroup
+	for i := range users.Results {
+		wg.Add(1)
+		go saveV(&users, i, &wg)
+	}
+	wg.Wait()
+
+	fmt.Println("--- Final Report ---")
+	key_number := ""
+	for {
+		// $Order
+		key_number, err = yottadb.SubNextE(tptoken, &errstr, "^users", []string{key_number})
+		// End of loop
+		if err != nil {
+			break
+		}
+		// We got to the index
+		if _, err := strconv.Atoi(key_number); err != nil {
+			break
+		}
+
+		name, _ := yottadb.ValE(tptoken, &errstr, "^users", []string{key_number, "name"})
+		gender, _ := yottadb.ValE(tptoken, &errstr, "^users", []string{key_number, "gender"})
+		dob, _ := yottadb.ValE(tptoken, &errstr, "^users", []string{key_number, "dob"})
+		id, _ := yottadb.ValE(tptoken, &errstr, "^users", []string{key_number, "id"})
+		address, _ := yottadb.ValE(tptoken, &errstr, "^users", []string{key_number, "address"})
+		city, _ := yottadb.ValE(tptoken, &errstr, "^users", []string{key_number, "city"})
+		state, _ := yottadb.ValE(tptoken, &errstr, "^users", []string{key_number, "state"})
+		country, _ := yottadb.ValE(tptoken, &errstr, "^users", []string{key_number, "country"})
+		postcode, _ := yottadb.ValE(tptoken, &errstr, "^users", []string{key_number, "postcode"})
+		line := key_number + ": " + name + " " + gender + " " + dob + " " + id + " " + address + " " + city + " " + state + " " + country + " " + postcode
+		fmt.Println(line)
+	}
 
 }
 func saveV(users *randomusers, i int, wg *sync.WaitGroup) {
@@ -152,90 +165,90 @@ func saveV(users *randomusers, i int, wg *sync.WaitGroup) {
 	errstr.Alloc(255)
 	tptoken := yottadb.NOTTP
 
-	    v := users.Results[i]
-	    first_name := v.Name.First  //done
-	    last_name  := v.Name.Last   //done
-	    gender     := v.Gender      //done
-	    dob        := v.Dob.Date.Format("2006-01-02") //done
-	    id         := v.ID.Value    //done
-	    street     := fmt.Sprintf("%v %s", v.Location.Street.Number, v.Location.Street.Name)
-	    city       := v.Location.City
-	    state      := v.Location.State
-	    country    := v.Location.Country
-	    postcode   := v.Location.Postcode
+	v := users.Results[i]
+	first_name := v.Name.First             //done
+	last_name := v.Name.Last               //done
+	gender := v.Gender                     //done
+	dob := v.Dob.Date.Format("2006-01-02") //done
+	id := v.ID.Value                       //done
+	street := fmt.Sprintf("%v %s", v.Location.Street.Number, v.Location.Street.Name)
+	city := v.Location.City
+	state := v.Location.State
+	country := v.Location.Country
+	postcode := v.Location.Postcode
 
-	    name := first_name + " " + last_name
+	name := first_name + " " + last_name
 
-	    data, err := yottadb.DataE(tptoken, &errstr, "^users", []string{"index",name})
-	    ec(err, errstr)
-	    if data == 0 {
-		    key_number, err := yottadb.IncrE(tptoken, &errstr, strconv.Itoa(1), "^users", []string{})
-		    ec(err, errstr)
+	data, err := yottadb.DataE(tptoken, &errstr, "^users", []string{"index", name})
+	ec(err, errstr)
+	if data == 0 {
+		key_number, err := yottadb.IncrE(tptoken, &errstr, strconv.Itoa(1), "^users", []string{})
+		ec(err, errstr)
 
-		    fmt.Printf("%v  -> %s %s %s %s %s\n", key_number, gender, first_name, last_name, dob, id)
-		    fmt.Printf("    -> %s %s %s %s %v\n", street, city, state, country, postcode)
+		fmt.Printf("%v  -> %s %s %s %s %s\n", key_number, gender, first_name, last_name, dob, id)
+		fmt.Printf("    -> %s %s %s %s %v\n", street, city, state, country, postcode)
 
-		    err = yottadb.TpE(yottadb.NOTTP, &errstr, func(tptoken uint64, errptr *yottadb.BufferT) int32 {
-			    err = yottadb.SetValE(tptoken, &errstr, name, "^users", []string{key_number, "name"})
-			    if err != nil {
+		err = yottadb.TpE(yottadb.NOTTP, &errstr, func(tptoken uint64, errptr *yottadb.BufferT) int32 {
+			err = yottadb.SetValE(tptoken, &errstr, name, "^users", []string{key_number, "name"})
+			if err != nil {
 				fmt.Printf("**%s** ", err)
 				return int32(yottadb.ErrorCode(err))
-			    }
-			    err = yottadb.SetValE(tptoken, &errstr, gender, "^users", []string{key_number, "gender"})
-			    if err != nil {
+			}
+			err = yottadb.SetValE(tptoken, &errstr, gender, "^users", []string{key_number, "gender"})
+			if err != nil {
 				fmt.Printf("**%s** ", err)
 				return int32(yottadb.ErrorCode(err))
-			    }
-			    err = yottadb.SetValE(tptoken, &errstr, dob, "^users", []string{key_number, "dob"})
-			    if err != nil {
+			}
+			err = yottadb.SetValE(tptoken, &errstr, dob, "^users", []string{key_number, "dob"})
+			if err != nil {
 				fmt.Printf("**%s** ", err)
 				return int32(yottadb.ErrorCode(err))
-			    }
-			    err = yottadb.SetValE(tptoken, &errstr, id, "^users", []string{key_number, "id"})
-			    if err != nil {
+			}
+			err = yottadb.SetValE(tptoken, &errstr, id, "^users", []string{key_number, "id"})
+			if err != nil {
 				fmt.Printf("**%s** ", err)
 				return int32(yottadb.ErrorCode(err))
-			    }
-			    err = yottadb.SetValE(tptoken, &errstr, street, "^users", []string{key_number, "address"})
-			    if err != nil {
+			}
+			err = yottadb.SetValE(tptoken, &errstr, street, "^users", []string{key_number, "address"})
+			if err != nil {
 				fmt.Printf("**%s** ", err)
 				return int32(yottadb.ErrorCode(err))
-			    }
-			    err = yottadb.SetValE(tptoken, &errstr, city, "^users", []string{key_number, "city"})
-			    if err != nil {
+			}
+			err = yottadb.SetValE(tptoken, &errstr, city, "^users", []string{key_number, "city"})
+			if err != nil {
 				fmt.Printf("**%s** ", err)
 				return int32(yottadb.ErrorCode(err))
-			    }
-			    err = yottadb.SetValE(tptoken, &errstr, state, "^users", []string{key_number, "state"})
-			    if err != nil {
+			}
+			err = yottadb.SetValE(tptoken, &errstr, state, "^users", []string{key_number, "state"})
+			if err != nil {
 				fmt.Printf("**%s** ", err)
 				return int32(yottadb.ErrorCode(err))
-			    }
-			    err = yottadb.SetValE(tptoken, &errstr, country, "^users", []string{key_number, "country"})
-			    if err != nil {
+			}
+			err = yottadb.SetValE(tptoken, &errstr, country, "^users", []string{key_number, "country"})
+			if err != nil {
 				fmt.Printf("**%s** ", err)
 				return int32(yottadb.ErrorCode(err))
-			    }
-			    err = yottadb.SetValE(tptoken, &errstr, strconv.Itoa(postcode), "^users", []string{key_number, "postcode"})
-			    if err != nil {
+			}
+			err = yottadb.SetValE(tptoken, &errstr, strconv.Itoa(postcode), "^users", []string{key_number, "postcode"})
+			if err != nil {
 				fmt.Printf("**%s** ", err)
 				return int32(yottadb.ErrorCode(err))
-			    }
-			    err = yottadb.SetValE(tptoken, &errstr, "", "^users", []string{"index", name, key_number})
-			    if err != nil {
+			}
+			err = yottadb.SetValE(tptoken, &errstr, "", "^users", []string{"index", name, key_number})
+			if err != nil {
 				fmt.Printf("**%s** ", err)
 				return int32(yottadb.ErrorCode(err))
-			    }
-			    err = yottadb.SetValE(tptoken, &errstr, key_number, "^userCount", []string{})
-			    if err != nil {
+			}
+			err = yottadb.SetValE(tptoken, &errstr, key_number, "^userCount", []string{})
+			if err != nil {
 				fmt.Printf("**%s** ", err)
 				return int32(yottadb.ErrorCode(err))
-			    }
-			    return yottadb.YDB_OK
-		    }, "CS", []string{})
-		    ec(err, errstr)
-	    } else {
-		    fmt.Println("found an existing user: " + name)
-	    }
-	    wg.Done()
+			}
+			return yottadb.YDB_OK
+		}, "CS", []string{})
+		ec(err, errstr)
+	} else {
+		fmt.Println("found an existing user: " + name)
+	}
+	wg.Done()
 }
