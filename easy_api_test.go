@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	//
+// Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -13,10 +13,16 @@
 package yottadb_test
 
 import (
+	"fmt"
 	"lang.yottadb.com/go/yottadb"
 	. "lang.yottadb.com/go/yottadb/internal/test_helpers"
+	"os"
+	"os/exec"
 	"strconv"
 	"testing"
+	"time"
+
+	assert "github.com/stretchr/testify/require"
 )
 
 func TestDataE(t *testing.T) {
@@ -471,6 +477,42 @@ func TestLockE(t *testing.T) {
 	VerifyLockExists([]byte("^lock1(\"sub11\",\"sub12\")"), &errors, true, t)
 	VerifyLockExists([]byte("lock2"), &errors, true, t)
 	VerifyLockExists([]byte("^lock3(\"sub21\")"), &errors, true, t)
+}
+
+func TestLockETimeout(t *testing.T) {
+	const tptoken uint64 = yottadb.NOTTP
+	const lock2 string = "^lock2"
+	var errstr yottadb.BufferT
+	locktimeout := uint64(10 * time.Millisecond)
+
+	defer errstr.Free() // Cleanup these allocated strings when they go out-of-scope
+	errstr.Alloc(yottadb.YDB_MAX_ERRORMSG)
+
+	// Lock node n in an external process for n seconds so that we can test its lock timeout here.
+	cmd := exec.Command(os.Getenv("ydb_dist")+"/yottadb", "-r", "%XCMD", fmt.Sprintf("lock +%s:1 hang 1 lock -%s", lock2, lock2))
+	err := cmd.Start()
+	if err != nil {
+		panic(err)
+	}
+	// Wait for it to get locked externally
+	for err = nil; err == nil; err = yottadb.LockE(tptoken, &errstr, locktimeout, lock2, []string{"42"}) {
+		// Pass
+	}
+	if yottadb.ErrorCode(err) != yottadb.YDB_LOCK_TIMEOUT {
+		panic(err)
+	}
+	// Test that a lock timeout works for LockE()
+	err = yottadb.LockE(tptoken, &errstr, locktimeout, lock2, []string{"42"})
+	if err == nil {
+		panic("Expected YDB_LOCK_TIMEOUT error, but lock successfully acquired")
+	}
+	assert.Equal(t, yottadb.ErrorCode(err), yottadb.YDB_LOCK_TIMEOUT)
+	// Test that a lock timeout works for LockIncrE()
+	err = yottadb.LockIncrE(tptoken, &errstr, locktimeout, lock2, []string{"42"})
+	if err == nil {
+		panic("Expected YDB_LOCK_TIMEOUT error, but lock successfully acquired")
+	}
+	assert.Equal(t, yottadb.ErrorCode(err), yottadb.YDB_LOCK_TIMEOUT)
 }
 
 func TestLockEErrors(t *testing.T) {
