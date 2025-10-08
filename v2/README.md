@@ -158,7 +158,9 @@ You can also override the path used by pkg-config to find `yottadb.pc` with the 
 
 ### Migrating v1 to v2
 
-Here is an example of the same Go program migrated from [YDBGo v1](test/ydb_v1.go) to [YDBGo v2](test/ydb_v2.go). A side-by-side diff may be instructive.
+* Here is an example of a Go program migrated from [YDBGo v1 'easyAPI'](test/ydb_v1.go) to [YDBGo v2](test/ydb_v2.go). A side-by-side diff may be instructive.
+* Similarly, here is a diff of another Go program migrated from [YDBGo v1 'simpleAPI' to YDBGo v2](https://gitlab.com/YottaDB/Lang/YDBGo/-/commit/0267948ddbef262180cc9809c07b4f5ccb8c2536).
+
 
 Applications that use YDBGo v1 will continue to operate without change. To aid migration of large applications from YDBGo v1 to v2, it is possible to use v1 and v2 APIs in the same application code. However, the the two versions cannot use each other's data types so this will only make sense where the old and new functionality is fairly modular. All signal handling will need to be migrated to v2 since v1 signal handlers will no longer be called.
 
