@@ -73,11 +73,15 @@ v2_unit_tests:
   script:
     - *base_unit_test_script
     # Create temporary database
-    - export ydb_gbldir=testapps_mumps.gld
+    - tmpdir=$(mktemp -d --tmpdir ydbgo_testapps_XXXXX)
+    - export ydb_gbldir=$tmpdir/mumps.gld
     - $ydb_dist/mumps -run ^GDE change -seg DEFAULT -file=${ydb_gbldir/.gld/.dat}
     - $ydb_dist/mupip create
+    - $ydb_dist/mupip extend -blocks=8192 DEFAULT  # more needed for pseudoBank.go
     # Verify that the mini-apps run
     - go run test/wordfreq.go <test/wordfreq_input.txt | diff - test/wordfreq_output.txt
+    - go run test/pseudoBank.go --timeout=2 --verbose
+    - rm -rf $tmpdir
 
 v1_unit_tests:
   extends: .unit_tests
