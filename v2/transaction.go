@@ -80,6 +80,7 @@ func (conn *Conn) Transaction(transID string, localsToRestore []string, callback
 			(*C.char)(unsafe.Pointer(unsafe.StringData(transID))), C.int(len(names)), namelist.cnode.buffers)
 		runtime.KeepAlive(namelist) // ensure namelist sticks around until we've finished copying data from it's C allocation
 	}
+	runtime.KeepAlive(transID) // ensure batch id doesn't disappear until transaction call returns and has finished using it
 	// Propagate any panics that occurred during the transaction function and
 	// sent to me by tpCallbackWrapper in info.err to avoid panics crossing the CGo boundary.
 	if info.err != nil {
