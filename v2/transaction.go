@@ -54,6 +54,8 @@ type tpInfo struct {
 //     fourth try, YottaDB will resort to calling it with other processes locked out to ensure its success.
 //   - Call [Conn.Restart] if it needs to rollback and immediately restart the transaction function
 //   - Call [Conn.Rollback] if it needs to rollback and immediately exit the transaction function
+//   - Finish quickly because database activity in other goroutines will be blocked until it is complete.
+//   - Not create goroutines within the transaction unless absolutely necessary, in which case see [Conn.CloneConn].
 //
 // Transaction nesting level may be determined within the callback function by reading the special variable [$tlevel], and the number of restart
 // repetitions by [$trestart]. These things are documented in more detail in [Transaction Processing].

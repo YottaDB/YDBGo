@@ -1,410 +1,217 @@
-// ////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
 //
-//	//
+// Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.
+// All rights reserved.
 //
-// Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries. //
-// All rights reserved.						//
+//	This source code contains the intellectual property
+//	of its copyright holder(s), and is made available
+//	under a license.  If you do not know the terms of
+//	the license, please stop and do not read further.
 //
-//								//
-//	This source code contains the intellectual property	//
-//	of its copyright holder(s), and is made available	//
-//	under a license.  If you do not know the terms of	//
-//	the license, please stop and do not read further.	//
-//								//
-//
-// ////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
+
 package main
 
-/* Run for a specified duration calling random features of the YottaDB Go Easy API.
-
-We fork off N threads, where has a chance of:
-
-- Getting a global/local
-- Setting a global/local
-- Killing a global/local
-- Data'ing a global/local
-- Walking through a global/local
-- Walking through a subscript
-- Incrementing a global/local
-- Settings locks on a global/local
-- Starting a TP transaction
-- Ending a TP transaction
-- Creating routines in a TP transaction
-
-The goal is to run for some time with no panics
-
-*/
-
 import (
+	"bytes"
+	"flag"
 	"fmt"
+	"io"
+	"log"
 	"math/rand"
+	"runtime"
+	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
-	"lang.yottadb.com/go/yottadb"
+	"lang.yottadb.com/go/yottadb/v2"
 )
 
-// This are set randomly at the start of the test but should be treated as constants
+// Run for a specified duration calling random features of the YottaDB Go Easy API.
+//
+// Creates DRIVER_THREADS goroutines, where each rusn runProc() in a loop until the timeout expires.
+// Each runProc() has an equal chance of performing one of the ACTION enums listed below
+// The goal is to run until timeout with no panics.
+
+const (
+	ACT_SET        = iota // Setting a global/local
+	ACT_SET2              // Ditto. Doubles the likelihood of this action
+	ACT_GET               // Getting a global/local
+	ACT_HAS               // Test global/local for whether it has data or subtree
+	ACT_KILL              // Kill or clear a global/local and its tree
+	ACT_KILLEXCEPT        // Kill all locals except the specified list of strings
+	ACT_NEXTSUB           // Walking through a global/local
+	ACT_NEXTNODE          // Walking through a node tree
+	ACT_INCR              // Incrementing a global/local
+	ACT_LOCK              // Settings locks on a global/local
+	ACT_TRANSACT          // Create a transaction nesting a function that performs this action list to a depth of MAX_DEPTH
+	ACT_SPAWN             // Create THREADS_TO_MAKE new goroutines to run a function that performs this action list to a depth of MAX_DEPTH
+	ACT_COUNT             // Number of actions defined above
+)
+
+// These are set below in init() and should be treated as constants for the rest of the test
 var THREADS_TO_MAKE int
 var DRIVER_THREADS int
 var MAX_THREADS int
 var MAX_DEPTH int
-var NEST_RATE float64
-var TEST_TIMEOUT int
 
-func Ok() {
-	// Noop that means everything is OK
-}
-
-type testSettings struct {
-	maxDepth     int
-	nestedTpRate float64
-}
-
-var countMutex sync.Mutex
-var rtnCount int
-
-/* Generate a variable to be used in runProc()
- */
-func genName() []string {
-	var ret []string
-	num_subs := rand.Int() % 5
-	global_id := rand.Int() % 4
-	switch global_id {
-	case 0:
-		ret = append(ret, "^MyGlobal1")
-	case 1:
-		ret = append(ret, "^MyGlobal2")
-	case 2:
-		ret = append(ret, "MyLocal1xx")
-	case 3:
-		ret = append(ret, "MyLocal2xx")
-	}
-	for i := 0; i < num_subs; i++ {
-		ret = append(ret, fmt.Sprintf("sub%d", i))
-	}
-	return ret
-}
-
-/* randomly attempts various EasyAPI functions with a generated variable
- * see header comment for details
- */
-func runProc(tptoken uint64, errstr *yottadb.BufferT, settings testSettings, curDepth int) int32 {
-	remainingOdds := 80 - (100 * settings.nestedTpRate)
-	t := genName()
-	varname := t[0]
-	subs := t[1:]
-	action := rand.Float64() * 100
-
-	if action < 20 {
-		err := yottadb.SetValE(tptoken, errstr, "MySecretValue", varname, subs)
-		// There are some error codes we accept; anything other than that, raise an error
-		if err != nil {
-			errcode := yottadb.ErrorCode(err)
-			switch errcode {
-			case yottadb.YDB_ERR_GVUNDEF:
-				Ok()
-			case yottadb.YDB_ERR_INVSVN:
-				Ok()
-			case yottadb.YDB_ERR_LVUNDEF:
-				Ok()
-			default:
-				panic(fmt.Sprintf("Unexpected return code (%d) issued! %s", errcode, err))
-			}
-		}
-	} else if action < 20+remainingOdds*(1/11.0) {
-		_, err := yottadb.ValE(tptoken, errstr, varname, subs)
-		// There are some error codes we accept; anything other than that, raise an error
-		if err != nil {
-			errcode := yottadb.ErrorCode(err)
-			switch errcode {
-			case yottadb.YDB_ERR_GVUNDEF:
-				Ok()
-			case yottadb.YDB_ERR_INVSVN:
-				Ok()
-			case yottadb.YDB_ERR_LVUNDEF:
-				Ok()
-			default:
-				panic(fmt.Sprintf("Unexpected return code (%d) issued! %s", errcode, err))
-			}
-		}
-	} else if action < 20+remainingOdds*(2/11.0) {
-		res, err := yottadb.DataE(tptoken, errstr, varname, subs)
-		// There are some error codes we accept; anything other than that, raise an error
-		if err != nil {
-			errcode := yottadb.ErrorCode(err)
-			switch errcode {
-			case yottadb.YDB_ERR_GVUNDEF:
-				Ok()
-			case yottadb.YDB_ERR_INVSVN:
-				Ok()
-			case yottadb.YDB_ERR_LVUNDEF:
-				Ok()
-			default:
-				panic(fmt.Sprintf("Unexpected return code (%d) issued! %s", errcode, err))
-
-			}
-		}
-		switch res {
-		case 0:
-			Ok()
-		case 1:
-			Ok()
-		case 10:
-			Ok()
-		case 11:
-			Ok()
-		default:
-			panic("Unexpected data value issued!")
-		}
-	} else if action < 20+remainingOdds*(3/11.0) {
-		delType := rand.Float64()
-		var err error
-		if delType < 0.5 {
-			err = yottadb.DeleteE(tptoken, errstr, yottadb.YDB_DEL_TREE, varname, subs)
-		} else {
-			err = yottadb.DeleteE(tptoken, errstr, yottadb.YDB_DEL_NODE, varname, subs)
-		}
-		// There are some error codes we accept; anything other than that, raise an error
-		if err != nil {
-			panic(err)
-		}
-	} else if action < 20+remainingOdds*(4/11.0) {
-		err := yottadb.DeleteExclE(tptoken, errstr, []string{})
-		if err != nil {
-			panic(err)
-		}
-	} else if action < 20+remainingOdds*(5/11.0) {
-		direction := rand.Float64()
-		if direction < .5 {
-			direction = 1
-		} else {
-			direction = -1
-		}
-		retcode := 0
-		var s []string
-		var err error
-		for err == nil {
-			if direction == 1 {
-				s, err = yottadb.NodeNextE(tptoken, errstr, varname, subs)
-			} else {
-				s, err = yottadb.NodePrevE(tptoken, errstr, varname, subs)
-			}
-			retcode = yottadb.ErrorCode(err)
-			subs = s
-		}
-		if retcode != yottadb.YDB_ERR_NODEEND {
-			panic(fmt.Sprintf("Unexpected return code (%d) issued!", retcode))
-		}
-	} else if action < 20+remainingOdds*(6/11.0) {
-		// Pick a random direction
-		direction := rand.Float64()
-		if direction < .5 {
-			direction = 1
-		} else {
-			direction = -1
-		}
-		retcode := 0
-		var s string
-		var err error
-		for err == nil {
-			if direction == 1 {
-				s, err = yottadb.SubNextE(tptoken, errstr, varname, subs)
-			} else {
-				s, err = yottadb.SubPrevE(tptoken, errstr, varname, subs)
-			}
-			retcode = yottadb.ErrorCode(err)
-			if len(t) == 1 {
-				varname = s
-			} else {
-				subs[len(subs)-1] = s
-			}
-		}
-		if retcode != yottadb.YDB_ERR_NODEEND {
-			panic(fmt.Sprintf("Unexpected return code (%d) issued!", retcode))
-		}
-	} else if action < 20+remainingOdds*(7/11.0) {
-		incr_amount := rand.Float64()*10 - 5
-		_, err := yottadb.IncrE(tptoken, errstr, fmt.Sprintf("%f", incr_amount), varname, subs)
-		if err != nil {
-			panic(err)
-		}
-	} else if action < 20+remainingOdds*(8/11.0) {
-		var err error
-		err = yottadb.LockE(tptoken, errstr, 0, varname, subs)
-		if err != nil {
-			errcode := yottadb.ErrorCode(err)
-			switch errcode {
-			case yottadb.YDB_ERR_GVUNDEF:
-				Ok()
-			case yottadb.YDB_ERR_INVSVN:
-				Ok()
-			case yottadb.YDB_ERR_LVUNDEF:
-				Ok()
-			case yottadb.YDB_ERR_TPLOCK:
-				Ok()
-			default:
-				errstr.Dump()
-				fmt.Println(varname)
-				fmt.Println(subs)
-				panic(fmt.Sprintf("Unexpected return code (%d) issued! %s", errcode, err))
-			}
-		}
-
-		err = yottadb.LockIncrE(tptoken, errstr, 0, varname, subs)
-		if err != nil {
-			errcode := yottadb.ErrorCode(err)
-			switch errcode {
-			case yottadb.YDB_ERR_GVUNDEF:
-				Ok()
-			case yottadb.YDB_ERR_INVSVN:
-				Ok()
-			case yottadb.YDB_ERR_LVUNDEF:
-				Ok()
-			case yottadb.YDB_ERR_TPLOCK:
-				Ok()
-			default:
-				panic(fmt.Sprintf("Unexpected return code (%d) issued! %s", errcode, err))
-			}
-		}
-		err = yottadb.LockDecrE(tptoken, errstr, varname, subs)
-		if err != nil {
-			errcode := yottadb.ErrorCode(err)
-			switch errcode {
-			case yottadb.YDB_ERR_GVUNDEF:
-				Ok()
-			case yottadb.YDB_ERR_INVSVN:
-				Ok()
-			case yottadb.YDB_ERR_LVUNDEF:
-				Ok()
-			case yottadb.YDB_ERR_TPLOCK:
-				Ok()
-			default:
-				panic(fmt.Sprintf("Unexpected return code (%d) issued! %s", errcode, err))
-			}
-		}
-		err = yottadb.LockE(tptoken, errstr, 0)
-		if err != nil {
-			errcode := yottadb.ErrorCode(err)
-			switch errcode {
-			case yottadb.YDB_ERR_GVUNDEF:
-				Ok()
-			case yottadb.YDB_ERR_INVSVN:
-				Ok()
-			case yottadb.YDB_ERR_LVUNDEF:
-				Ok()
-			case yottadb.YDB_ERR_TPLOCK:
-				Ok()
-			default:
-				panic(fmt.Sprintf("Unexpected return code (%d) issued! %s", errcode, err))
-			}
-		}
-	} else if action < 20+remainingOdds*(9/11.0) && tptoken != yottadb.NOTTP {
-		/*	err := yottadb.Exit()
-			if err != nil {
-				panic(err)
-			} */
-	} else if action < 20+remainingOdds*(10/11.0) {
-		_, err := yottadb.MessageT(tptoken, errstr, yottadb.YDB_ERR_KILLBYSIGUINFO)
-		if err != nil {
-			panic(err)
-		}
-	} else if action < 20+remainingOdds*(11/11.0) {
-		yottadb.IsLittleEndian()
-	} else if action <= 100 {
-		if curDepth > settings.maxDepth { //if at max depth exit
-			return 0
-		}
-		var err error
-		makeThreads := rand.Float64() //half the time do a TP, else create THREADS_TO_MAKE routines
-		// have to save this to a local variable to prevent dataraces in the 'if' clause
-		countMutex.Lock()
-		curCount := rtnCount
-		countMutex.Unlock()
-		if makeThreads < 0.5 || curCount >= MAX_THREADS {
-			err = yottadb.TpE(tptoken, errstr, func(tptoken uint64, errstr *yottadb.BufferT) int32 {
-				n := rand.Int() % 20
-				for i := 0; i < n; i++ {
-					runProc(tptoken, errstr, settings, curDepth+1)
-				}
-				return 0
-			}, "BATCH", []string{})
-		} else {
-			var wg sync.WaitGroup
-			for i := 0; i < THREADS_TO_MAKE; i++ {
-				wg.Add(1)
-				go func() {
-					countMutex.Lock()
-					rtnCount++
-					countMutex.Unlock()
-					runProc(tptoken, errstr, testSettings{MAX_DEPTH, NEST_RATE / 2}, curDepth+1)
-					countMutex.Lock()
-					rtnCount--
-					countMutex.Unlock()
-					wg.Done()
-				}()
-			}
-			wg.Wait()
-			return 0
-		}
-		if err != nil {
-			panic(err)
-		}
-	} else {
-		panic("Huh, random number out of range")
-	}
-	return 0
-}
-
-func main() {
+func init() {
 	rand.Seed(time.Now().UTC().UnixNano())
 	THREADS_TO_MAKE = rand.Intn(17) + 4 //[4,20]
 	DRIVER_THREADS = rand.Intn(9) + 2   //[2,10]
 	MAX_THREADS = 1000
-	MAX_DEPTH = rand.Intn(19) + 2            //[2,20]
-	NEST_RATE = float64(rand.Intn(21)) / 100 //[0,0.20]
-	TEST_TIMEOUT = rand.Intn(106) + 15       //[15,120] test timeout in seconds for the driver threads to stop
-	defer yottadb.Exit()
-	var wg sync.WaitGroup
-	var doneMutex sync.Mutex
+	MAX_DEPTH = rand.Intn(19) + 2 //[2,20]
+}
 
-	tptoken := yottadb.NOTTP
-	done := false
+var routineCount atomic.Int32
 
-	go func() { //wait for test timeout then set done to true
-		time.Sleep(time.Duration(TEST_TIMEOUT) * time.Second)
-		doneMutex.Lock()
-		done = true
-		doneMutex.Unlock()
-	}()
+// Generate a node with a randomly global or local varname and randomly 1-5 subscripts to be used in runProc()
+func genNode(conn *yottadb.Conn) *yottadb.Node {
+	// randomly select one of  4 varnames
+	names := []string{"^MyGlobal1", "^MyGlobal2", "MyLocal1xx", "MyLocal2xx"}
+	varname := names[rand.Intn(len(names))]
+	var subs []any
+	for i := range rand.Intn(5) {
+		subs = append(subs, fmt.Sprintf("sub%d", i))
+	}
+	return conn.Node(varname, subs...)
+}
 
-	for i := 0; i < DRIVER_THREADS; i++ {
-		wg.Add(1)
-		go func() {
-			var errstr yottadb.BufferT
-			defer errstr.Free()
-			errstr.Alloc(yottadb.YDB_MAX_ERRORMSG)
-			countMutex.Lock()
-			rtnCount++
-			countMutex.Unlock()
-			for { //loop until test timeout then break
-				doneMutex.Lock()
-				d := done
-				doneMutex.Unlock()
-				if d {
-					break
+// runProc randomly attempts various YDBGo functions
+func runProc(conn *yottadb.Conn, depth int) {
+	node := genNode(conn)
+	action := rand.Intn(ACT_COUNT)
+	//fmt.Printf("%d %s\n", action, node)
+	switch action {
+	case ACT_SET:
+		fallthrough
+	case ACT_SET2:
+		node.Set("MySecretValue")
+	case ACT_GET:
+		node.Get()
+	case ACT_HAS:
+		// randomly select one of 6 functions to run
+		funcs := []func() bool{node.HasValue, node.HasValueOnly, node.HasTree, node.HasTreeOnly, node.HasBoth, node.HasNone}
+		f := funcs[rand.Intn(len(funcs))]
+		f()
+	case ACT_KILL:
+		if rand.Intn(2) == 0 {
+			node.Kill()
+		} else {
+			node.Clear()
+		}
+	case ACT_KILLEXCEPT:
+		conn.KillLocalsExcept()
+	case ACT_NEXTSUB:
+		if rand.Intn(2) == 0 {
+			node.Next()
+		} else {
+			node.Prev()
+		}
+	case ACT_NEXTNODE:
+		if rand.Intn(2) == 0 {
+			node.TreeNext()
+		} else {
+			node.TreePrev()
+		}
+	case ACT_INCR:
+		node.Incr(rand.Float64()*10 - 5)
+	case ACT_LOCK:
+		// Avoid %YDB-E-TPLOCK from trying to use conn.Lock() inside a transaction to release locks created outside the transaction
+		if depth == 0 {
+			conn.Lock(0, node) // release all nodes and then try only once to lock this node
+		}
+		node.Lock(0)  // lock this node (again)
+		node.Unlock() // unlock this node (once)
+		// Avoid %YDB-E-TPLOCK from trying to use conn.Lock() inside a transaction to release locks created outside the transaction
+		if depth == 0 {
+			conn.Lock(0) // unlock all nodes
+		}
+	case ACT_TRANSACT:
+		if depth > MAX_DEPTH {
+			break
+		}
+		// Half the time do runProc() inside a transaction; otherwise create THREADS_TO_MAKE new goroutines.
+		// But suppress the second option if we've already got at least MAX_THREADS goroutines
+		if rand.Intn(2) == 0 || int(routineCount.Load()) >= MAX_THREADS {
+			conn.TransactionFast([]string{}, func() {
+				for range rand.Intn(20) {
+					runProc(conn, depth+1)
 				}
-				runProc(tptoken, &errstr, testSettings{
-					MAX_DEPTH,
-					NEST_RATE,
-				}, 0)
+			})
+		}
+	case ACT_SPAWN:
+		if depth > MAX_DEPTH {
+			break
+		}
+		var wg sync.WaitGroup
+		for range THREADS_TO_MAKE {
+			wg.Add(1)
+			go func() {
+				defer yottadb.ShutdownOnPanic()
+				defer wg.Done()
+				routineCount.Add(1)
+				defer routineCount.Add(-1)
+				conn := conn.CloneConn()
+				runProc(conn, depth+1)
+			}()
+		}
+		wg.Wait()
+	}
+}
+
+// goid extracts the goroutine ID from the stack trace.
+// This may be used for debug printing if there are problems.
+func goid() int {
+	var buf [64]byte
+	n := runtime.Stack(buf[:], false)
+	idField := bytes.Fields(buf[:n])[1]
+	id, err := strconv.Atoi(string(idField))
+	if err != nil {
+		panic(fmt.Sprintf("cannot get goroutine id: %v", err))
+	}
+	return id
+}
+
+func main() {
+	var Verbose = flag.Bool("verbose", false, "Display extra progress information")
+	var Timeout = flag.Float64("timeout", -1.0, "Test time in seconds (default randomly between 15 and 120 seconds)")
+	flag.Parse()
+	if !*Verbose {
+		log.SetOutput(io.Discard)
+	}
+	if *Timeout < 0.0 {
+		*Timeout = float64(rand.Intn(106) + 15) //[15,120] test timeout in seconds for the driver threads to stop
+	}
+	timeout := time.Duration(*Timeout * float64(time.Second))
+
+	defer yottadb.Shutdown(yottadb.MustInit())
+
+	var waitGroup sync.WaitGroup
+	waitGroup.Add(DRIVER_THREADS)
+	var stop atomic.Bool // set true to stop all jobs -- use atomic to ensure volatility
+	for range DRIVER_THREADS {
+		go func() {
+			defer yottadb.ShutdownOnPanic()
+			routineCount.Add(1)
+			defer routineCount.Add(-1)
+			// Create new connection and node objects for this goroutine
+			conn := yottadb.NewConn()
+
+			for !stop.Load() { // loop until test timeout then break
+				depth := 0
+				runProc(conn, depth)
 			}
-			countMutex.Lock()
-			rtnCount--
-			countMutex.Unlock()
-			wg.Done()
+			waitGroup.Done()
 		}()
 	}
 
-	wg.Wait() //wait for existing routines to end
+	// Wait for timeout
+	log.Printf("Waiting %ds", timeout/time.Second)
+	time.Sleep(timeout)
+	stop.Store(true)
+	log.Printf("Waiting for goroutines to stop")
+	waitGroup.Wait()
+	log.Println("Done")
 }

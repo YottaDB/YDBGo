@@ -71,8 +71,8 @@ type Conn struct {
 	// Pointer to C.conn rather than the item itself so we can malloc it and point to it from C without Go moving it.
 	cconn *C.conn
 	// tptoken is a place to store tptoken for thread-safe ydb_*_st() function calls
-	// It was originally made to be atomic so that Conn.CloneConn() could share pointers to it
-	// until I realized that caused a bug. But keep it atomic since atomicity has no compiled overhead
+	// It was originally made to be atomic so that Conn.CloneConn() could share pointers to it until
+	// it was realized that created a bug. But keep it atomic since atomicity has no compiled overhead
 	// with Uint64 on a 64-bit machine (confirmed empirically).
 	tptoken atomic.Uint64
 	// timeoutAction is the action to take on transaction timeout. See [conn.TimeoutAction]()

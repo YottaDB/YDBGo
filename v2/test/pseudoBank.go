@@ -28,6 +28,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"lang.yottadb.com/go/yottadb/v2"
@@ -62,7 +63,7 @@ func main() {
 
 	var waitGroup sync.WaitGroup
 	waitGroup.Add(concurrent)
-	var stop bool // set true to stop all jobs -- atomic by nature; needs no mutex
+	var stop atomic.Bool // set true to stop all jobs -- use atomic to ensure volatility
 	for guid := range concurrent {
 		user := string('A' + guid)
 		// Start job
@@ -73,7 +74,7 @@ func main() {
 			conn := yottadb.NewConn()
 			data := &Nodes{conn, conn.Node("^ZACN"), conn.Node("^ZHIST"), conn.Node("^ZTRNLOG")}
 
-			for t := 0; !stop; t++ {
+			for t := 0; !stop.Load(); t++ {
 				ref := guid + (t * concurrent) // make a big reference number
 				from := startCid + rand.Intn(accountNeeded)
 				to := startCid + rand.Intn(accountNeeded-1)
@@ -87,7 +88,7 @@ func main() {
 	// Wait for timeout
 	log.Printf("Waiting %ds\n", timeout/time.Second)
 	time.Sleep(timeout)
-	stop = true
+	stop.Store(true)
 	log.Printf("Waiting for goroutines to stop\n")
 	waitGroup.Wait()
 	log.Println("Done")

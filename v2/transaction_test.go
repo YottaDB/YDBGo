@@ -164,7 +164,7 @@ func TestTransactionGoroutines(t *testing.T) {
 	testTransactionGoroutines(conn)
 	// Test again nested inside a transaction
 	conn.TransactionFast([]string{}, func() {
-		//testTransactionGoroutines(conn)
+		testTransactionGoroutines(conn)
 	})
 }
 
