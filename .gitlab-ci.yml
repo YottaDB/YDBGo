@@ -41,7 +41,7 @@ before_script: |-
 
 .unit_tests:
   stage: test
-  script: |-
+  script: &base_unit_test_script |-
     export YDB_GO_SKIP_TIMED_TESTS="yes"
     cd ${TEST_VERSION}
     go get -t
@@ -70,6 +70,14 @@ v2_unit_tests:
     TEST_VERSION: v2
     # Test against the latest point release of Go in each major version since the version of Go specified in go.mod up to latest
     TEST_GO_VERSIONS: "1.24.0 latest"
+  script:
+    - *base_unit_test_script
+    # Create temporary database
+    - export ydb_gbldir=testapps_mumps.gld
+    - $ydb_dist/mumps -run ^GDE change -seg DEFAULT -file=${ydb_gbldir/.gld/.dat}
+    - $ydb_dist/mupip create
+    # Verify that the mini-apps run
+    - go run test/wordfreq.go <test/wordfreq_input.txt | diff - test/wordfreq_output.txt
 
 v1_unit_tests:
   extends: .unit_tests
