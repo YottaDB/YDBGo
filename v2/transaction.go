@@ -15,6 +15,7 @@
 package yottadb
 
 import (
+	"fmt"
 	"runtime"
 	"runtime/cgo"
 	"unsafe"
@@ -84,8 +85,14 @@ func (conn *Conn) Transaction(transID string, localsToRestore []string, callback
 	runtime.KeepAlive(transID) // ensure batch id doesn't disappear until transaction call returns and has finished using it
 	// Propagate any panics that occurred during the transaction function and
 	// sent to me by tpCallbackWrapper in info.err to avoid panics crossing the CGo boundary.
-	if info.err != nil {
-		panic(info.err)
+	err := info.err
+	if err != nil {
+		// Re-panic the err, including any traceback (if it's a YDB error; we don't know how to get stacktraces from other Go errors)
+		yerr, ok := err.(*Error)
+		if ok {
+			err = newError(yerr.Code, fmt.Sprintf("%s\n\n%s\nWas re-paniced as: %s", err, yerr.stack, err), yerr.chain...)
+		}
+		panic(err)
 	}
 	if status == YDB_TP_ROLLBACK {
 		return false

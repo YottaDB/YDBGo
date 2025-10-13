@@ -192,7 +192,7 @@ Goroutines are supported since YDBGo is implemented using YottaDB's multi-thread
 
 Goroutines are subject to the requirements stated in the documentation for C [Threads](https://docs.yottadb.com/MultiLangProgGuide/programmingnotes.html#threads). However, its requirements for [error buffers](https://docs.yottadb.com/MultiLangProgGuide/programmingnotes.html#threads) and [transaction tokens](https://docs.yottadb.com/MultiLangProgGuide/programmingnotes.html#threads-and-transaction-processing) are fully managed by the YDBGo wrapper, placing no burden on the programmer except that each goroutine must have its own instances of [yottadb.Conn](https://pkg.go.dev/lang.yottadb.com/go/yottadb/v2#Conn), and [yottadb.Node](https://pkg.go.dev/lang.yottadb.com/go/yottadb/v2#Node).
 
-Although Goroutines are fully supported, you should be aware that if the goroutines are database-intensive rather than computationally intensive, they will run faster as parallel *processes* than as parallel *goroutines*. As the database engine itself is not multi-threaded, all goroutine access to the database is internally gated and queued through a single thread: only computational activity in Go is done in parallel.
+Although Goroutines are fully supported, you should be aware that if the goroutines are database-intensive rather than computationally intensive, they will run faster as parallel *processes* than as parallel *goroutines*. This is because the database engine itself is not multi-threaded, so all goroutine access to the database is internally gated and queued through a single thread: only computational activity in Go is done in parallel.
 
 ### Signals
 

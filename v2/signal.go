@@ -246,11 +246,15 @@ func SignalWasFatal() bool {
 func ShutdownOnPanic() {
 	err := recover()
 	if err != nil {
-		// Quit if fatal signal caused the shutdown
-		quitAfterSIGINT(err)
 		// Ensure database is shut down before panicing to avoid having to run MUPIP RUNDOWN after shutdown
 		ShutdownHard(dbHandle)
-		// re-panic the err
+		// Quit threads without panic only if SIGINT caused the shutdown
+		quitAfterSIGINT(err)
+		// Otherwise re-panic the err, including any traceback (if it's a YDB error; we don't know how to get stacktraces from other Go errors)
+		yerr, ok := err.(*Error)
+		if ok {
+			err = newError(yerr.Code, fmt.Sprintf("%s\n\n%s\nWas re-paniced as: %s", err, yerr.stack, err), yerr.chain...)
+		}
 		panic(err)
 	}
 }

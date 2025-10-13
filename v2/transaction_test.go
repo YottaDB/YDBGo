@@ -24,6 +24,16 @@ import (
 
 // ---- Tests
 
+// Run f() and return any error or nil
+func captureError(f func()) (err error) {
+	defer func() {
+		recovered := recover()
+		err, _ = recovered.(error)
+	}()
+	f()
+	return err
+}
+
 // Test that $ZMAXTPTIME works
 func TestTimeoutAction(t *testing.T) {
 	conn := NewConn()
@@ -74,7 +84,8 @@ func TestTimeoutAction(t *testing.T) {
 	conn.TimeoutAction(TransactionTimeout)
 	index.Set(0)
 	// true = use fast fakeTimeout below -- always do so here because the YottaDB timeout functionality has already been tested above
-	assert.PanicsWithError(t, "%YDB-E-TPTIMEOUT, Transaction timeout", func() { timeoutTransaction(true) })
+	err := captureError(func() { timeoutTransaction(true) })
+	assert.Equal(t, ydberr.TPTIMEOUT, err.(*Error).Code)
 	assert.Equal(t, 0, index.GetInt()) // timeout also does a rollback, so should be 0
 }
 
@@ -182,9 +193,10 @@ func TestTransaction(t *testing.T) {
 	n.Lock()
 	// skip the unlock line below which causes BADLOCKNEXT error (it seems that the nexted unlock worked even though it gave an error)
 	// defer n.Unlock()
-	assert.PanicsWithError(t, "%YDB-E-TPLOCK, Cannot release LOCK(s) held prior to current TSTART", func() {
+	err := captureError(func() {
 		conn.TransactionFast([]string{}, func() {
 			n.Unlock()
 		})
 	})
+	assert.Equal(t, ydberr.TPLOCK, err.(*Error).Code)
 }

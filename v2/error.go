@@ -27,6 +27,9 @@ import (
 // #include "libyottadb.h"
 import "C"
 
+// MaxStackDepth is the maximum number of stack frames stored in an Error instance
+var MaxStacktrace = 4096
+
 // Error type holds YDBGo and YottaDB errors including a numeric error code.
 // YDBGo error strategy is as follows. Database setup functions like Init, Import (and its returned functions) return errors.
 // However, Node functions panic on errors because Node errors are caused by either programmer blunders (like invalid variable name)
@@ -43,6 +46,7 @@ type Error struct {
 	Message string  // The error string - generally from $ZSTATUS when available
 	Code    int     // The error value (e.g. ydberr.INVSTRLEN, etc)
 	chain   []error // Lists any errors wrapped by this one
+	stack   string  // stack trace of error, used by Error.Format
 }
 
 // Error is a type method of [yottadb.Error] to return the error message string.
@@ -89,7 +93,9 @@ func newError(code int, message string, wrapErrors ...error) error {
 			message = message + ": " + newMessage
 		}
 	}
-	return &Error{Code: code, Message: message, chain: wrapErrors}
+	stack := make([]byte, MaxStacktrace)
+	n := runtime.Stack(stack[:], false)
+	return &Error{Code: code, Message: message, chain: wrapErrors, stack: string(stack[:n])}
 }
 
 // errorf same as fmt.Errorf except that it returns error type yottadb.Error with specified code; and doesn't handle %w.

@@ -50,6 +50,7 @@ func tpCallbackWrapper(tptoken C.uint64_t, errstr *C.ydb_buffer_t, handle unsafe
 		}
 		code := err.Code
 		if code == ydberr.TPTIMEOUT {
+			// If timeout, set return code to timeoutAction, which is one of: YDB_OK, YDB_TP_ROLLBACK, or ydb.TPTIMEOUT
 			code = conn.timeoutAction
 		}
 		if code == YDB_TP_ROLLBACK || code == YDB_TP_RESTART || code == YDB_OK {

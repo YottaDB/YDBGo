@@ -63,8 +63,8 @@ func TestUnwrap(t *testing.T) {
 func TestLastError(t *testing.T) {
 	conn := SetupTest(t)
 	assert.Nil(t, conn.lastError(YDB_OK))
-	assert.Equal(t, newError(YDB_TP_RESTART, "YDB_TP_RESTART"), conn.lastError(YDB_TP_RESTART))
-	assert.Equal(t, newError(YDB_TP_ROLLBACK, "YDB_TP_ROLLBACK"), conn.lastError(YDB_TP_ROLLBACK))
+	assert.Equal(t, YDB_TP_RESTART, conn.lastError(YDB_TP_RESTART).(*Error).Code)
+	assert.Equal(t, YDB_TP_ROLLBACK, conn.lastError(YDB_TP_ROLLBACK).(*Error).Code)
 
 	// Generate an actual error from YDB
 	_, err := conn.Str2Zwr(strings.Repeat("A", YDB_MAX_STR))
