@@ -68,6 +68,7 @@ func (conn *Conn) Transaction(transID string, localsToRestore []string, callback
 
 	names := stringArrayToAnyArray(localsToRestore)
 	var status C.int
+	transID += "\x00" // NUL-terminate transID because it's required by ydb_tp_st()
 	if len(names) == 0 {
 		conn.prepAPI()
 		status = C.ydb_tp_st(C.uint64_t(conn.tptoken.Load()), &cconn.errstr, C.ydb_tpfnptr_t(C.tp_callback_wrapper), unsafe.Pointer(&handle),
