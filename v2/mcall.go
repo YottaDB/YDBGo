@@ -534,7 +534,7 @@ func (conn *Conn) callM(routine *RoutineData, args []any) (any, error) {
 		// This is commented out because it triggers a YottaDB bug which complains if environment variable
 		// ydb_ci/CTMCI is not set even if it has already called the relevant M routine and thus already has
 		// table data for it. The bug is slated for fixing in YDB at https://gitlab.com/YottaDB/DB/YDB/-/issues/1160
-		//defer C.ydb_ci_tab_switch_t(cconn.tptoken, &cconn.errstr, *oldhandle, oldhandle)
+		//defer C.ydb_ci_tab_switch_t(conn.tptoken, &cconn.errstr, *oldhandle, oldhandle)
 	}
 
 	// Add each parameter to the vararg list required to call ydb_cip_t()

@@ -15,6 +15,8 @@ package yottadb
 import (
 	"errors"
 	"flag"
+	"log"
+	"sync"
 	"testing"
 	"time"
 
@@ -90,11 +92,10 @@ func TestTimeoutAction(t *testing.T) {
 }
 
 func TestTransactionToken(t *testing.T) {
-	// Make sure that a cloned conn points to the same tptoken as its parent
 	conn1 := NewConn()
 	original := conn1.TransactionToken()
 	conn1.TransactionTokenSet(original + 1)
-	assert.Equal(t, original+1, conn1.tptoken.Load())
+	assert.Equal(t, original+1, conn1.TransactionToken())
 }
 
 // TestMRestart checks that a TRESTART issued by calling M works fine.
@@ -127,9 +128,9 @@ func TestCloneConn(t *testing.T) {
 	original := conn1.TransactionToken()
 	conn2 := conn1.CloneConn()
 	conn2.TransactionTokenSet(original + 1)
-	assert.Equal(t, original+1, conn1.TransactionToken())
+	assert.NotEqual(t, conn2.TransactionToken(), conn1.TransactionToken())
 
-	// Now create actual goroutines inside a transaction both using a cloned conn to make sure that works
+	// Create goroutines inside a transaction both using a cloned conn to make sure they don't clobber each other's errstr fields
 	conn := NewConn()
 	conn.TransactionFast([]string{}, func() {
 		n := conn.Node("count")
@@ -152,6 +153,51 @@ func TestCloneConn(t *testing.T) {
 		assert.Equal(t, "", conn.getErrorString())
 		assert.Equal(t, 2, n.GetInt())
 	})
+}
+
+// TestTransactionGoroutines makes two concurrent goroutines each start a transaction using a cloned Conn,
+// and ensures that each call to Transaction() generates a different tptoken for its transaction.
+// This tests a bug introduced in #df86e2b9 where cloned conns incorrectly shared tptokens.
+// Transactions created in two concurrent goroutines should each use a different tptoken provided by ydb_tp_st().
+func TestTransactionGoroutines(t *testing.T) {
+	conn := NewConn()
+	testTransactionGoroutines(conn)
+	// Test again nested inside a transaction
+	conn.TransactionFast([]string{}, func() {
+		//testTransactionGoroutines(conn)
+	})
+}
+
+// Perform the substance of TestTransactionGoroutines
+func testTransactionGoroutines(conn *Conn) {
+	bump := make(chan struct{}) // call for action in the other thread
+	var running sync.WaitGroup
+	running.Add(2) // number of running threads to eventually stop
+	go func() {
+		defer ShutdownOnPanic()
+		defer running.Done()
+		conn := conn.CloneConn()
+		conn.TransactionFast([]string{}, func() {
+			// This bump starts the other goroutine's TransactionFast() which fetches its conn.tptoken
+			// if the other goroutine's tptoken is linked to this one as they were in invalid commit #df86e2b9
+			// then the other goroutine incorrectly interrupts this one while its engine lock is engaged
+			// and causes ydberr.SIMPLEAPINEST or ydberr.INVTPTRANS errors or hangs
+			// (or causes even earlier assert errors in the debug build of YottaDB).
+			// At least, I think that's the mechanism that was causing the errors.
+			bump <- struct{}{}
+			node := conn.Node("^abc") // dummy set inside transaction
+			node.Set("MySecretValue")
+		})
+	}()
+	go func() {
+		defer ShutdownOnPanic()
+		defer running.Done()
+		conn := conn.CloneConn()
+		<-bump // wait for other goroutine to start its transaction
+		conn.TransactionFast([]string{}, func() {})
+	}()
+	running.Wait()
+	log.Println("Done")
 }
 
 // Set up custom flag to allow user to specify deadlock test
