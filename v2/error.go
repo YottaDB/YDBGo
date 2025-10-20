@@ -31,8 +31,8 @@ import "C"
 var MaxStacktrace = 4096
 
 // Error type holds YDBGo and YottaDB errors including a numeric error code.
-// YDBGo error strategy is as follows. Database setup functions like Init, Import (and its returned functions) return errors.
-// However, Node functions panic on errors because Node errors are caused by either programmer blunders (like invalid variable name)
+// YDBGo error strategy is as follows. Database setup functions like [Init] and [Conn.Import] (and its returned functions) return errors.
+// However, [Node] functions panic on errors because Node errors are caused by either programmer blunders (like invalid variable name)
 // or system-level events (like out of memory). This approach greatly simplifies the use of Node methods.
 //
 // If a particular panic needs to be captured this can be done with recover as YDBGo ensures that all its errors and panics
@@ -41,7 +41,9 @@ var MaxStacktrace = 4096
 //     defined in ydberr/errorscodes.go.
 //   - All YDBGo errors likewise have a message string, but have a positive error code, defined in ydberr.ydberr.go.
 //
-// The yottadb.Error type implements the method [yottatdb.Error.Is] so you can identify a specific error with [ErrorIs](err, ydberr.<ErrorCode>).
+// The [yottadb.Error] type implements the [Error.Is] method to check the entire error chain, matching only against the error code.
+// However, the API function [yottadb.ErrorIs] wraps this more conveniently to check any error type (even non-YottaDB errors)
+// for a match against a given YottaDB error code: yottadb.ErrorIs(err, ydberr.<ErrorCode>).
 type Error struct {
 	Message string  // The error string - generally from $ZSTATUS when available
 	Code    int     // The error value (e.g. ydberr.INVSTRLEN, etc)

@@ -27,7 +27,7 @@ func ExampleConn_TransactionTokenSet() {
 	yottadbV1.ForceInit() // Tell v1 that v2 has done the initialization
 
 	err := yottadbV1.TpE(yottadbV1.NOTTP, nil, func(tptoken uint64, errstr *yottadbV1.BufferT) int32 {
-		err := yottadbV1.SetValE(tptoken, nil, "Fred", "^person", []string{})
+		err := yottadbV1.SetValE(tptoken, nil, "Fred", "^person", nil)
 		if err != nil {
 			panic(err)
 		}
@@ -38,7 +38,7 @@ func ExampleConn_TransactionTokenSet() {
 		person := conn.Node("^person")
 		fmt.Print(person.Dump())
 		return yottadb.YDB_OK
-	}, "BATCH", []string{})
+	}, "BATCH", nil)
 	if err != nil {
 		panic(err)
 	}
@@ -51,13 +51,13 @@ func ExampleConn_TransactionToken() {
 	yottadbV1.ForceInit() // Tell v1 that v2 has done the initialization
 
 	conn := yottadbV2.NewConn()
-	conn.TransactionFast([]string{}, func() {
+	conn.TransactionFast(nil, func() {
 		person := conn.Node("^person")
 		person.Set("Sally")
 
 		// Run a YDBGo v1 function
 		tptoken := conn.TransactionToken() // without this the v1 function will hang
-		val, err := yottadbV1.ValE(tptoken, nil, "^person", []string{})
+		val, err := yottadbV1.ValE(tptoken, nil, "^person", nil)
 		if err != nil {
 			panic(err)
 		}
@@ -96,7 +96,7 @@ func ExampleConn_Restart() {
 
 	// Run transaction again but give it an error condition so that it rolls back
 	restarts = 10
-	rollback := !conn.TransactionFast([]string{}, run)
+	rollback := !conn.TransactionFast(nil, run)
 	fmt.Printf("Transaction rollback %v; restores database value n of 2 to %d\n", rollback, n.GetInt())
 	// Output:
 	// Database updated 1 times; transaction restarted 2 times then normal exit was: true

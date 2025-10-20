@@ -102,7 +102,7 @@ func TestSignalNotify(t *testing.T) {
 		n := conn.Node("^a", i)
 		for !allDone.Load() {
 			// Do update inside a transaction
-			conn.TransactionFast([]string{}, func() {
+			conn.TransactionFast(nil, func() {
 				n.Incr(1)
 			})
 		}

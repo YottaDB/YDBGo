@@ -35,7 +35,7 @@ func panicIf(err error) {
 func BenchmarkV1Easy(b *testing.B) {
 	b.Run("Set", func(b *testing.B) {
 		for i := 0; b.Loop(); i++ {
-			err := yottadb.SetValE(yottadb.NOTTP, nil, v2.Randstr(), "var", []string{})
+			err := yottadb.SetValE(yottadb.NOTTP, nil, v2.Randstr(), "var", nil)
 			panicIf(err)
 		}
 	})

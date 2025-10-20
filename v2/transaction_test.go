@@ -50,7 +50,7 @@ func TestTimeoutAction(t *testing.T) {
 	conn.TimeoutAction(TransactionRollback)
 
 	// Check that a short transaction doesn't trigger the 1s timeout
-	success := conn.TransactionFast([]string{}, func() {
+	success := conn.TransactionFast(nil, func() {
 		time.Sleep(time.Millisecond * 1)
 	})
 	assert.Equal(t, true, success)
@@ -58,7 +58,7 @@ func TestTimeoutAction(t *testing.T) {
 	// Function to create a transaction timeout.
 	index.Kill()
 	timeoutTransaction := func(fakeTimeout bool) bool {
-		return conn.TransactionFast([]string{}, func() {
+		return conn.TransactionFast(nil, func() {
 			for i := range 2000 {
 				// Note these sets won't make it to the DB as the transaction is never committed
 				index.Set(i)
@@ -115,7 +115,7 @@ func TestMRestart(t *testing.T) {
 			m.Call("trestart")
 		}
 	}
-	success := conn.TransactionFast([]string{}, run)
+	success := conn.TransactionFast(nil, run)
 	assert.Equal(t, 1, n.GetInt())
 	assert.Equal(t, 2, restarts)
 	assert.Equal(t, true, success)
@@ -132,7 +132,7 @@ func TestCloneConn(t *testing.T) {
 
 	// Create goroutines inside a transaction both using a cloned conn to make sure they don't clobber each other's errstr fields
 	conn := NewConn()
-	conn.TransactionFast([]string{}, func() {
+	conn.TransactionFast(nil, func() {
 		n := conn.Node("count")
 		done := make(chan struct{}, 2)
 		subfunc := func() {
@@ -217,7 +217,7 @@ func TestDeadlock(t *testing.T) {
 	conn := NewConn()
 	n := conn.Node("^testdeadlock")
 	tptoken := conn.TransactionToken()
-	success := conn.TransactionFast([]string{}, func() {
+	success := conn.TransactionFast(nil, func() {
 		conn.TransactionTokenSet(tptoken) // use the wrong (outer) tptoken
 		n.Get()
 	})
@@ -229,9 +229,9 @@ func TestTransaction(t *testing.T) {
 	conn := NewConn()
 
 	// Test that a panic using a non-YottaDB error also works inside a transaction
-	assert.PanicsWithError(t, "testPanic", func() { conn.TransactionFast([]string{}, func() { panic(errors.New("testPanic")) }) })
+	assert.PanicsWithError(t, "testPanic", func() { conn.TransactionFast(nil, func() { panic(errors.New("testPanic")) }) })
 	// Test that a panic using a string value also works inside a transaction
-	assert.PanicsWithValue(t, "testString", func() { conn.TransactionFast([]string{}, func() { panic("testString") }) })
+	assert.PanicsWithValue(t, "testString", func() { conn.TransactionFast(nil, func() { panic("testString") }) })
 
 	// Test that a transaction with any other kind of YottaDB error creates a panic as it should.
 	// In this case we force a TPLOCK error by trying to unlock a lock that was locked outside the transaction.
@@ -240,7 +240,7 @@ func TestTransaction(t *testing.T) {
 	// skip the unlock line below which causes BADLOCKNEXT error (it seems that the nexted unlock worked even though it gave an error)
 	// defer n.Unlock()
 	err := captureError(func() {
-		conn.TransactionFast([]string{}, func() {
+		conn.TransactionFast(nil, func() {
 			n.Unlock()
 		})
 	})
