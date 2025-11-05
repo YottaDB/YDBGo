@@ -60,6 +60,15 @@ func TestUnwrap(t *testing.T) {
 	assert.Equal(t, err, errs[0])
 }
 
+func TestErrorCode(t *testing.T) {
+	// Ensure ErrorCode() works even if supplied with a parameter that is not an error.
+	var err error
+	assert.Equal(t, ydberr.NotYDBError, ErrorCode(err))
+	assert.Equal(t, ydberr.NotYDBError, ErrorCode(nil))
+	err = &Error{Code: ydberr.INVSTRLEN, Message: "string too long"}
+	assert.Equal(t, ydberr.INVSTRLEN, ErrorCode(err))
+}
+
 func TestLastError(t *testing.T) {
 	conn := SetupTest(t)
 	assert.Nil(t, conn.lastError(YDB_OK))
@@ -76,8 +85,6 @@ func TestLastError(t *testing.T) {
 	// Test code path when invalid message is returned;
 	// create invalid message by artificially shortening the last error message to 2 chars.
 	conn.cconn.errstr.len_used = 2
-	//assert.Equal(t, ydberr.YDBMessageInvalid, conn.lastError(lastCode).(*Error).Code)
-	//err2 := conn.lastError(lastCode)
 	var err2 error
 	func() {
 		defer func() { err2 = recover().(error) }()
@@ -94,7 +101,5 @@ func TestLastError(t *testing.T) {
 	// lastCode() shouild return YDB_OK if there is no message in errstr
 	assert.Equal(t, YDB_OK, int(conn.lastCode()))
 	// lastError() should take lastCode (that we saved above) and recover the message related to that.
-	//~ 	fmt.Println("recovered message=", conn.recoverMessage(lastCode))
-	//~ 	fmt.Println("err.Error()      =", err.Error())
 	assert.Equal(t, err.Error(), conn.lastError(lastCode).Error())
 }

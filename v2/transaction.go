@@ -43,7 +43,7 @@ type tpInfo struct {
 //   - `transId` has its first 8 bytes recorded in the commit record of journal files for database regions participating in the transaction.
 //     Note that a transId of case-insensitive "BATCH" or "BA" are special: see [Conn.TransactionFast]()
 //   - `localsToRestore` are names of local M variables to be restored to their original values when a transaction is restarted.
-//     If localsToRestore[0] equals "*" then all local M database variables are restored on restart. Note that since Go has its own local
+//     If localsToRestore[0] equals "*" then all local M locals are restored on restart. Note that since Go has its own local
 //     variables it is unlikely that you will need this feature in Go.
 //   - Returns true to indicate that the transaction logic was successful and has been committed to the database, or false if a rollback was necessary.
 //   - Panics on errors because they are are all panic-worthy (e.g. invalid variable names). See [yottadb.Error] for rationale.

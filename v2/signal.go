@@ -179,7 +179,6 @@ func SignalReset(signals ...os.Signal) {
 }
 
 // NotifyYDB calls the YottaDB signal handler for sig.
-// Return as a boolean whether YottaDB returned error code ydberr.CALLINAFTERXIT.
 // If YottaDB deferred handling of the signal, return false; otherwise return true.
 // Panic on YottaDB errors.
 func NotifyYDB(sig os.Signal) bool {
