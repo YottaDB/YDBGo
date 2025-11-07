@@ -184,7 +184,8 @@ func anyToString(val any) string {
 
 // setAnyValue is the same as setValue but accepts any type.
 // It is akin to setValue(Sprint(val)) but faster.
-//   - val may be a string, []byte slice, integer type, or float; numeric types are converted to a string using the appropriate strconv function.
+//   - val may be a string, []byte slice, integer type, bool, or float; numeric types are converted to a string using the appropriate strconv function.
+//     Type bool is converted to 0 or 1
 //
 // This function could use [anyToString] but it is faster when it doesn't because it can store []byte arrays directly into YDB buffer without conversion.
 func (conn *Conn) setAnyValue(val any) {
@@ -211,6 +212,12 @@ func (conn *Conn) setAnyValue(val any) {
 		str = strconv.FormatUint(n, 10)
 	case float32:
 		str = strconv.FormatFloat(float64(n), 'G', -1, 32)
+	case bool:
+		if n {
+			str = "1"
+		} else {
+			str = "0"
+		}
 	case []byte:
 		conn.setValueBytes(n)
 		return

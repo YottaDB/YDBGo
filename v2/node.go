@@ -353,6 +353,9 @@ func (n *Node) Set(val any) {
 }
 
 // Get fetches and returns the value of a database node or defaultValue[0] if the database node is empty.
+//   - defaultValue defaults to {""}
+//
+// Return defaultValue[0] if the node's value does not exist.
 func (n *Node) Get(defaultValue ...string) string {
 	ok := n._Lookup()
 	if !ok {
@@ -369,7 +372,9 @@ func (n *Node) Get(defaultValue ...string) string {
 }
 
 // GetInt fetches and returns the value of a database node as an integer.
-// Return zero if the node's value does not exist or is not convertable to an integer.
+//   - defaultValue defaults to {0}
+//
+// Return defaultValue[0] if the node's value does not exist or is not convertable to an integer.
 func (n *Node) GetInt(defaultValue ...int) int {
 	val := n.Get()
 	num, err := strconv.ParseInt(val, 10, 0)
@@ -385,8 +390,32 @@ func (n *Node) GetInt(defaultValue ...int) int {
 	return int(num)
 }
 
+// GetBool fetches and returns the value of a database node as a bool.
+//   - defaultValue defaults to {false}
+//
+// Return true if the node's value is a non-zero integer; false if it is integer zero; otherwise return defaultValue[0] (nonexistant, or is not convertable to an integer)
+func (n *Node) GetBool(defaultValue ...bool) bool {
+	val := n.Get()
+	num, err := strconv.ParseInt(val, 10, 0)
+	if err != nil {
+		if _, ok := err.(*strconv.NumError); !ok {
+			panic(err) // unknown error unrelated to conversion
+		}
+		if len(defaultValue) == 0 {
+			return false
+		}
+		return defaultValue[0]
+	}
+	if num == 0 {
+		return false
+	}
+	return true
+}
+
 // GetFloat fetches and returns the value of a database node as a float64.
-// Return zero if the node's value does not exist or is not convertable to float64.
+//   - defaultValue defaults to {0}
+//
+// Return defaultValue[0] if the node's value does not exist or is not convertable to float64.
 func (n *Node) GetFloat(defaultValue ...float64) float64 {
 	val := n.Get()
 	num, err := strconv.ParseFloat(val, 64)
