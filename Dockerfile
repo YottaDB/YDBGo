@@ -9,6 +9,8 @@
 #   the license, please stop and do not read further.		#
 #								#
 #################################################################
+# Build this Dockerfile with:
+# docker build --progress=plain -f Dockerfile -t ydbgo .
 
 FROM yottadb/yottadb-base:latest-master
 
@@ -33,12 +35,12 @@ RUN apt-get update && \
 ENV GOPROXY=https://proxy.golang.org/cached-only
 ENV GOPATH=/go
 RUN mkdir /go
-ENV GOLANG_VERSION=1.24.0
+ENV GOLANG_VERSION=1.25.4
 ENV PATH=$GOPATH/bin:/usr/local/go/bin:$PATH
-RUN wget -O go.tgz -q https://golang.org/dl/go${GOLANG_VERSION}.linux-amd64.tar.gz && \
-    tar -C /usr/local -xzf go.tgz && \
-    rm go.tgz
+RUN rm -rf /usr/local/go && wget -O - https://go.dev/dl/go${GOLANG_VERSION}.linux-amd64.tar.gz | tar -C /usr/local -xz
+RUN go version
 
 # Setup YottaDB
 ENV ydb_dir=/data
 ENV ydb_dist=/opt/yottadb/current
+ENV ydb_chset=UTF-8
