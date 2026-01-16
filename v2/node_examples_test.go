@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.
+// Copyright (c) 2025-2026 YottaDB LLC and/or its subsidiaries.
 // All rights reserved.
 //
 //	This source code contains the intellectual property
@@ -175,6 +175,21 @@ func ExampleNode_Index() {
 	// counter(0): 1
 	// counter(99999): 1
 	// counter(100000): untouched
+}
+
+// Example of when not to use Node.Index
+func ExampleNode_Index_incorrect() {
+	conn := yottadb.NewConn()
+	person := conn.Node("person")
+	first := person.Index("first")
+	last := person.Index("last") // This overwrites the person index to be 'last' so first now points to the wrong thing
+	first.Set("Joe")
+	last.Set("Bloggs")
+	// Trying to set the first name failed; instead setting the last name,
+	// which was then overwritten when setting the last name
+	fmt.Printf("Retrieving the stored names yields first='%s', last='%s'\n", first.Get(), last.Get())
+	// Output:
+	// Retrieving the stored names yields first='Bloggs', last='Bloggs'
 }
 
 // Example of traversing a database tree

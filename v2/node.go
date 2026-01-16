@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.
+// Copyright (c) 2025-2026 YottaDB LLC and/or its subsidiaries.
 // All rights reserved.
 //
 //	This source code contains the intellectual property
@@ -177,9 +177,10 @@ func (conn *Conn) Node(varname string, subscripts ...any) (n *Node) {
 
 // CloneNode creates a copy of node associated with conn (in case node was created using a different conn).
 // A node associated with a conn used by another goroutine must not be used by the current goroutine except as
-// a parameter to CloneNode(). If this rule is not obeyed, then the two goroutines could have their transaction depth
-// and error messages mixed up. It is the programmer's responsibility to ensure this does not happen by using CloneNode.
+// a parameter to CloneNode(). If this rule is not obeyed, then the two goroutines could overwrite each others transaction
+// level and error message values. It is the programmer's responsibility to ensure this does not happen by using CloneNode.
 // This does the same as n.Clone() except that it can switch to new conn.
+// Mutable nodes passed to CloneNode will cause a panic. They must be converted to immutable nodes with Node.Clone()
 // Only immutable nodes are returned.
 func (conn *Conn) CloneNode(n *Node) *Node {
 	if n.IsMutable() {
@@ -666,12 +667,18 @@ func (conn *Conn) stubNode(original *Node, buffers *C.ydb_buffer_t, len int) (n 
 var preallocSubscript string = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 var preallocMutationDepth int = 5 // May expand on-the-fly up to YDB_MAX_SUBS
 
-// Index allows fast temporary access to subnodes referenced by the given subscripts.
+// Index allows fast temporary access to subnodes referenced by the given subscripts, but must be used with caution.
+// It is most helpful for high-speed inner loops. If in doubt, use the slower [Node.Child].
 // It indexes a node object with the given subscripts and returns a mutable node object that will change next time Index is invoked
 // on the same parent node object (which is thread-safe because each Goroutine has separate node objects).
-// Fast access is achieved by removing the overhead of creating a new node object every access, e.g. each time around a loop.
-// For example, [Node.Children] yields mutable nodes created by Index().
-// [Node.Child] should be used instead, for non-temporary access, for example, where nodes will be passed to subroutines.
+// Fast access is achieved by removing the overhead of creating a new child node object every access, e.g. each time around a loop.
+// [Node.Children], for example, yields mutable nodes created by Index().
+//
+// *Caution*: for non-temporary access, the slower [Node.Child] should be used instead. For example, where nodes will be passed to subroutines
+// (subroutines should be able to assume they have been passed immutable nodes).
+// Node.Index must also be avoided when you wish a Go variable to retain a pointer to a specific node after another use of Node.Index.
+// The second example below illustrates incorrect usage.
+//
 //   - Returns a mutable child of the given node with the given subscripts appended (see [Node.IsMutable] for mutability details).
 //
 // Usage is similar to [Node.Child] except that it typically runs about 4 times as fast and returns mutable instead of immutable nodes.
@@ -839,7 +846,7 @@ func (n *Node) reallocateMutation(newsubs []string) *Node {
 // Mutable nodes may have their subscripts changed each loop iteration or each call to Node.Index(). This means that
 // the same mutable node object may reference different database nodes and will not always point to the same one.
 //   - Mutable nodes are returned by [Node.Index], [Node.Next], [Node.Prev] and iterator [Node.Children].
-//   - All standard node methods operate on a mutable node except conn.CloneNode().
+//   - All standard node methods are valid operations on a mutable node except conn.CloneNode() which will panic.
 //   - If an immutable copy of a mutable node is required, use [Node.Clone] or [Node.Child].
 //   - If you need to take an immutable snapshot of a mutable node this may be done with [Node.Clone] or [Node.Child].
 //
