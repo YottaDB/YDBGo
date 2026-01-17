@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.
+// Copyright (c) 2025-2026 YottaDB LLC and/or its subsidiaries.
 // All rights reserved.
 //
 //	This source code contains the intellectual property
@@ -160,6 +160,7 @@ func lockExists(lockpath string) bool {
 	cmd.Stderr = &outbuff
 	err := cmd.Run()
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error running '$ydb_dist/lke show -all -wait': %#v:\n%s\n", err, outbuff.String())
 		panic(err)
 	}
 	output := outbuff.Bytes()

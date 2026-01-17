@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.
+// Copyright (c) 2025-2026 YottaDB LLC and/or its subsidiaries.
 // All rights reserved.
 //
 //	This source code contains the intellectual property
@@ -13,21 +13,12 @@
 package yottadb
 
 import (
-	"flag"
 	"strings"
 	"testing"
 	"unicode"
 
 	assert "github.com/stretchr/testify/require"
 )
-
-// ---- Tests
-
-var noInit bool
-
-func init() {
-	flag.BoolVar(&noInit, "noinit", false, "don't init database in yottadb_test.go startup code so as to check failure paths during YDB Init()")
-}
 
 // TestNoInit checks that Init() including its failure paths work properly.
 // Note: requires an external helper program to run the test with flags: -run TestNoInit -noinit

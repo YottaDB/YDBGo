@@ -32,13 +32,14 @@ var testSyslog bool  // Run a specific test that outputs a syslog entry. Not on 
 var testNoDB bool    // Run without creating a test database (use the default specified by environment variable ydb_gbldir)
 var testLog string   // Specify path to store test logging - defaults to /tmp/ydbgotest-*/output.log")
 var testDB string    // Specify path of database global directory file - otherwise creates /tmp/ydbgotest-*/mumps.{gld,dat}
+var noInit bool      // For use with special init test paths, invoked by special command: go test -run TestNoInit -noinit
 
 func init() {
 	flag.StringVar(&fatalTest, "fataltest", "none", `test a fatal signal code path; if set "real" to use syscall.Kill or "fake" to call exit handler directly`)
 	flag.BoolVar(&testSyslog, "syslog", false, "check that program can output a syslog entry")
-	flag.BoolVar(&testNoDB, "nodb", false, "run without creating a test database (use the default specified by ydb_gbldir)")
 	flag.StringVar(&testLog, "log", "", "Specify file path to append test logging -- defaults to /tmp/ydbgotest-*/output.log")
 	flag.StringVar(&testDB, "testdb", "", "Specify path of database global directory file - otherwise creates /tmp/ydbgotest-*/mumps.{gld,dat}")
+	flag.BoolVar(&noInit, "noinit", false, "don't init database in yottadb_test.go startup code so as to check failure paths during YDB Init()")
 }
 
 // ---- Utility functions for tests
@@ -196,8 +197,8 @@ func _testMain(m *testing.M) int {
 		fmt.Printf("(PathA=%d PathB=%d)\n", pathA.Load(), pathB.Load())
 	}
 
-	// Cleanup the temp directory, but leave it if we are in verbose mode or the test failed
-	if !testNoDB && !verbose && ret == 0 {
+	// Delete the temp directory if we are not in verbose mode or the test passed
+	if !verbose && ret == 0 {
 		log.Printf("Cleaning up test directory")
 		os.RemoveAll(testDir)
 	}
