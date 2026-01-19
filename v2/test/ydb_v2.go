@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.
+// Copyright (c) 2025-2026 YottaDB LLC and/or its subsidiaries.
 // All rights reserved.
 //
 //	This source code contains the intellectual property
@@ -121,7 +121,7 @@ func main() {
 	var wg sync.WaitGroup
 	for i := range users.Results {
 		wg.Add(1)
-		go saveV(&users, i, &wg)
+		go saveV(conn, &users, i, &wg)
 	}
 	wg.Wait()
 
@@ -148,7 +148,7 @@ func main() {
 
 }
 
-func saveV(users *randomusers, i int, wg *sync.WaitGroup) {
+func saveV(conn yottadb.Conn, users *randomusers, i int, wg *sync.WaitGroup) {
 	defer yottadb.QuitAfterFatalSignal()
 	v := users.Results[i]
 	first_name := v.Name.First
@@ -164,7 +164,6 @@ func saveV(users *randomusers, i int, wg *sync.WaitGroup) {
 
 	name := first_name + " " + last_name
 
-	conn := yottadb.NewConn()
 	usersNode := conn.Node("^users")
 	if usersNode.Child("index", name).HasNone() {
 		key_number := usersNode.Incr(1)

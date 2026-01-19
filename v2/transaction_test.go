@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.
+// Copyright (c) 2025-2026 YottaDB LLC and/or its subsidiaries.
 // All rights reserved.
 //
 //	This source code contains the intellectual property
@@ -38,7 +38,7 @@ func captureError(f func()) (err error) {
 
 // Test that $ZMAXTPTIME works
 func TestTimeoutAction(t *testing.T) {
-	conn := NewConn()
+	conn := SetupTest(t)
 	// 1 is the shortest possible timeout. We could speed up testing if it allowed floating point, but it rounds to zero.
 	conn.Node("$ZMAXTPTIME").Set(1)
 	defer func() { conn.Node("$ZMAXTPTIME").Set(0) }() // restore $ZMAXTPTIME global at end of test
@@ -92,7 +92,7 @@ func TestTimeoutAction(t *testing.T) {
 }
 
 func TestTransactionToken(t *testing.T) {
-	conn1 := NewConn()
+	conn1 := SetupTest(t)
 	original := conn1.TransactionToken()
 	conn1.TransactionTokenSet(original + 1)
 	assert.Equal(t, original+1, conn1.TransactionToken())
@@ -102,7 +102,7 @@ func TestTransactionToken(t *testing.T) {
 // This confirms implementation of YDB#619: https://gitlab.com/YottaDB/DB/YDB/-/issues/619
 // Do not test rollback via M because it does not work by design. See https://gitlab.com/YottaDB/DB/YDB/-/issues/1166#note_2704105725
 func TestMRestart(t *testing.T) {
-	conn := NewConn()
+	conn := SetupTest(t)
 	m := conn.MustImport(`trestart: trestart^trestart()`)
 
 	n := conn.Node("^activity")
@@ -123,25 +123,25 @@ func TestMRestart(t *testing.T) {
 
 // TestCloneConn checks that a cloned connection behaves correctly by following its parent's transactions
 func TestCloneConn(t *testing.T) {
-	// Make sure that a cloned conn points to the same tptoken as its parent
-	conn1 := NewConn()
-	original := conn1.TransactionToken()
-	conn2 := conn1.CloneConn()
-	conn2.TransactionTokenSet(original + 1)
-	assert.NotEqual(t, conn2.TransactionToken(), conn1.TransactionToken())
-
+	conn := SetupTest(t)
 	// Create goroutines inside a transaction both using a cloned conn to make sure they don't clobber each other's errstr fields
-	conn := NewConn()
 	conn.TransactionFast(nil, func() {
 		n := conn.Node("count")
 		done := make(chan struct{}, 2)
 		subfunc := func() {
 			subconn := conn.CloneConn()
+			// Make sure that a cloned conn has the same tptoken as its parent
+			assert.Equal(t, conn.TransactionToken(), subconn.TransactionToken())
 			// Create an error in subconn to make sure it doesn't clobber conn's error
 			_, err := subconn.Zwr2Str(`"X"_$C(1234`)
 			assert.NotNil(t, err)
 			n := subconn.Node("count")
 			n.Incr(1)
+
+			// Now that we're done using subconn (the goroutine is about to end),
+			// we can mess it up to test its independence from conn.
+			subconn.TransactionTokenSet(conn.TransactionToken() + 1)
+			assert.NotEqual(t, conn.TransactionToken(), subconn.TransactionToken())
 			done <- struct{}{} // say I'm done
 		}
 		// Create two goroutines
@@ -160,7 +160,7 @@ func TestCloneConn(t *testing.T) {
 // This tests a bug introduced in #df86e2b9 where cloned conns incorrectly shared tptokens.
 // Transactions created in two concurrent goroutines should each use a different tptoken provided by ydb_tp_st().
 func TestTransactionGoroutines(t *testing.T) {
-	conn := NewConn()
+	conn := SetupTest(t)
 	testTransactionGoroutines(conn)
 	// Test again nested inside a transaction
 	conn.TransactionFast([]string{}, func() {
@@ -214,7 +214,7 @@ func TestDeadlock(t *testing.T) {
 		return
 	}
 
-	conn := NewConn()
+	conn := SetupTest(t)
 	n := conn.Node("^testdeadlock")
 	tptoken := conn.TransactionToken()
 	success := conn.TransactionFast(nil, func() {
@@ -226,7 +226,7 @@ func TestDeadlock(t *testing.T) {
 
 // TestTransaction tests everything else not covered by the tests above and in transaction_examples_test.go
 func TestTransaction(t *testing.T) {
-	conn := NewConn()
+	conn := SetupTest(t)
 
 	// Test that a panic using a non-YottaDB error also works inside a transaction
 	assert.PanicsWithError(t, "testPanic", func() { conn.TransactionFast(nil, func() { panic(errors.New("testPanic")) }) })

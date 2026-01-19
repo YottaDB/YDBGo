@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.
+// Copyright (c) 2025-2026 YottaDB LLC and/or its subsidiaries.
 // All rights reserved.
 //
 //	This source code contains the intellectual property
@@ -19,6 +19,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/outrigdev/goid"
 	assert "github.com/stretchr/testify/require"
 )
 
@@ -143,5 +144,19 @@ func BenchmarkZwr2Str(b *testing.B) {
 	for b.Loop() {
 		_, err := tconn.Zwr2Str(str)
 		assert.Nil(b, err)
+	}
+}
+
+// Getting goroutine ID is slow for architectures not supported by goid module
+func BenchmarkGoid(b *testing.B) {
+	for b.Loop() {
+		goid.Get()
+	}
+}
+
+// Just for interest on how fast CGo is for when we call YottaDB C API
+func BenchmarkCGo(b *testing.B) {
+	for b.Loop() {
+		callCGo()
 	}
 }

@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.
+// Copyright (c) 2025-2026 YottaDB LLC and/or its subsidiaries.
 // All rights reserved.
 //
 //	This source code contains the intellectual property
@@ -27,9 +27,11 @@ const (
 	InvalidValueType             // Value type is not a string or number
 	InvalidSubscriptIndex        // Subscript index is out of bounds
 	InvalidMutableOperation      // The operation may not be performed on a mutable node object
+	InvalidGoroutineID           // Failed attempt to get goroutine ID from runtime.Stack()
 	NotYDBError                  // Attempt to return error code of an error/interface that is not yottadb.Error
 	SubscriptRequired            // Method requires a subscript
 	TooManyParameters            // Too many parameters supplied to function
+	MultipleConns                // Tried to create more than one Conn in a goroutine
 	OutOfMemory                  // Not enough memory for attempted allocation
 	YDBMessageInvalid            // Failure decoding message prefixes from YottaDB
 	YDBMessageRecoveryFailure    // Failure calling ydb_message_t() to get a YottaDB message matching a code

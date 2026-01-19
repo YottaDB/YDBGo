@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.
+// Copyright (c) 2025-2026 YottaDB LLC and/or its subsidiaries.
 // All rights reserved.
 //
 //	This source code contains the intellectual property
@@ -146,7 +146,8 @@ func setupDatabase(testDir string) {
 }
 
 func setPath() {
-	conn := NewConn()
+	// Since this conn is only used here before tests start, we can call forceNewConnWithoutRegistering() to avoid registering this goroutine as having a conn
+	conn := forceNewConnWithoutRegistering()
 	zroutines := conn.Node("$ZROUTINES")
 	zroutines.Set("./test " + zroutines.Get())
 }
@@ -212,7 +213,8 @@ func TestMain(m *testing.M) {
 // SetupTest is called by each test to set up the database prior to the test.
 // Returns a database connection that may be used by that test.
 func SetupTest(t testing.TB) *Conn {
-	tconn := NewConn()
-	tconn.KillAllLocals()
-	return tconn
+	// use forceNewConn here because benchmarks get run multiple times in one goroutine
+	conn := forceNewConn()
+	conn.KillAllLocals()
+	return conn
 }

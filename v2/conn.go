@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.
+// Copyright (c) 2025-2026 YottaDB LLC and/or its subsidiaries.
 // All rights reserved.
 //
 //	This source code contains the intellectual property
@@ -18,10 +18,13 @@ import (
 	"reflect"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync/atomic"
+	"testing"
 	"time"
 	"unsafe"
 
+	"github.com/outrigdev/goid"
 	"lang.yottadb.com/go/yottadb/v2/ydberr"
 )
 
@@ -50,6 +53,8 @@ int fill_buffer_bytes(ydb_buffer_t *buf, char *data, int len) {
 }
 
 // C routine to get address of ydb_lock_st() since CGo doesn't let you take the address of a variadic parameter-list function.
+// #cgo nocallback getfunc_ydb_lock_st
+// #cgo noescape getfunc_ydb_lock_st
 void *getfunc_ydb_lock_st(void) {
         return (void *)&ydb_lock_st;
 }
@@ -71,12 +76,13 @@ type Conn struct {
 	// Pointer to C.conn rather than the item itself so we can malloc it and point to it from C without Go moving it.
 	cconn *C.conn
 	// tptoken is a place to store tptoken for thread-safe ydb_*_st() function calls
-	// It was originally made to be atomic so that Conn.CloneConn() could share pointers to it until
+	// It was originally made to be atomic and a pointer, so that Conn.CloneConn() could share pointers to it until
 	// it was realized that created a bug. But keep it atomic since atomicity has no compiled overhead
 	// with Uint64 on a 64-bit machine (confirmed empirically).
 	tptoken atomic.Uint64
 	// timeoutAction is the action to take on transaction timeout. See [conn.TimeoutAction]()
 	timeoutAction int
+	goroutineID   uint64 // allows a runtime assert that this Conn is being accessed by the correct goroutine
 }
 
 // _newConn is a subset of NewConn without initCheck and value space -- used by signals.init()
@@ -86,6 +92,7 @@ func _newConn() *Conn {
 	conn.tptoken = atomic.Uint64{}
 	conn.tptoken.Store(C.YDB_NOTTP)
 	conn.timeoutAction = TransactionTimeout
+	conn.goroutineID = goid.Get()
 	// Create space for err
 	conn.cconn.errstr.buf_addr = (*C.char)(C.malloc(C.YDB_MAX_ERRORMSG))
 	conn.cconn.errstr.len_alloc = C.YDB_MAX_ERRORMSG
@@ -103,19 +110,75 @@ func _newConn() *Conn {
 
 // NewConn creates a new database connection.
 // Each goroutine must have its own connection.
+// To prevent deadlocks, this function panics if another Conn has already been created in this goroutine.
 func NewConn() *Conn {
+	// Go workaround to make examples work properly
+	if testing.Testing() {
+		// This is very hacky, but lets all Go Example*() functions run.
+		// The problem is that although Go runs tests in separate goroutines,
+		// it runs all examples in the same goroutine.
+		// So each example has to use the same Conn, but at the same time
+		// each example has to call NewConn() in order to be a verbatim user-runnable example.
+		// So if testing and the caller is Example*(), we call forceNewConn() instead of NewConn()
+		// to ignore the fact that it's getting more than only one per goroutine.
+		// In an ideal world, Go testing would let us hook each example before running it to freshen things up.
+		programCounter, _, _, ok := runtime.Caller(1)
+		f := runtime.FuncForPC(programCounter)
+		names := strings.Split(f.Name(), ".")
+		if ok && f != nil && strings.HasPrefix(names[len(names)-1], "Example") {
+			return forceNewConn()
+		}
+	}
+	// Note that it would be possible to use the goroutine ID to allow use of multiple Conns with transactions,
+	// But using the goroutine ID is not recommended by Go, so it is deemed acceptable only to use it for catching
+	// unintentional programmer errors, as is done by this panic.
+	val, ok := dbHandle.routineHasConn.Swap(goid.Get(), true)
+	hasConn := ok && val.(bool)
+	if hasConn {
+		panic(errorf(ydberr.MultipleConns, "tried to run NewConn() in goroutine %d that already has a Conn", goid.Get()))
+	}
+	return forceNewConnWithoutRegistering()
+}
+
+// forceNewConn is the same as [NewConn] but does not prevent multiple Conns per goroutine.
+// It is private, for internal use and testing.
+// It is ok to create more than one Conn per connection provided only one is used while a transactions is active.
+// Since the Conn contains the transaction token, starting a transaction with one Conn and then performing
+// database functions with another conn while that first transaction is still processing, will cause a deadlock.
+func forceNewConn() *Conn {
+	dbHandle.routineHasConn.Store(goid.Get(), true)
+	return forceNewConnWithoutRegistering()
+}
+
+// forceNewConnWithoutRegistering creates a new Conn but does not register that this thread has a Conn.
+func forceNewConnWithoutRegistering() *Conn {
 	initCheck()
 	conn := _newConn()
-	// Create initial space for value used by various API call/return
+	// Create initial space for value used by various C API calls and returns
 	conn.cconn.value.buf_addr = (*C.char)(C.malloc(overalloc))
 	conn.cconn.value.len_alloc = C.uint(overalloc)
 	conn.cconn.value.len_used = 0
 	return conn
 }
 
+var hasFastGoID bool
+
+// Setup code to determine whether goid supports fast fetching of the goroutineID.
+// Hopefully that module will expose this information itself in its next version:
+// I have offered a pull request at https://github.com/outrigdev/goid/issues/2
+// and hopefully it will not be Go-version-dependent in future: https://github.com/outrigdev/goid/issues/1
+func init() {
+	version := runtime.Version()
+	hasFastGoID = strings.HasPrefix(version, "go1.23.") || strings.HasPrefix(version, "go1.24.") || strings.HasPrefix(version, "go1.25.")
+	hasFastGoID = hasFastGoID && (runtime.GOARCH == "arm64" || runtime.GOARCH == "amd64")
+}
+
 // prepAPI initializes anything necessary before C API calls.
 // This sets the error_output string to the empty string in case the API call fails -- at least then we don't get an obsolete string reported.
 func (conn *Conn) prepAPI() {
+	if hasFastGoID && conn.goroutineID != goid.Get() {
+		panic(errorf(ydberr.InvalidGoroutineID, "yottadb function invoked in goroutine %d from a Conn instance belonging to goroutine %d", goid.Get(), conn.goroutineID))
+	}
 	conn.cconn.errstr.len_used = 0 // ensure error string is empty before API call
 }
 
@@ -394,4 +457,9 @@ func (conn *Conn) Lock(timeout time.Duration, nodes ...*Node) bool {
 		panic(conn.lastError(status))
 	}
 	return status == YDB_OK
+}
+
+// This function is just to test CGo speed in the benchmarks
+func callCGo() {
+	C.getfunc_ydb_lock_st()
 }

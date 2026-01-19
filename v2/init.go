@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2020-2025 YottaDB LLC and/or its subsidiaries.
+// Copyright (c) 2025-2026 YottaDB LLC and/or its subsidiaries.
 // All rights reserved.
 //
 //	This source code contains the intellectual property
@@ -34,11 +34,13 @@ import "C"
 // DB is the type returned by Init() which must be passed to Shutdown().
 // It is used as a clue to the user that they must not forget to Shutdown()
 type DB struct {
-	YDBRelease float64 // release version of the installed YottaDB
+	YDBRelease     float64  // release version of the installed YottaDB
+	routineHasConn sync.Map // atomic map[uint64]bool to tell whether a goroutine already has a Conn; one bool for each goroutine ID (uint64)
 }
 
 // dbHandle is the global handle used to access database metadata
-var dbHandle = &DB{} // make this a single instance per app because we can: so that e.g. mcall can check YDBRelease without having access to a particular DB instance
+// Make this a single instance per app so that we can use it, e.g. for routineHasConn to store goroutineIDs for the whole process
+var dbHandle = &DB{}
 
 // Init and Exit globals
 var wgexit sync.WaitGroup
@@ -95,7 +97,9 @@ func Init() (*DB, error) {
 	// YDB calls the exit handler after rundown (equivalent to ydb_exit()).
 	printEntry("YottaDB Init()")
 
-	conn := NewConn()              // temporary conn used purely during Init() to fetch version info from YDB
+	// temporary conn used purely during Init() to fetch version info from YDB
+	// use forceNewConnWithoutRegistering() so as not to set routineHasConn for this goroutine since it is only used in init
+	conn := forceNewConnWithoutRegistering()
 	ydbSigPanicCalled.Store(false) // Since running ydb_main_lang_init, ydb_exit() has not been called by a signal
 	// Note: ydb_init returns positive rather than negative status unlike all other API functions, so negate it here.
 	status := -C.ydb_main_lang_init(C.YDB_MAIN_LANG_GO, C.ydb_signal_exit_callback)
@@ -172,7 +176,7 @@ func Init() (*DB, error) {
 	}
 	// Now wait for the goroutine to initialize and get signals all set up. When that is done, we can return
 	wgSigInit.Wait()
-	dbHandle = &DB{runningYDBRelease}
+	dbHandle = &DB{runningYDBRelease, sync.Map{}}
 
 	// Increment this once more in the case of success since there is a defer that decrements it for error cases
 	initCount.Add(1)

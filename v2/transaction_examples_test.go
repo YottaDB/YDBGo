@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.
+// Copyright (c) 2025-2026 YottaDB LLC and/or its subsidiaries.
 // All rights reserved.
 //
 //	This source code contains the intellectual property
@@ -26,6 +26,7 @@ func ExampleConn_TransactionTokenSet() {
 	defer yottadbV2.Shutdown(yottadbV2.MustInit())
 	yottadbV1.ForceInit() // Tell v1 that v2 has done the initialization
 
+	conn := yottadbV2.NewConn()
 	err := yottadbV1.TpE(yottadbV1.NOTTP, nil, func(tptoken uint64, errstr *yottadbV1.BufferT) int32 {
 		err := yottadbV1.SetValE(tptoken, nil, "Fred", "^person", nil)
 		if err != nil {
@@ -33,7 +34,6 @@ func ExampleConn_TransactionTokenSet() {
 		}
 
 		// Run a YDBGo v2 function Node.Dump()
-		conn := yottadbV2.NewConn()
 		conn.TransactionTokenSet(tptoken) // without this the v2 function will hang
 		person := conn.Node("^person")
 		fmt.Print(person.Dump())
@@ -42,6 +42,10 @@ func ExampleConn_TransactionTokenSet() {
 	if err != nil {
 		panic(err)
 	}
+	// Restore transaction token in conn to its initial value
+	// without this, subsequent use of conn will hang
+	conn.TransactionTokenSet(yottadbV1.NOTTP)
+
 	// Output:
 	// ^person="Fred"
 }

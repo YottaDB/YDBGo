@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.
+// Copyright (c) 2025-2026 YottaDB LLC and/or its subsidiaries.
 // All rights reserved.
 //
 //	This source code contains the intellectual property
@@ -54,7 +54,34 @@ func TestNode(t *testing.T) {
 
 func TestConn(t *testing.T) {
 	conn1 := SetupTest(t)
-	conn2 := NewConn()
+
+	// Make sure NewConn() panics if there's already a new conn for this goroutine
+	assert.Panics(t, func() { NewConn() })
+	// But doesn't panic when NewConn() is run in a child goroutine
+	done := make(chan struct{}, 1)
+	go func() {
+		NewConn()
+		done <- struct{}{} // say I'm done
+	}()
+	<-done // wait for goroutine to finish
+
+	// Check that using another goroutine's conn panics
+	result := make(chan bool, 1)
+	go func() {
+		defer func() {
+			if recover() != nil {
+				result <- true // say I'm done and passed if the expected panic occurred
+			}
+		}()
+		conn1.Node("x").Set(3) // call yottadb using the wrong conn
+		// We expect a failure (false) if hasFastGoID and there was no panic before this
+		result <- !hasFastGoID // say I'm done but failed since it should have panic'ed
+	}()
+	passed := <-result // wait for goroutine to finish
+	assert.Equal(t, passed, true)
+
+	// setup
+	conn2 := forceNewConn()
 	n1 := conn1.Node("$invalidSVN")
 	n2 := conn2.Node("var")
 
@@ -96,7 +123,7 @@ func (n *Node) checkBuffers(t *testing.T) {
 
 func TestCloneNode(t *testing.T) {
 	conn1 := SetupTest(t)
-	conn2 := NewConn()
+	conn2 := forceNewConn()
 	n := conn1.Node("var", "abc")
 	clone1 := conn1.CloneNode(n)
 	clone2 := conn2.CloneNode(n)
@@ -139,7 +166,7 @@ func TestIteration(t *testing.T) {
 
 	// Code coverage for when Next() gets an INVSTRLEN error and has to retry
 	longString := strings.Repeat("A", YDB_MAX_STR)
-	conn2 := NewConn() // new conn to ensure no large pre-allocated buffer
+	conn2 := forceNewConn() // new conn to ensure no large pre-allocated buffer
 	n = conn2.Node("var")
 	n.Child(1).Set(1)
 	n.Child(longString).Set(2)
@@ -303,7 +330,7 @@ func TestSetGet(t *testing.T) {
 	// Set to a really big value to exercise _Lookup's code path to re-try lookup after YDB says buffer isn't big enough
 	longString := strings.Repeat("A", YDB_MAX_STR)
 	n.Set(longString)
-	conn2 := NewConn() // new conn to ensure no large pre-allocated buffer
+	conn2 := forceNewConn() // new conn to ensure no large pre-allocated buffer
 	n2 := conn2.CloneNode(n)
 	assert.Equal(t, longString, n2.Get())
 
@@ -427,7 +454,7 @@ func TestIncr(t *testing.T) {
 
 // Test traversal of a database tree
 func TestDump(t *testing.T) {
-	conn := NewConn()
+	conn := SetupTest(t)
 	conn.KillAllLocals()
 	n := conn.Node("tree", 1)
 	n.Child("name", "first").Set("fred")

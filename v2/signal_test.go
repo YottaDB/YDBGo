@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.
+// Copyright (c) 2025-2026 YottaDB LLC and/or its subsidiaries.
 // All rights reserved.
 //
 //	This source code contains the intellectual property
@@ -31,7 +31,7 @@ import (
 // TestSigSegv tests ability to catch a SIGSEGV and do cleanup rather than exit immediately leaving a core file.
 // This test is derived from a test case in the YDBGo repository: YottaDB/Lang/YDBGo#25 (comment 258495195) by @zapkub
 func TestSigSegv(t *testing.T) {
-	conn := NewConn()
+	conn := SetupTest(t)
 	conn.Node("avariable").Set("a value") // dummy Set
 
 	// Access invalid address -1 to test this because accessing nil always produces a panic regardless of SetPanicOnFault

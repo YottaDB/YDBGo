@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.
+// Copyright (c) 2025-2026 YottaDB LLC and/or its subsidiaries.
 // All rights reserved.
 //
 //	This source code contains the intellectual property
@@ -179,8 +179,10 @@ func (conn *Conn) TransactionTokenSet(tptoken uint64) {
 // Clone returns a new connection that initially begins with the same transaction token as the original connection conn.
 // This may be used if you absolutely must have activity within one transaction spread across multiple goroutines, in which case
 // each new goroutine will need a new connection that has the same transaction token as the original connection.
-// However, be aware that spreading transaction activity across multiple goroutines is not a recommended pattern.
-// Before doing so the programmer should first read and understand [Threads and Transaction Processing].
+// However, be aware that spreading transaction activity across multiple goroutines is highly discouraged.
+// If it is done, CloneConn should be called in the new goroutine that uses the conn, and it is also
+// the user's responsibility to ensure that the spawned goroutines complete before the parent terminates the transaction.
+// Before doing this the programmer should first read and understand [Threads and Transaction Processing].
 //
 // [Threads and Transaction Processing]: https://docs.yottadb.com/MultiLangProgGuide/programmingnotes.html#threads-and-transaction-processing
 func (conn *Conn) CloneConn() *Conn {
