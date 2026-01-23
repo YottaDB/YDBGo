@@ -2,9 +2,9 @@
 
 [![Go Report Card](https://goreportcard.com/badge/lang.yottadb.com/go/yottadb?style=flat-square)](https://goreportcard.com/report/lang.yottadb.com/go/yottadb) | [![Go Doc](https://img.shields.io/badge/godoc-reference-blue.svg?style=flat-square)](https://godoc.org/lang.yottadb.com/go/yottadb) | [![Coverage report](https://gitlab.com/YottaDB/Lang/YDBGo/badges/master/coverage.svg?job=v1_coverage)](https://gitlab.com/YottaDB/Lang/YDBGo/-/jobs?name=v1_coverage)
 
-# Deprecation Warning
+# Supersession Notice
 
-The [YDBGo v2](pkg/lang.yottadb.com/go/yottadb/v2) API is in field test. If you use the v1 API rest assured that it remains fully supported. Please refer to [Migrating v1 to v2](v2/README.md#migrating-v1-to-v2) for details on migration and on applications that simultaneously use v1 and v2 APIs during migration.
+The [YDBGo v2](https://pkg.go.dev/lang.yottadb.com/go/yottadb/v2) API is fully tested and released and should be used in preference to this v1 API for new software. However, if you use the v1 API rest assured that it remains fully supported. Please refer to [Migrating v1 to v2](v2/README.md#migrating-v1-to-v2) for details on migration and on applications that simultaneously use v1 and v2 APIs during migration.
 
 # Usage (Writing a YDBGo Client application)
 
