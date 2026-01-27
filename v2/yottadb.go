@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.
+// Copyright (c) 2026 YottaDB LLC and/or its subsidiaries.
 // All rights reserved.
 //
 //	This source code contains the intellectual property
@@ -43,7 +43,7 @@ var MinYDBRelease string = "r1.34"
 // version will be bumped by 1 and the third piece of the version set to 0. On rare occasions, we may bump the first
 // piece of the version and zero the others when the changes are significant.
 // Also, the version numbers may be followed by a hyphen and text, e.g. "v2.0.2-alpha"
-const WrapperRelease string = "v2.0.2-alpha4"
+const WrapperRelease string = "v2.0.4"
 
 // ---- Wait times
 
