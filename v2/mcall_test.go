@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.
+// Copyright (c) 2025-2026 YottaDB LLC and/or its subsidiaries.
 // All rights reserved.
 //
 //	This source code contains the intellectual property
@@ -125,7 +125,7 @@ func TestCallM(t *testing.T) {
 
 	// Test CallErr returning an error: create an error by having AddVerbose append to a max-sized string
 	bigString := strings.Repeat("A", prealloc)
-	ret, err = m.CallErr("AddVerbose", &bigString, &n, 4, "100")
+	_, err = m.CallErr("AddVerbose", &bigString, &n, 4, "100")
 	assert.NotNil(t, err)
 	// Test that Wrap panics on error
 	assert.Panics(t, func() { m.Wrap("AddVerbose")(&bigString, &n, 4, "100") })

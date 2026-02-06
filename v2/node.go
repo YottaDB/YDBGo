@@ -212,7 +212,7 @@ func (n *Node) _subscript(index int) string {
 	return r
 }
 
-// Subscripts returns a string that holds the specified varname or subscript of the given node.
+// Subscript returns a string that holds the specified varname or subscript of the given node.
 // An index of zero returns the varname; higher numbers return the respective subscript.
 // A negative index returns a subscript counted from the end (the last is -1).
 // An out-of-range subscript panics.
@@ -722,8 +722,8 @@ func (n *Node) Index(subscripts ...any) *Node {
 		original = n.original
 	}
 	originalLen := int(original.cnode.len)
-	var depth int // indexing depth: number of subscripts the mutation adds to the *original* node
-	depth = int(n.cnode.len) - originalLen + len(newsubs)
+	// indexing depth: number of subscripts the mutation adds to the *original* node
+	depth := int(n.cnode.len) - originalLen + len(newsubs)
 	if originalLen-1+depth > YDB_MAX_SUBS { // -1 for varname
 		panic(errorf(ydberr.InvalidSubscriptIndex, "attempt to Index() node %s exceeded YDB_MAX_SUBS", n))
 	}
@@ -793,8 +793,8 @@ func (n *Node) reallocateMutation(newsubs []string) *Node {
 		original = n.original
 	}
 	originalLen := int(original.cnode.len)
-	var depth int // indexing depth: number of subscripts the mutation adds to the *original* node
-	depth = int(n.cnode.len) - originalLen + len(newsubs)
+	// indexing depth: number of subscripts the mutation adds to the *original* node
+	depth := int(n.cnode.len) - originalLen + len(newsubs)
 	if original.mutations == nil {
 		original.mutations = make([]*Node, 1, preallocMutationDepth)
 	}

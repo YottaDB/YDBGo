@@ -176,7 +176,7 @@ func (conn *Conn) TransactionTokenSet(tptoken uint64) {
 	conn.tptoken.Store(tptoken)
 }
 
-// Clone returns a new connection that initially begins with the same transaction token as the original connection conn.
+// CloneConn returns a new connection that initially begins with the same transaction token as the original connection conn.
 // This may be used if you absolutely must have activity within one transaction spread across multiple goroutines, in which case
 // each new goroutine will need a new connection that has the same transaction token as the original connection.
 // However, be aware that spreading transaction activity across multiple goroutines is highly discouraged.

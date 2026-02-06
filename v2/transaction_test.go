@@ -79,7 +79,7 @@ func TestTimeoutAction(t *testing.T) {
 
 	// Check that TimeoutAction(TransactionCommit) causes it to commit on timeout
 	conn.TimeoutAction(TransactionCommit)
-	success = timeoutTransaction(true) // true = use fast fakeTimeout -- always do so here because the YottaDB timeout functionality has already been tested above
+	timeoutTransaction(true)           // true = use fast fakeTimeout -- always do so here because the YottaDB timeout functionality has already been tested above
 	assert.Equal(t, 2, index.GetInt()) // timeout also does a rollback
 
 	// Check that TimeoutAction(TransactionTimeout) causes a panic

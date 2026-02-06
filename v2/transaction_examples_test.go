@@ -15,8 +15,7 @@ package yottadb_test
 import (
 	"fmt"
 
-	yottadbV1 "lang.yottadb.com/go/yottadb" // for TransactionTokenSet() example
-	yottadb "lang.yottadb.com/go/yottadb/v2"
+	yottadbV1 "lang.yottadb.com/go/yottadb"    // for TransactionTokenSet() example
 	yottadbV2 "lang.yottadb.com/go/yottadb/v2" // for TransactionTokenSet() example
 )
 
@@ -37,7 +36,7 @@ func ExampleConn_TransactionTokenSet() {
 		conn.TransactionTokenSet(tptoken) // without this the v2 function will hang
 		person := conn.Node("^person")
 		fmt.Print(person.Dump())
-		return yottadb.YDB_OK
+		return yottadbV2.YDB_OK
 	}, "BATCH", nil)
 	if err != nil {
 		panic(err)
@@ -72,7 +71,7 @@ func ExampleConn_TransactionToken() {
 }
 
 func ExampleConn_Restart() {
-	conn := yottadb.NewConn()
+	conn := yottadbV2.NewConn()
 	n := conn.Node("^activity")
 	n.Set(0)
 	// M locals to demonstrate restoration of M 'local' on restart or not

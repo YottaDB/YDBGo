@@ -2,7 +2,7 @@
 #
 #################################################################
 #                                                               #
-# Copyright (c) 2020-2025 YottaDB LLC and/or its subsidiaries.  #
+# Copyright (c) 2020-2026 YottaDB LLC and/or its subsidiaries.  #
 # All rights reserved.                                          #
 #                                                               #
 #       This source code contains the intellectual property     #
@@ -114,9 +114,11 @@ endif
 # ------------------------------------------------------------------------------------------
 # 4) Run "staticcheck" as linter
 # ------------------------------------------------------------------------------------------
-# Check v1 with settings compatible with "golint" which was used previously
-staticcheck -checks inherit,-ST1017,-SA4006,-S1006,-S1005,-S1000,-S1008 || @ exitstatus = 1
-# Check v2 with staticcheck. Any special config options should be added in a staticcheck.conf file
-(cd v2; staticcheck -checks -SA1019) || @ exitstatus = 1
+# Get latest staticcheck version otherwise it can produce error `file requires newer Go version` when any imported
+# module is updated to use a Go version more recent than the Go version used to build staticcheck.
+go install honnef.co/go/tools/cmd/staticcheck@latest
+# Check with staticcheck. Config options for v1 and v2 are in their respective staticcheck.conf files.
+staticcheck || @ exitstatus = 1
+(cd v2; staticcheck) || @ exitstatus = 1
 
 exit $exitstatus

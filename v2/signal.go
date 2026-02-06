@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2020-2025 YottaDB LLC and/or its subsidiaries.
+// Copyright (c) 2020-2026 YottaDB LLC and/or its subsidiaries.
 // All rights reserved.
 //
 //	This source code contains the intellectual property
@@ -226,7 +226,7 @@ func NotifyYDB(sig os.Signal) bool {
 	return true
 }
 
-// FatalSignalPanic returns whether the currently unwinding panic was caused by a fatal signal like Ctrl-C.
+// SignalWasFatal returns whether the currently unwinding panic was caused by a fatal signal like Ctrl-C.
 // May be used in a deferred function like [ShutdownOnPanic] to check whether a fatal signal caused the current exit procedure.
 func SignalWasFatal() bool {
 	return ydbSigPanicCalled.Load()

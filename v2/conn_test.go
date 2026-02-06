@@ -66,9 +66,9 @@ func TestStr2Zwr(t *testing.T) {
 	str, err = conn.Str2Zwr(input)
 	assert.Nil(t, err)
 	assert.Equal(t, `"`+input+`"`, str)
-	str, err = conn.Str2Zwr(input + "A")
+	_, err = conn.Str2Zwr(input + "A")
 	assert.NotNil(t, err)
-	str, err = conn.Str2Zwr(input + "AAAA")
+	_, err = conn.Str2Zwr(input + "AAAA")
 	assert.NotNil(t, err)
 
 	assert.Panics(t, func() { conn.Quote(input + "\x00") })

@@ -29,7 +29,6 @@ import (
 // Set up custom `go test` options to allow user to specify fatal signal test
 var fatalTest string // Run a specific fatal-exit test that needs to exit the test process, so no other tests will be run after this one
 var testSyslog bool  // Run a specific test that outputs a syslog entry. Not on by default because syslog may not be set up (as in the CI pipeline)
-var testNoDB bool    // Run without creating a test database (use the default specified by environment variable ydb_gbldir)
 var testLog string   // Specify path to store test logging - defaults to /tmp/ydbgotest-*/output.log")
 var testDB string    // Specify path of database global directory file - otherwise creates /tmp/ydbgotest-*/mumps.{gld,dat}
 var noInit bool      // For use with special init test paths, invoked by special command: go test -run TestNoInit -noinit

@@ -261,7 +261,7 @@ func TestIndex(t *testing.T) {
 	n = conn.Node("person")
 	n.Index(1, "a")
 	index1 = n.Index(bigSubscript) // force reallocation of depth 1 -- but it should retain depth 2 capacity
-	index2 = n.Index(3, "b")
+	n.Index(3, "b")
 	// Check that index1 is also changed to the new depth-0 subscript of index2 -- i.e. node reused, not reallocated
 	assert.Equal(t, "3", index1.Subscript(1))
 

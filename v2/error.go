@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.
+// Copyright (c) 2025-2026 YottaDB LLC and/or its subsidiaries.
 // All rights reserved.
 //
 //	This source code contains the intellectual property
@@ -27,7 +27,7 @@ import (
 // #include "libyottadb.h"
 import "C"
 
-// MaxStackDepth is the maximum number of stack frames stored in an Error instance
+// MaxStacktrace is the maximum number of stack frames stored in an Error instance
 var MaxStacktrace = 4096
 
 // Error type holds YDBGo and YottaDB errors including a numeric error code.
