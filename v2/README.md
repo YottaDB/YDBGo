@@ -1,6 +1,6 @@
 # YottaDB Go Wrapper v2
 
-[![Go Report Card](https://goreportcard.com/badge/lang.yottadb.com/go/yottadb/v2?style=flat-square)](https://goreportcard.com/report/lang.yottadb.com/go/yottadb/v2) | [![Go Doc](https://img.shields.io/badge/godoc-reference-blue.svg?style=flat-square)](https://godoc.org/lang.yottadb.com/go/yottadb/v2) | [![Coverage report](https://gitlab.com/YottaDB/Lang/YDBGo/badges/master/coverage.svg?job=v2_coverage)](https://gitlab.com/YottaDB/Lang/YDBGo/-/jobs?name=v2_coverage)
+[![Go Report Card](https://goreportcard.com/badge/lang.yottadb.com/go/yottadb/v2?style=flat-square)](https://goreportcard.com/report/lang.yottadb.com/go/yottadb/v2) | [![Go Doc](https://img.shields.io/badge/godoc-reference-blue.svg?style=flat-square)](https://godoc.org/lang.yottadb.com/go/yottadb/v2) | [![Coverage report](https://ydbgo-092cff.gitlab.io/v2/coverage.svg)](https://ydbgo-092cff.gitlab.io/v2/coverage.html)
 
 YDBGo v2 is the latest and recommended Go API for YottaDB. Reference documentation is on the [Go packages website](https://pkg.go.dev/lang.yottadb.com/go/yottadb/v2).
 

@@ -1,6 +1,6 @@
 #################################################################
 #								#
-# Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	#
+# Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	#
 # All rights reserved.						#
 #								#
 #	This source code contains the intellectual property	#
@@ -62,7 +62,8 @@ before_script: |-
   artifacts:
     paths:
       - artifacts
-    expire_in: 7 days
+    # Also set Settings/CI/CD/Artifacts to "Keep artifacts from most recent successful jobs"
+    expire_in: 7 days  # but keep latest forever (per line above)
 
 v2_unit_tests:
   extends: .unit_tests
@@ -114,9 +115,10 @@ v2_coverage:
   stage: test
   variables:
     TEST_VERSION: v2
-    COVERDIR: ${CI_PROJECT_DIR}/cover/${TEST_VERSION}
+    COVERDIR: ${CI_PROJECT_DIR}/${TEST_VERSION}/cover
   script: |-
     make -C ${TEST_VERSION} coverage
+    # The following provides colored code coverage bars alongside code in gitlab views.
     # Visualization instructions: https://docs.gitlab.com/ci/testing/code_coverage/?tab=Go
     go get github.com/boumenot/gocover-cobertura
     go install github.com/boumenot/gocover-cobertura
@@ -126,41 +128,51 @@ v2_coverage:
   coverage: '/coverage: \d+(?:\.\d+)?/'
   artifacts:
     paths:
-      - cover/${TEST_VERSION}/coverage.cov
-      - cover/${TEST_VERSION}/coverage.html
+      - ${COVERDIR}/coverage.cov
+      - ${COVERDIR}/coverage.html
+      - ${COVERDIR}/coverage.svg
     reports:
       coverage_report:
         coverage_format: cobertura
         path: ${COVERDIR}/coverage.xml
-    expire_in: 2 years  # default is 1 week but YDBGo can exist for a long time without change
+    # Also set Settings/CI/CD/Artifacts to "Keep artifacts from most recent successful jobs"
+    expire_in: 30 days  # but keep latest forever (per line above)
 
 v1_coverage:
   stage: test
   variables:
     # Set version to . to test v1
     TEST_VERSION: .
+    COVERDIR: ${CI_PROJECT_DIR}/${TEST_VERSION}/cover
   script: |-
-    mkdir -p $CI_PROJECT_DIR/cover/${TEST_VERSION}
-    go get -C ${TEST_VERSION} -t
-    go test -C ${TEST_VERSION} -covermode=count -coverprofile "$CI_PROJECT_DIR/cover/${TEST_VERSION}/coverage.cov"
-    go tool -C ${TEST_VERSION} cover -func=$CI_PROJECT_DIR/cover/${TEST_VERSION}/coverage.cov
-    go tool -C ${TEST_VERSION} cover -html=$CI_PROJECT_DIR/cover/${TEST_VERSION}/coverage.cov -o $CI_PROJECT_DIR/cover/${TEST_VERSION}/coverage.html
+    dir=${COVERDIR}
+    mkdir -p $dir
+    go get -t
+    # tee below required for the pipeline to see coverage.out
+    go test -covermode=count -coverprofile "$dir/coverage.cov" | tee $dir/coverage.out
+    go tool cover -html=$dir/coverage.cov -o $dir/coverage.html
+    grep -oP '(?<=coverage: )[\d.]+(?=%)' $dir/coverage.out >$dir/coverage.percent
+    # awk $0+0 below converts it to a float
+    badge=`awk 'END {n=$0+0; color=n<75? "red": (n<90)? "yellow": (n<95)? "a3c51c": "4c1"; print n "%25-" color}' $dir/coverage.percent` && \
+            wget --no-verbose https://img.shields.io/badge/coverage-$badge -O $dir/coverage.svg
     # Visualization instructions: https://docs.gitlab.com/ci/testing/code_coverage/?tab=Go
     go get github.com/boumenot/gocover-cobertura
     go install github.com/boumenot/gocover-cobertura
-    (cd ${TEST_VERSION} && gocover-cobertura < $CI_PROJECT_DIR/cover/${TEST_VERSION}/coverage.cov > $CI_PROJECT_DIR/cover/${TEST_VERSION}/coverage.xml)
+    gocover-cobertura < $dir/coverage.cov > $dir/coverage.xml
   # Capture output of go test `-covermode` switch above
   #   cf. https://docs.gitlab.com/ci/yaml/#coverage
   coverage: '/coverage: \d+(?:\.\d+)?/'
   artifacts:
     paths:
-      - cover/${TEST_VERSION}/coverage.cov
-      - cover/${TEST_VERSION}/coverage.html
+      - ${COVERDIR}/coverage.cov
+      - ${COVERDIR}/coverage.html
+      - ${COVERDIR}/coverage.svg
     reports:
       coverage_report:
         coverage_format: cobertura
-        path: $CI_PROJECT_DIR/cover/${TEST_VERSION}/coverage.xml
-    expire_in: 2 years  # default is 1 week but YDBGo can exist for a long time without change
+        path: ${COVERDIR}/coverage.xml
+    # Also set Settings/CI/CD/Artifacts to "Keep artifacts from most recent successful jobs"
+    expire_in: 30 days  # but keep latest forever (per line above)
 
 
 commit-verify:
@@ -200,10 +212,13 @@ pages:
     - v2_coverage
   script: |-
     mkdir $CI_PROJECT_DIR/public
-    mv cover/coverage.html $CI_PROJECT_DIR/public/
+    mkdir $CI_PROJECT_DIR/public/v2
+    mv cover/coverage.{html,svg} $CI_PROJECT_DIR/public/
+    mv v2/cover/coverage.{html,svg} $CI_PROJECT_DIR/public/v2
   artifacts:
     paths:
       - public
-    expire_in: 30 days
+    # Also set Settings/CI/CD/Artifacts to "Keep artifacts from most recent successful jobs"
+    expire_in: 30 days  # but keep latest forever (per line above)
   only:
     - master

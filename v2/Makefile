@@ -2,7 +2,7 @@
 
 ##################################################################
 #
-# Copyright (c) 2025 YottaDB LLC and#or its subsidiaries.
+# Copyright (c) 2025-2026 YottaDB LLC and#or its subsidiaries.
 # All rights reserved.
 #
 #	This source code contains the intellectual property
@@ -69,8 +69,13 @@ coverage:
 	@# Run the rest of the tests
 	test/test -test.timeout=5s -test.gocoverdir=$(COVERDIR)
 	go tool covdata textfmt -i=$(COVERDIR) -o $(COVERDIR)/coverage.cov
-	go tool covdata percent -i=$(COVERDIR)
-	go tool cover -html="$(COVERDIR)/coverage.cov" -o $(COVERDIR)/coverage.html
+	go tool -C $(COVERDIR) cover -html=coverage.cov -o coverage.html
+	@# tee below required for the pipeline to see coverage.out
+	go tool covdata percent -i=$(COVERDIR) | tee $(COVERDIR)/coverage.out
+	grep -oP '(?<=coverage: )[\d.]+(?=%)' $(COVERDIR)/coverage.out >$(COVERDIR)/coverage.percent
+	@# awk $0+0 below converts it to a float
+	badge=`awk 'END {n=$$0+0; color=n<75? "red": (n<90)? "yellow": (n<95)? "a3c51c": "4c1"; print n "%25-" color}' $(COVERDIR)/coverage.percent` && \
+		wget --no-verbose https://img.shields.io/badge/coverage-$$badge -O $(COVERDIR)/coverage.svg
 
 clean:
 	rm -f $(COVERDIR)/* test/*.o test/fatalsignal test/test

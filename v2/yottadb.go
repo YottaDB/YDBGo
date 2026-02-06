@@ -43,7 +43,8 @@ var MinYDBRelease string = "r1.34"
 // version will be bumped by 1 and the third piece of the version set to 0. On rare occasions, we may bump the first
 // piece of the version and zero the others when the changes are significant.
 // Also, the version numbers may be followed by a hyphen and text, e.g. "v2.0.2-alpha"
-const WrapperRelease string = "v2.0.4"
+// Note: version descriptions may be seen on the git tags with `git tag -n`
+const WrapperRelease string = "v2.0.6"
 
 // ---- Wait times
 
