@@ -77,7 +77,7 @@ func BenchmarkNewNode(b *testing.B) {
 	}
 }
 
-// Benchmark setting a node repeatedly to new values each time.
+// Benchmark setting a node to new values each time.
 func BenchmarkSet(b *testing.B) {
 	tconn := SetupTest(b)
 	n := tconn.Node("var")
@@ -86,13 +86,41 @@ func BenchmarkSet(b *testing.B) {
 	}
 }
 
-// Benchmark getting a node repeatedly.
+// Benchmark getting a node.
 func BenchmarkGet(b *testing.B) {
 	tconn := SetupTest(b)
 	n := tconn.Node("var")
 	n.Set(12345678) // store something into it so we can Get() it back
 	for b.Loop() {
 		n.Get()
+	}
+}
+
+// Benchmark getting an empty node as an integer that defaults to zero.
+func BenchmarkGetEmpty(b *testing.B) {
+	tconn := SetupTest(b)
+	n := tconn.Node("var")
+	for b.Loop() {
+		n.GetInt()
+	}
+}
+
+// Benchmark getting node.Has*() on full nodes
+func BenchmarkHas(b *testing.B) {
+	tconn := SetupTest(b)
+	n := tconn.Node("var")
+	n.Set(12345678) // store something into it so we can check its existence
+	for b.Loop() {
+		n.HasValue()
+	}
+}
+
+// Benchmark getting node.Has*() on empty nodes
+func BenchmarkHasEmpty(b *testing.B) {
+	tconn := SetupTest(b)
+	n := tconn.Node("var")
+	for b.Loop() {
+		n.HasValue()
 	}
 }
 
