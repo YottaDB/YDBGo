@@ -168,7 +168,7 @@ func (conn *Conn) _Node(varname any, subscripts []any) (n *Node) {
 	return n
 }
 
-// Node method creates a `Node` type instance that represents a database node with methods that access YottaDB.
+// Node method creates a `Node` type instance that represents a YottaDB database node or M local node, and offers methods that access that YottaDB node.
 //   - The strings and array are stored in C-allocated space to give Node methods fast access to YottaDB API functions.
 //   - The varname and subscripts may be of type string, []byte slice, or an integer or float type; numeric types are converted to a string using the appropriate strconv function.
 func (conn *Conn) Node(varname string, subscripts ...any) (n *Node) {
@@ -572,11 +572,13 @@ func (n *Node) Clear() {
 	}
 }
 
-// Incr atomically increments the value of database node by amount.
+// Incr atomically increments the value of the database node by amount and returns the new value as a string.
 //   - The amount may be an integer, float or string representation of the same.
-//   - YottaDB first converts the value of the node to a number by discarding any trailing non-digits and returning zero if it is still not a number.
+//   - YottaDB first converts the value of the node to a [canonical number] by discarding any trailing non-digits and returning zero if it is still not a number.
 //     Then it adds amount to the node, all atomically.
 //   - Return the new value of the node as a string
+//
+// [canonical number]: https://docs.yottadb.com/MultiLangProgGuide/programmingnotes.html#canonical-numbers
 func (n *Node) Incr(amount any) string {
 	cnode := n.cnode // access C equivalents of Go types
 	cconn := cnode.conn
@@ -595,6 +597,29 @@ func (n *Node) Incr(amount any) string {
 	valuestring := C.GoStringN(cconn.value.buf_addr, C.int(cconn.value.len_used))
 	runtime.KeepAlive(n) // ensure n sticks around until we've finished copying data from it's C allocation
 	return valuestring
+}
+
+// IncrFloat atomically increments the value of the database node by amount and returns the new value as a float64.
+// It operates the same as [Node.Incr]() except that it returns a float64 instead of a string.
+// It panics if the returned value cannot be represented as a float, which should be impossible since prior to the increment,
+// YottaDB first converts the node's value to a [canonical number] by discarding any trailing non-digits and, if it is still not a number, defaulting to zero.
+//
+// [canonical number]: https://docs.yottadb.com/MultiLangProgGuide/programmingnotes.html#canonical-numbers
+func (n *Node) IncrFloat(amount any) float64 {
+	val := n.Incr(amount)
+	num, err := strconv.ParseFloat(val, 64)
+	if err != nil {
+		panic(err)
+	}
+	return num
+}
+
+// IncrInt atomically increments the value of the database node by amount and returns the new value as an integer.
+// It operates the same as [Node.IncrFloat]() except that it returns an int instead of a float64.
+// Any fractional portion in the returned value is truncated by Go's standard int(n) type cast logic,
+// but is retained in the database and may be accessed by [Node.GetFloat]().
+func (n *Node) IncrInt(amount any) int {
+	return int(n.IncrFloat(amount))
 }
 
 // Lock attempts to acquire or increment the count of a lock matching this node, waiting up to timeout for availability.
