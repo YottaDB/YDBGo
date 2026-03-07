@@ -135,8 +135,10 @@ func TestLock(t *testing.T) {
 	assert.Equal(t, false, lockExists(n.String()))
 	assert.Equal(t, false, lockExists(n2.String()))
 
-	// Lock node n in an external process for n seconds so that we can test its lock timeout here.
-	cmd := exec.Command(os.Getenv("ydb_dist")+"/yottadb", "-r", "%XCMD", fmt.Sprintf("lock +%s:1 hang 1 lock -%s", n, n))
+	// Wait up to 10 second to lock node n in an external process for timeout seconds so that we can test its lock timeout here.
+	// There was one pipeline where timeout=1 was too short and so the assert.Equal below failed, so increased to timeout=3
+	timeout := 3
+	cmd := exec.Command(os.Getenv("ydb_dist")+"/yottadb", "-r", "%XCMD", fmt.Sprintf("lock +%s:10 hang %d lock -%s", n, timeout, n))
 	err := cmd.Start()
 	if err != nil {
 		panic(err)
