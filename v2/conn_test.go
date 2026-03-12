@@ -149,6 +149,11 @@ func TestLock(t *testing.T) {
 	}
 	// Test that a lock timeout works
 	assert.Equal(t, false, n.Lock(10*time.Millisecond))
+	// Wait for process to terminate before exiting test
+	err = cmd.Wait()
+	if err != nil {
+		panic(err)
+	}
 }
 
 // lockExists return whether a lock exists using YottaDB's LKE utility.
