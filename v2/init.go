@@ -232,8 +232,8 @@ func ShutdownHard(handle *DB) error {
 // _shutdown is the core of Shutdown.
 // If force is true, Shutdown now even if it has not yet been called as many times as Init.
 func _shutdown(handle *DB, force bool) error {
-	// Defer a func that exits silently (after shutting down) if it was a fatal signal that caused the shutdown,
-	// (which would have happened  in another goroutine).
+	// Defer a func that exits silently (after shutting down) if it was a fatal signal that caused the shutdown
+	// (which signal would have been handled in another goroutine).
 	defer func() {
 		if err := recover(); err != nil {
 			// Quit rather than error if Ctrl-C signal caused the shutdown

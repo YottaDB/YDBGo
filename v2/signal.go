@@ -270,7 +270,7 @@ func ShutdownOnPanic() {
 // To silence these many panics and have each goroutine simply exit gracefully, defer quitAfterSIGINT()
 // at the start of each goroutine. Then you will get just one panic from the Ctrl-C signal interrupt rather
 // than one CALLINAFTERXIT panic per goroutine.
-// This is automatically deferred if the user defers [SignalWasFatal].
+// This is automatically deferred if the user defers [ShutdownOnPanic].
 func quitAfterSIGINT(err any) {
 	if ErrorIs(err, ydberr.CALLINAFTERXIT) && SignalWasFatal() {
 		// Silently and gracefully exit the goroutine

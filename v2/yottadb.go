@@ -44,7 +44,7 @@ var MinYDBRelease string = "r1.34"
 // piece of the version and zero the others when the changes are significant.
 // Also, the version numbers may be followed by a hyphen and text, e.g. "v2.0.2-alpha"
 // Note: version descriptions may be seen on the git tags with `git tag -n`
-const WrapperRelease string = "v2.0.6"
+const WrapperRelease string = "v2.0.7"
 
 // ---- Wait times
 
