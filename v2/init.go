@@ -17,13 +17,13 @@ package yottadb
 import (
 	"fmt"
 	"log"
-	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/outrigdev/goid"
 	"lang.yottadb.com/go/yottadb/v2/ydberr"
 )
 
@@ -211,7 +211,7 @@ func initCheck() {
 //   - Shutdown() must be called exactly once for each time [Init]() was called, and shutdown will not occur until the last time.
 //
 // Returns [ydberr.ShutdownIncomplete] if it has to wait longer than MaxNormalExitWait for signal handling goroutines to exit.
-// No other errors are returned. Panics if Shutdown is called more than Init.
+// No other errors are returned. Panics if Shutdown is called more than Init or on any other errors.
 //
 // [Database Integrity]: https://docs.yottadb.com/MultiLangProgGuide/goprogram.html#database-integrity
 // [relevant LKE documentation]: https://docs.yottadb.com/AdminOpsGuide/mlocks.html#introduction
@@ -232,9 +232,6 @@ func ShutdownHard(handle *DB) error {
 // _shutdown is the core of Shutdown.
 // If force is true, Shutdown now even if it has not yet been called as many times as Init.
 func _shutdown(handle *DB, force bool) error {
-	// Do-nothing hack purely to prevent goimport from removing runtime/debug from imports since it's required for the docstring above
-	debug.SetPanicOnFault(debug.SetPanicOnFault(false))
-
 	// Defer a func that exits silently (after shutting down) if it was a fatal signal that caused the shutdown,
 	// (which would have happened  in another goroutine).
 	defer func() {
@@ -265,15 +262,16 @@ func _shutdown(handle *DB, force bool) error {
 	}
 
 	if DebugMode.Load() >= 2 {
-		log.Println("Exit(): YDB Engine shutdown started")
+		log.Println("Shutdown(): YDB Engine shutdown started in goroutine", goid.Get())
 	}
 	// When we run ydb_exit(), set up a timer that will pop if ydb_exit() gets stuck in a deadlock or whatever. We could
 	// be running after some fatal error has occurred so things could potentially be fairly screwed up and ydb_exit() may
 	// not be able to get the lock. We'll give it the given amount of time to finish before we give up and just exit.
 	exitdone := make(chan struct{}, 1)
 	wgexit.Add(1)
+	var exit_status int = YDB_OK
 	go func() {
-		_ = C.ydb_exit()
+		exit_status = int(C.ydb_exit())
 		wgexit.Done()
 	}()
 	wgexit.Add(1) // And run our signal goroutine cleanup in parallel
@@ -300,8 +298,9 @@ func _shutdown(handle *DB, force bool) error {
 	var errstr string
 	select {
 	case <-exitdone:
-		// We don't really care at this point what the return code is as we're just trying to run things down the
-		// best we can as this is the end of using the YottaDB engine in this process.
+		if exit_status != YDB_OK {
+			panic(errorf(exit_status, "Encountered error %d during shutdown; use `$ydb_dist/yottadb %%XCMD ZMESSAGE %d` to decode it. Consider using `$ydb_dist/mupip rundown` to ensure database integrity.", exit_status, exit_status))
+		}
 	case <-time.After(exitWait):
 		if DebugMode.Load() >= 2 {
 			log.Println("Shutdown(): Wait for ydb_exit() expired")

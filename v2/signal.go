@@ -27,6 +27,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/outrigdev/goid"
 	"lang.yottadb.com/go/yottadb/v2/ydberr"
 )
 
@@ -65,10 +66,10 @@ var YDBSignals = []os.Signal{
 
 // sigInfo holds info for each signal that YDBGo handles and defers to YottaDB.
 type sigInfo struct {
-	updating     sync.Mutex     // Indicate this struct is being modified
+	accessing    sync.Mutex     // indicate the notifyChan field of this struct is being accessed
 	signal       os.Signal      // signal number for this entry
 	notifyChan   chan os.Signal // user-supplied channel to notify of incoming signal
-	shutdownNow  chan struct{}  // Channel used to shutdown signal handling goroutine
+	shutdownNow  chan struct{}  // channel used to shutdown signal handling goroutine
 	shutdownDone atomic.Bool    // indicate that goroutine shutdown is complete
 	servicing    atomic.Bool    // indicate signal handler is active
 	_conn        *Conn          // not a full Conn; just acts as a place to store errstr for use by this signal's NotifyYDB()
@@ -153,7 +154,8 @@ func validateYDBSignal(sig os.Signal) *sigInfo {
 //
 // [YottaDB signals]: https://docs.yottadb.com/MultiLangProgGuide/programmingnotes.html#signals
 func SignalNotify(notifyChan chan os.Signal, signals ...os.Signal) {
-	// Do-nothing hack purely to prevent goimport from removing runtime/debug from imports since it's required for the docstring above
+	// Do-nothing hack purely to prevent goimport from removing runtime/debug from imports since it's required
+	// to make [debug.SetPanicOnFault] clickable in the the docstring above.
 	debug.SetPanicOnFault(debug.SetPanicOnFault(false))
 
 	// Although this routine itself does not interact with the YottaDB runtime, use of this routine has an expectation that
@@ -161,9 +163,9 @@ func SignalNotify(notifyChan chan os.Signal, signals ...os.Signal) {
 	initCheck()
 	for _, sig := range signals {
 		info := validateYDBSignal(sig)
-		info.updating.Lock()
+		info.accessing.Lock()
 		info.notifyChan = notifyChan
-		info.updating.Unlock()
+		info.accessing.Unlock()
 	}
 }
 
@@ -172,9 +174,9 @@ func SignalNotify(notifyChan chan os.Signal, signals ...os.Signal) {
 func SignalReset(signals ...os.Signal) {
 	for _, sig := range signals {
 		info := lookupYDBSignal(sig)
-		info.updating.Lock()
+		info.accessing.Lock()
 		info.notifyChan = nil
-		info.updating.Unlock()
+		info.accessing.Unlock()
 	}
 }
 
@@ -184,7 +186,7 @@ func SignalReset(signals ...os.Signal) {
 func NotifyYDB(sig os.Signal) bool {
 	value, ok := ydbSignalMap.Load(sig)
 	if !ok {
-		panic(errorf(ydberr.SignalUnsupported, "goroutine-sighandler: called NotifyYDB with a non-YottaDB signal %d (%v)", sig, sig))
+		panic(errorf(ydberr.SignalUnsupported, "goroutine%d-sighandler: called NotifyYDB with a non-YottaDB signal %d (%v)", goid.Get(), sig, sig))
 	}
 	info := value.(*sigInfo)
 	_conn := info._conn
@@ -195,7 +197,7 @@ func NotifyYDB(sig os.Signal) bool {
 
 	if DebugMode.Load() >= 2 && sig != syscall.SIGURG {
 		// SIGURG happens almost continually, so don't report it.
-		log.Printf("goroutine-sighandler: calling YottaDB signal handler for signal %d (%v)\n", sig, sig)
+		log.Printf("goroutine%d-sighandler: called NotifyYDB signal handler for signal %d (%v)\n", goid.Get(), sig, sig)
 	}
 	signum := C.int(sig.(syscall.Signal)) // have to type-assert before converting to an int
 	// Note this call to ydb_sig_dispatch() does not pass a tptoken. The reason for this is that inside
@@ -212,11 +214,15 @@ func NotifyYDB(sig os.Signal) bool {
 		// Not an error, but the fact is logged
 		// Hard to test code coverage for this as I don't know how to make YDB produce this condition
 		if DebugMode.Load() >= 2 {
-			log.Printf("goroutine-sighandler: YottaDB deferred signal %d (%v)\n", sig, sig)
+			log.Printf("goroutine%d-sighandler: YottaDB deferred signal %d (%v)\n", goid.Get(), sig, sig)
 		}
 		return false
 	case ydberr.CALLINAFTERXIT:
+		if DebugMode.Load() >= 2 {
+			log.Printf("goroutine%d-sighandler: C call to ydb_sig_dispatch for signal %d (%v) returned CALLINAFTERXIT; shutting down signal handlers\n", goid.Get(), sig, sig)
+		}
 		// If CALLINAFTERXIT, we're done - exit goroutine
+		// This flags the current signal handler (that called NotifyYDB) to shut itself down.
 		shutdownSignalGoroutine(info)
 	default: // Some sort of error occurred during signal handling
 		// Hard to test code coverage for this as I don't know how to make YDB produce this condition. It is an undocumented function.
@@ -288,7 +294,7 @@ func handleSignal(info *sigInfo) {
 	// Tell Go to pass this signal to our channel.
 	signal.Notify(sigchan, sig)
 	if DebugMode.Load() >= 2 {
-		log.Printf("goroutine-sighandler: Signal handler initialized for %d (%v)\n", sig, sig)
+		log.Printf("goroutine%d-sighandler: Signal handler initialized for %d (%v)\n", goid.Get(), sig, sig)
 	}
 	wgSigInit.Done() // Signal parent goroutine that we have completed initializing signal handling
 	allDone := false
@@ -308,17 +314,17 @@ func handleSignal(info *sigInfo) {
 		info := lookupYDBSignal(sig)
 		// Note that for fatal signals, the YDB handler probably won't return as it will (usually) exit,
 		// but some fatal signals can be deferred under the right conditions (holding crit, interrupts-disabled-state, etc).
-		info.updating.Lock()
+		info.accessing.Lock()
 		notifyChan := info.notifyChan
-		info.updating.Unlock()
+		info.accessing.Unlock()
 		if notifyChan != nil {
 			// Notify user code via the supplied channel
 			if DebugMode.Load() >= 2 {
-				log.Printf("goroutine-sighandler: notifying user-specified channel of signal %d (%v)\n", sig, sig)
+				log.Printf("goroutine%d-sighandler: notifying user-specified channel of signal %d (%v)\n", goid.Get(), sig, sig)
 			}
 			// Send to channel without blocking (same as Signal.Notify)
 			select {
-			case notifyChan <- sig: // notify channel of signal, sending it a function to use to notify YDB
+			case notifyChan <- sig: // notify the caller-supplied channel of the signal
 			default:
 			}
 		} else {
@@ -328,7 +334,7 @@ func handleSignal(info *sigInfo) {
 	}
 	signal.Stop(sigchan) // No more signal notification for this signal channel
 	if DebugMode.Load() >= 2 {
-		log.Printf("goroutine-sighandler: exiting goroutine for signal %d (%v)\n", sig, sig)
+		log.Printf("goroutine%d-sighandler: exiting goroutine for signal %d (%v)\n", goid.Get(), sig, sig)
 	}
 	info.shutdownDone.Store(true)  // Indicate this channel is closed
 	ydbShutdownCheck <- struct{}{} // Notify shutdownSignalGoroutines that it needs to check if all channels closed now
@@ -414,14 +420,15 @@ func shutdownSignalGoroutines() {
 }
 
 // signalExitCallback is called from C by YottaDB to perform an exit when YottaDB gets a fatal signal.
-// Its purpose is to make sure defers get called before exit, which it does by calling panic.
+// Its purpose is to make sure Go defers get called before exit, which it does by calling panic.
 // This function is passed to YottaDB during init by ydb_main_lang_init().
 // YDB calls this exit handler after rundown (equivalent to ydb_exit()).
 // The sigNum parameter is reported in the panic message.
+// Go panic thus runs down the signalled goroutine nicely whereupon Go simply terminates all other goroutines (as usual after a panic).
 //
 //export signalExitCallback
 func signalExitCallback(sigNum C.int) {
-	printEntry("YDBWrapperPanic()")
+	printEntry("signalExitCallback()")
 	ydbSigPanicCalled.Store(true) // Need "atomic" usage to avoid read/write DATA RACE issues
 	shutdownSignalGoroutines()    // Close the goroutines down with their signal notification channels
 	sig := syscall.Signal(sigNum) // Convert numeric signal number to Signal type for use in panic() message
