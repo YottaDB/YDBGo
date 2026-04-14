@@ -135,10 +135,10 @@ func TestLock(t *testing.T) {
 	assert.Equal(t, false, lockExists(n.String()))
 	assert.Equal(t, false, lockExists(n2.String()))
 
-	// Wait up to 10 second to lock node n in an external process for timeout seconds so that we can test its lock timeout here.
-	// There was one pipeline where timeout=1 was too short and so the assert.Equal below failed, so increased to timeout=3
-	timeout := 3
-	cmd := exec.Command(os.Getenv("ydb_dist")+"/yottadb", "-r", "%XCMD", fmt.Sprintf("lock +%s:10 hang %d lock -%s", n, timeout, n))
+	// Lock ^var2 in the current process to force the below spawned yottadb process to wait to exit until this process releases the ^var2 lock,
+	// ensuring that this process can confirm the Lock() timeout behavior while trying to get a lock on ^var, which is held by the spawned process.
+	n2.Lock()
+	cmd := exec.Command(os.Getenv("ydb_dist")+"/yottadb", "-r", "%XCMD", fmt.Sprintf("lock +%s:10 lock +%s:10  lock -%s lock -%s", n, n2, n2, n))
 	err := cmd.Start()
 	if err != nil {
 		panic(err)
@@ -147,13 +147,13 @@ func TestLock(t *testing.T) {
 	for locked := n.Lock(0); locked; locked = n.Lock(0) {
 		n.Unlock()
 	}
-	// Test that a lock timeout works
 	assert.Equal(t, false, n.Lock(10*time.Millisecond))
 	// Wait for process to terminate before exiting test
 	err = cmd.Wait()
 	if err != nil {
 		panic(err)
 	}
+	n2.Unlock()
 }
 
 // lockExists return whether a lock exists using YottaDB's LKE utility.

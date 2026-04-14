@@ -67,7 +67,7 @@ coverage:
 	@# Test that YDBGo creates proper errors when it cannot Init()
 	test/test -test.timeout=5s -test.gocoverdir=$(COVERDIR) -test.v -test.run TestNoInit -noinit
 	@# Run the rest of the tests
-	test/test -test.timeout=5s -test.gocoverdir=$(COVERDIR)
+	test/test -test.timeout=20s -test.gocoverdir=$(COVERDIR)
 	go tool covdata textfmt -i=$(COVERDIR) -o $(COVERDIR)/coverage.cov
 	go tool -C $(COVERDIR) cover -html=coverage.cov -o coverage.html
 	@# tee below required for the pipeline to see coverage.out
