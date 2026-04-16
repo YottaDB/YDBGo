@@ -645,12 +645,13 @@ func (n *Node) Lock(timeout ...time.Duration) bool {
 		if status == YDB_OK {
 			return true
 		}
-		if status == C.YDB_LOCK_TIMEOUT && !forever {
+		if status == C.YDB_LOCK_TIMEOUT {
+			if forever {
+				continue
+			}
 			return false
 		}
-		if status != YDB_OK {
-			panic(n.Conn.lastError(status))
-		}
+		panic(n.Conn.lastError(status))
 	}
 }
 
