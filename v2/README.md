@@ -199,7 +199,7 @@ Although Goroutines are fully supported, you should be aware that if the gorouti
 As discussed in [Signals](https://docs.yottadb.com/MultiLangProgGuide/programmingnotes.html#signals), the YottaDB runtime system uses signals. When the Go wrapper is in use, the YottaDB runtime system receives signals from the Go runtime system through the Go wrapper, instead of directly from the operating system. YDBGo registers handlers with the Go runtime system for the following signals:
 
 - **fatal signals:** SIGABRT, SIGBUS, SIGFPE, SIGILL, SIGINT, SIGQUIT, SIGSEGV, SIGTERM, SIGTRAP
-- **non-fatal signals:** SIGALRM, SIGCONT, SIGHUP, SIGTSTP, SIGTTIN, SIGTTOU, SIGURG, SIGUSR1
+- **non-fatal signals:** SIGALRM, SIGCONT, SIGHUP, SIGTSTP, SIGTTIN, SIGTTOU, SIGURG, SIGUSR1, SIGWINCH
 
 In addition, the following two signals have the same signal numbers as other handled signals:
 

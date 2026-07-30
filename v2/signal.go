@@ -62,6 +62,7 @@ var YDBSignals = []os.Signal{
 	syscall.SIGTTOU,
 	syscall.SIGURG,
 	syscall.SIGUSR1,
+	syscall.SIGWINCH, // so the SIGWINCH deviceparameter (YottaDB/DB/YDB#1247) sees terminal resizes
 }
 
 // sigInfo holds info for each signal that YDBGo handles and defers to YottaDB.

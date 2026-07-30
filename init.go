@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2020-2025 YottaDB LLC and/or its subsidiaries.	//
+// Copyright (c) 2020-2026 YottaDB LLC and/or its subsidiaries.	//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -49,15 +49,16 @@ var ydbSignalList = []syscall.Signal{
 	syscall.SIGINT,  // [7]
 	// syscall.SIGIO - this is a duplicate of SIGURG
 	// syscall.SIGIOT - this is a duplicate of SIGABRT
-	syscall.SIGQUIT, // [8]
-	syscall.SIGSEGV, // [9]
-	syscall.SIGTERM, // [10]
-	syscall.SIGTRAP, // [11]
-	syscall.SIGTSTP, // [12]
-	syscall.SIGTTIN, // [13]
-	syscall.SIGTTOU, // [14]
-	syscall.SIGURG,  // [15]
-	syscall.SIGUSR1, // [16]
+	syscall.SIGQUIT,  // [8]
+	syscall.SIGSEGV,  // [9]
+	syscall.SIGTERM,  // [10]
+	syscall.SIGTRAP,  // [11]
+	syscall.SIGTSTP,  // [12]
+	syscall.SIGTTIN,  // [13]
+	syscall.SIGTTOU,  // [14]
+	syscall.SIGURG,   // [15]
+	syscall.SIGUSR1,  // [16]
+	syscall.SIGWINCH, // [17] - so the SIGWINCH deviceparameter (YottaDB/DB/YDB#1247) sees terminal resizes
 }
 
 // signalsHandled is the count of the signals the wrapper gets notified of and passes on to YottaDB. This matches with
@@ -112,6 +113,7 @@ func validateNotifySignal(sig syscall.Signal, entryPoint ydbEntryPoint) error {
 	// case syscall.SIGTTOU: // Trying to handle this signal just hangs
 	case syscall.SIGURG: // Same as SIGPOLL and SIGIO - happens almost constantly so be careful if used
 	case syscall.SIGUSR1:
+	case syscall.SIGWINCH:
 	default:
 		entryPoint := selectString((ydbEntryRegisterSigNotify == entryPoint), "yottadb.RegisterSignalNotify()",
 			"yottadb.UnRegisterSignalNotify()")
