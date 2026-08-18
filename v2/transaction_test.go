@@ -129,6 +129,15 @@ func TestCloneConn(t *testing.T) {
 		n := conn.Node("count")
 		done := make(chan struct{}, 2)
 		subfunc := func() {
+			// Report on the way out rather than at the end of the body, so that a goroutine
+			// which ends early still reports. Sending only at the end leaves the parent
+			// blocked on <-done forever if this goroutine ends before it gets there, and that
+			// shows up as a package-wide `go test` timeout ten minutes later, with the
+			// goroutine already gone from the traceback and the results of every other test
+			// in the package lost with it. Deferring the send costs nothing when the goroutine
+			// runs to completion, and turns that hang into whatever the real failure was: a
+			// reported assertion, or a panic printed with its own traceback.
+			defer func() { done <- struct{}{} }() // say I'm done, however this goroutine ends
 			subconn := conn.CloneConn()
 			// Make sure that a cloned conn has the same tptoken as its parent
 			assert.Equal(t, conn.TransactionToken(), subconn.TransactionToken())
@@ -142,7 +151,6 @@ func TestCloneConn(t *testing.T) {
 			// we can mess it up to test its independence from conn.
 			subconn.TransactionTokenSet(conn.TransactionToken() + 1)
 			assert.NotEqual(t, conn.TransactionToken(), subconn.TransactionToken())
-			done <- struct{}{} // say I'm done
 		}
 		// Create two goroutines
 		go subfunc()
