@@ -77,8 +77,9 @@ type Conn struct {
 	cconn *C.conn
 	// tptoken is a place to store tptoken for thread-safe ydb_*_st() function calls
 	// It was originally made to be atomic and a pointer, so that Conn.CloneConn() could share pointers to it until
-	// it was realized that created a bug. But keep it atomic since atomicity has no compiled overhead
-	// with Uint64 on a 64-bit machine (confirmed empirically).
+	// it was realized that (commit #df86e2b9) created a bug, cf. TestTransactionGoroutines().
+	// But although its no longer a pointer, keep it atomic in case it needs to be atomic in future,
+	// since atomicity has no compiled overhead with Uint64 on a 64-bit machine (confirmed empirically).
 	tptoken atomic.Uint64
 	// timeoutAction is the action to take on transaction timeout. See [conn.TimeoutAction]()
 	timeoutAction int

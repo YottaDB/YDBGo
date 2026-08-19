@@ -190,7 +190,7 @@ func testTransactionGoroutines(conn *Conn) {
 			// if the other goroutine's tptoken is linked to this one as they were in invalid commit #df86e2b9
 			// then the other goroutine incorrectly interrupts this one while its engine lock is engaged
 			// and causes ydberr.SIMPLEAPINEST or ydberr.INVTPTRANS errors or hangs
-			// (or causes even earlier assert errors in the debug build of YottaDB).
+			// (or causes even earlier assert errors, if using the debug build of YottaDB).
 			// At least, I think that's the mechanism that was causing the errors.
 			bump <- struct{}{}
 			node := conn.Node("^abc") // dummy set inside transaction
