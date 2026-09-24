@@ -19,8 +19,8 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/outrigdev/goid"
 	assert "github.com/stretchr/testify/require"
+	"gitlab.com/YottaDB/Lang/goid"
 )
 
 // ---- Benchmarks

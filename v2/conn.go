@@ -24,7 +24,7 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/outrigdev/goid"
+	"gitlab.com/YottaDB/Lang/goid"
 	"lang.yottadb.com/go/yottadb/v2/ydberr"
 )
 
@@ -162,22 +162,10 @@ func forceNewConnWithoutRegistering() *Conn {
 	return conn
 }
 
-var hasFastGoID bool
-
-// Setup code to determine whether goid supports fast fetching of the goroutineID.
-// Hopefully that module will expose this information itself in its next version:
-// I have offered a pull request at https://github.com/outrigdev/goid/issues/2
-// and hopefully it will not be Go-version-dependent in future: https://github.com/outrigdev/goid/issues/1
-func init() {
-	version := runtime.Version()
-	hasFastGoID = strings.HasPrefix(version, "go1.23.") || strings.HasPrefix(version, "go1.24.") || strings.HasPrefix(version, "go1.25.")
-	hasFastGoID = hasFastGoID && (runtime.GOARCH == "arm64" || runtime.GOARCH == "amd64")
-}
-
 // prepAPI initializes anything necessary before C API calls.
 // This sets the error_output string to the empty string in case the API call fails -- at least then we don't get an obsolete string reported.
 func (conn *Conn) prepAPI() {
-	if hasFastGoID && conn.goroutineID != goid.Get() {
+	if conn.goroutineID != goid.Get() {
 		panic(errorf(ydberr.InvalidGoroutineID, "yottadb function invoked in goroutine %d from a Conn instance belonging to goroutine %d", goid.Get(), conn.goroutineID))
 	}
 	conn.cconn.errstr.len_used = 0 // ensure error string is empty before API call

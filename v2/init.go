@@ -23,7 +23,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/outrigdev/goid"
+	"gitlab.com/YottaDB/Lang/goid"
 	"lang.yottadb.com/go/yottadb/v2/ydberr"
 )
 

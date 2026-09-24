@@ -76,8 +76,8 @@ func TestConn(t *testing.T) {
 			}
 		}()
 		conn1.Node("x").Set(3) // call yottadb using the wrong conn
-		// We expect a failure (false) if hasFastGoID and there was no panic before this
-		result <- !hasFastGoID // say I'm done but failed since it should have panic'ed
+		// We expect a failure (false) if there was no panic before this
+		result <- false // say I'm done but failed since it should have panic'ed
 	}()
 	passed := <-result // wait for goroutine to finish
 	assert.Equal(t, passed, true)

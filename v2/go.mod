@@ -7,7 +7,7 @@ require (
 	lang.yottadb.com/go/yottadb v1.2.8 // v1 import required for benchmarks which compare v1 against v2
 )
 
-require github.com/outrigdev/goid v0.3.0
+require gitlab.com/YottaDB/Lang/goid v1.0.0
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
