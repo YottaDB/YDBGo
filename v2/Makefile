@@ -60,6 +60,9 @@ coverage:
 		test/test -test.timeout=5s -test.gocoverdir=$(COVERDIR) -test.v -test.run TestFatal -fataltest=$$i 2>&1 \
 		| grep "shutdownSignalGoroutines: Channel closings complete"; \
 	done
+	@# Test coverage path where runtime.Goexit is called inside a transaction
+	test/test -test.timeout=5s -test.gocoverdir=$(COVERDIR) -test.v -test.run TestGoexitInTransaction -goexit 2>&1 \
+		| grep "runtime.Goexit() called inside a transaction"
 	@# Test that YDBGo creates proper errors when it cannot Init()
 	test/test -test.timeout=5s -test.gocoverdir=$(COVERDIR) -test.v -test.run TestNoInit -noinit
 	@# Run the rest of the tests

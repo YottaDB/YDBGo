@@ -205,6 +205,9 @@ func (conn *Conn) recoverMessage(status C.int) string {
 	case ydberr.CALLINAFTERXIT:
 		// The engine is shut down so calling ydb_message_t will fail if we attempt it so just hard-code this error return value.
 		return "%YDB-E-CALLINAFTERXIT, After a ydb_exit(), a process cannot create a valid YottaDB context"
+	case ydberr.INVTPTRANS:
+		// An invalid tptoken makes ydb_message_t() fail too, because we would pass it that same tptoken, so hard-code this one.
+		return "%YDB-E-INVTPTRANS, Invalid TP transaction - either invalid TP token or transaction not in progress"
 	}
 	// note: ydb_message_t() only looks at the absolute value of status so no need to negate it
 	conn.prepAPI()

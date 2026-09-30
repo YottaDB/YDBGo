@@ -56,6 +56,8 @@ type tpInfo struct {
 //   - Call [Conn.Rollback] if it needs to rollback and immediately exit the transaction function
 //   - Finish quickly because database activity in other goroutines will be blocked until it is complete.
 //   - Not create goroutines within the transaction unless absolutely necessary, in which case see [Conn.CloneConn].
+//   - Not call [runtime.Goexit], e.g. via a test assertion (testify.require.*). YDBGo then panics with [ydberr.GoexitInCallback],
+//     the transaction is abandoned and YottaDB will hang if used by the rest of the process, even if the panic is recovered.
 //
 // Transaction nesting level may be determined within the callback function by reading the special variable [$tlevel], and the number of restart
 // repetitions by [$trestart]. These things are documented in more detail in [Transaction Processing].

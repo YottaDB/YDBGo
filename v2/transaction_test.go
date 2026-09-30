@@ -14,8 +14,8 @@ package yottadb
 
 import (
 	"errors"
-	"flag"
 	"log"
+	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -188,7 +188,8 @@ func testTransactionGoroutines(conn *Conn) {
 		conn := conn.CloneConn()
 		conn.TransactionFast([]string{}, func() {
 			// This bump starts the other goroutine's TransactionFast() which fetches its conn.tptoken
-			// if the other goroutine's tptoken is linked to this one as they were in invalid commit #df86e2b9
+			// if the other goroutine's tptoken is linked to this one (a pointer to the same memory)
+			// as they were in invalid commit #df86e2b9 (fixed in commit #5c1ccbd)
 			// then the other goroutine incorrectly interrupts this one while its engine lock is engaged
 			// and causes ydberr.SIMPLEAPINEST or ydberr.INVTPTRANS errors or hangs
 			// (or causes even earlier assert errors, if using the debug build of YottaDB).
@@ -209,14 +210,42 @@ func testTransactionGoroutines(conn *Conn) {
 	log.Println("Done")
 }
 
-// Set up custom flag to allow user to specify deadlock test
-var testDeadlock bool
+// TestGoexitInTransaction checks that runtime.Goexit() inside a transaction callback panics with ydberr.GoexitInCallback.
+// A failed require.* assertion calls runtime.Goexit(), so a failed assertion inside a callback does this (see issue #72).
+// Goexit unwinds past the C frames of ydb_tp_st(), so the transaction never ends and every later YDB call hangs.
+// The panic reports this at once instead of leaving a silent hang for the package-wide `go test` timeout.
+// The YDB engine stays unusable afterwards, so shutdown fails with INVYDBEXIT. Run this test on its own with:
+// go test -run GoexitInTransaction -goexit=true
+func TestGoexitInTransaction(t *testing.T) {
+	if !testGoexit {
+		return
+	}
 
-func init() {
-	flag.BoolVar(&testDeadlock, "deadlock", false, "test that a transaction using the wrong tptimeout causes a deadlock")
+	SetupTest(t)
+	var recovered any
+	exited := make(chan struct{})
+	go func() {
+		defer close(exited)
+		defer func() { recovered = recover() }() // recovering does not stop the Goexit; this goroutine still exits
+		conn := NewConn()
+		conn.TransactionFast(nil, func() {
+			runtime.Goexit() // what a failed require.* assertion does
+		})
+		t.Error("TransactionFast() returned after Goexit; this line should be unreachable")
+	}()
+	<-exited
+	t.Logf("recovered: %v", recovered)
+	assert.True(t, ErrorIs(recovered, ydberr.GoexitInCallback), "expected GoexitInCallback panic but got: %v", recovered)
+
+	// Shut down inside the test so coverage of the failed shutdown is recorded.
+	// TestMain also shuts down, but only after m.Run() has saved the coverage data.
+	// YottaDB is still inside the abandoned transaction, so ydb_exit() fails with INVYDBEXIT.
+	err := captureError(func() { Shutdown(dbHandle) })
+	assert.NotNil(t, err)
+	assert.Equal(t, ydberr.INVYDBEXIT, -err.(*Error).Code, "ydb_exit() returns a positive error code")
 }
 
-// TestDeadlock checks that a panic instead of an error occurs if an invalid Conn is used inside a transaction
+// TestDeadlock checks that a deadlock occurs if an invalid Conn is used inside a transaction.
 // Run this test with: go test -timeout 2s -run Deadlock -deadlock=true >/dev/null || echo Successfully deadlocked
 func TestDeadlock(t *testing.T) {
 	if !testDeadlock {

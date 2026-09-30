@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2020-2025 YottaDB LLC and/or its subsidiaries.
+// Copyright (c) 2020-2026 YottaDB LLC and/or its subsidiaries.
 // All rights reserved.
 //
 //	This source code contains the intellectual property
@@ -33,10 +33,19 @@ func tpCallbackWrapper(tptoken C.uint64_t, errstr *C.ydb_buffer_t, handle unsafe
 	conn := info.conn
 	cconn := conn.cconn
 
+	completed := false // set once the callback returns normally, so the defer can detect runtime.Goexit()
 	// Defer captures panics. Restart() and Rollback() panics are returned to the YDB transaction processor as the appropriate constants.
 	// Other panic error values are stored in info.err to cross the CGo boundary and are re-paniced later back in Conn.Transaction().
 	defer func() {
 		recovered := recover()
+		if recovered == nil && !completed {
+			// Neither a return nor a panic, so runtime.Goexit() is unwinding this goroutine, e.g. from a failed testify.require.* assertion.
+			// Goexit cannot be stopped, and it abandons the C frames of ydb_tp_st(), so the transaction never ends
+			// and every later YottaDB call hangs. Panic so the cause is reported now instead.
+			// Recovering this panic cannot stop the goroutine from exiting, and YottaDB stays inside the abandoned transaction,
+			// so YottaDB will hang if used by the rest of the process.
+			panic(errorf(ydberr.GoexitInCallback, "runtime.Goexit() called inside a transaction; transaction abandoned"))
+		}
 		info.err = recovered
 		if recovered == nil {
 			retval = YDB_OK
@@ -68,5 +77,6 @@ func tpCallbackWrapper(tptoken C.uint64_t, errstr *C.ydb_buffer_t, handle unsafe
 		panic(errorf(ydberr.CallbackWrongGoroutine, "YDBGo design fault: transaction callback from a different connection than the one that initiated the transaction; contact YottaDB support."))
 	}
 	info.callback()
+	completed = true
 	return YDB_OK // retval may be changed by deferred func
 }

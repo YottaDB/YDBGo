@@ -194,13 +194,16 @@ func TestSyslogEntry(t *testing.T) {
 
 // TestFatal checks that a fatal signal exits and shuts down cleanly.
 // This forces a database shutdown so it should be run stand-alone, not with other tests.
-// Note: requires an external helper program to provide flags: -run TestFatal -fataltest=fake, etc
-// and to check that stdout says "shutdownSignalGoroutines: Channel closings complete"
+// Note: must be run with extra flags (cf. Makefile), e.g.: go test -run TestFatal -fataltest=fake
+//
+// The caller must check stdout for "shutdownSignalGoroutines: Channel closings complete"
 // (cf. shutdownSignalGoroutines)
+//
 // Set -fataltest to:
 //   - "real" to send the signal with syscall.Kill
-//   - "fake" to call signalExit() directly
-//   - "shutdownpanic" to test that path
+//   - "fake" to call signalExit directly for coverage testing
+//   - "goroutine" to test signal notification via a goroutine
+//   - "shutdownpanic" or "shutdownpanic2" to test those paths
 //
 // Only the "fake" form saves coverage data in the coverage file.
 // The "real" form doesn't because YottaDB calls os.Exit() before Go saves the coverage data.

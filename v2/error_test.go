@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.
+// Copyright (c) 2025-2026 YottaDB LLC and/or its subsidiaries.
 // All rights reserved.
 //
 //	This source code contains the intellectual property
@@ -102,4 +102,11 @@ func TestLastError(t *testing.T) {
 	assert.Equal(t, YDB_OK, int(conn.lastCode()))
 	// lastError() should take lastCode (that we saved above) and recover the message related to that.
 	assert.Equal(t, err.Error(), conn.lastError(lastCode).Error())
+
+	// An invalid tptoken must return INVTPTRANS rather than panic while recovering its message.
+	tptoken := conn.TransactionToken()
+	conn.TransactionTokenSet(tptoken + 12345)
+	_, err = conn.Zwr2Str(`"abc"`)
+	conn.TransactionTokenSet(tptoken)
+	assert.True(t, ErrorIs(err, ydberr.INVTPTRANS), "expected INVTPTRANS but got: %v", err)
 }

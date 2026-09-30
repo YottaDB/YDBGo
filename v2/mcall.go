@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.
+// Copyright (c) 2025-2026 YottaDB LLC and/or its subsidiaries.
 // All rights reserved.
 //
 //	This source code contains the intellectual property
@@ -449,8 +449,8 @@ func (conn *Conn) Import(table string) (*MFunctions, error) {
 	// Now create a ydb version of the call-in table without any preallocation specs (which YDB doesn't currently support)
 	f, err := os.CreateTemp("", "YDBGo_callins_*.ci")
 	if err != nil {
-		// Not in coverage test because it should never fail since we've just written the file
-		return nil, errorf(ydberr.ImportTemp, "could not open temporary call-in table file '%s': %s", f.Name(), err)
+		// Not in coverage test because it only fails if the temporary directory is unusable.
+		return nil, errorf(ydberr.ImportTemp, "could not open temporary call-in table file: %s", err)
 	}
 	if DebugMode.Load() >= 1 { // In debug modes retain YDB-format temporary file for later inspection
 		log.Printf("Temporary call-in table file is: %s\n", f.Name())

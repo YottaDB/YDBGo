@@ -27,14 +27,18 @@ import (
 )
 
 // Set up custom `go test` options to allow user to specify fatal signal test
-var fatalTest string // Run a specific fatal-exit test that needs to exit the test process, so no other tests will be run after this one
-var testSyslog bool  // Run a specific test that outputs a syslog entry. Not on by default because syslog may not be set up (as in the CI pipeline)
-var testLog string   // Specify path to store test logging - defaults to /tmp/ydbgotest-*/output.log")
-var testDB string    // Specify path of database global directory file - otherwise creates /tmp/ydbgotest-*/mumps.{gld,dat}
-var noInit bool      // For use with special init test paths, invoked by special command: go test -run TestNoInit -noinit
+var fatalTest string  // Run a specific fatal-exit test that needs to exit the test process, so no other tests will be run after this one
+var testDeadlock bool // Run fatal-exit test that a transaction using the wrong tptimeout causes a deadlock
+var testGoexit bool   // Run fatal-exit test that runtime.Goexit() inside a transaction callback panics with GoexitInCallback
+var testSyslog bool   // Run a specific test that outputs a syslog entry. Not on by default because syslog may not be set up (as in the CI pipeline)
+var testLog string    // Specify path to store test logging - defaults to /tmp/ydbgotest-*/output.log")
+var testDB string     // Specify path of database global directory file - otherwise creates /tmp/ydbgotest-*/mumps.{gld,dat}
+var noInit bool       // For use with special init test paths, invoked by special command: go test -run TestNoInit -noinit
 
 func init() {
 	flag.StringVar(&fatalTest, "fataltest", "none", `test a fatal signal code path; if set "real" to use syscall.Kill or "fake" to call exit handler directly`)
+	flag.BoolVar(&testDeadlock, "deadlock", false, "test that a transaction using the wrong tptimeout causes a deadlock")
+	flag.BoolVar(&testGoexit, "goexit", false, "test that runtime.Goexit() inside a transaction callback panics with GoexitInCallback")
 	flag.BoolVar(&testSyslog, "syslog", false, "check that program can output a syslog entry")
 	flag.StringVar(&testLog, "log", "", "Specify file path to append test logging -- defaults to /tmp/ydbgotest-*/output.log")
 	flag.StringVar(&testDB, "testdb", "", "Specify path of database global directory file - otherwise creates /tmp/ydbgotest-*/mumps.{gld,dat}")

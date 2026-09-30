@@ -61,4 +61,5 @@ const (
 	ImportTemp                   // Error opening temporary call-in file
 	ImportOpen                   // ydb_ci_tab_open_t error when YottaDB tried to open temp import table
 	InvalidZwriteFormat          // String supplied to ZwrStr() contains invalid Zwrite format
+	GoexitInCallback             // runtime.Goexit() was called inside a transaction callback
 )
