@@ -36,12 +36,12 @@ func TestZwr2Str(t *testing.T) {
 	str, err := conn.Zwr2Str(`"X"_$C(0)_"ABC"`)
 	assert.Nil(t, err)
 	assert.Equal(t, str, "X\x00ABC")
-	// Test InvalidZwriteFormat format error
-	_, err = conn.Zwr2Str(`"X"_$C(1234`)
+	// Test InvalidZwriteFormat format error using an invalid UTF-8 character
+	_, err = conn.Zwr2Str(`"X"_$C(1234567`)
 	assert.NotNil(t, err)
 	// Test test the same again but now exercise code path that truncates the string for the error message
 	bigString := strings.Repeat("A", 200)
-	_, err = conn.Zwr2Str(`"X"_$C(1234` + bigString)
+	_, err = conn.Zwr2Str(`"X"_$C(1234567` + bigString)
 	assert.NotNil(t, err)
 	bigString = strings.Repeat("A", YDB_MAX_STR-2)
 	_, err = conn.Zwr2Str(`"` + bigString + `"`)

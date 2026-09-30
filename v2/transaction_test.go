@@ -141,8 +141,9 @@ func TestCloneConn(t *testing.T) {
 			subconn := conn.CloneConn()
 			// Make sure that a cloned conn has the same tptoken as its parent
 			assert.Equal(t, conn.TransactionToken(), subconn.TransactionToken())
-			// Create an error in subconn to make sure it doesn't clobber conn's error
-			_, err := subconn.Zwr2Str(`"X"_$C(1234`)
+			// Create an error in subconn to make sure it doesn't clobber conn's error.
+			// This uses an invalid UTF-8 character to force a zwr conversion failure.
+			_, err := subconn.Zwr2Str(`"X"_$C(1234567`)
 			assert.NotNil(t, err)
 			n := subconn.Node("count")
 			n.Incr(1)
