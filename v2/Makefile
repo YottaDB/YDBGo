@@ -53,13 +53,9 @@ cover: coverage
 coverage:
 	mkdir -p $(COVERDIR)
 	rm -f $(COVERDIR)/*
-	@# The following commented-out lines are if we need to build a non-test executable to perform part of the test.
-	@#go build -covermode=count -o test/fatalsignal test/fatalsignal.go
-	@#@# Run standalone program to capture coverage of fatal signal effect
-	@##GOCOVERDIR=$(COVERDIR) test/fatalsignal || true
 	go test -c -covermode=count -o test/test
 	@# Capture coverage for several different exit tests
-	@# Run multiple times for the different tests: real=SIGINT; fake=SignalExitCallback() to capture coverage data for real; shutdownpanic test
+	@# Run multiple times for the different tests: real=SIGINT; fake=signalExit() to capture coverage data for real; shutdownpanic test
 	for i in real fake goroutine shutdownpanic shutdownpanic2; do \
 		test/test -test.timeout=5s -test.gocoverdir=$(COVERDIR) -test.v -test.run TestFatal -fataltest=$$i 2>&1 \
 		| grep "shutdownSignalGoroutines: Channel closings complete"; \
@@ -78,6 +74,6 @@ coverage:
 		wget --no-verbose https://img.shields.io/badge/coverage-$$badge -O $(COVERDIR)/coverage.svg
 
 clean:
-	rm -f $(COVERDIR)/* test/*.o test/fatalsignal test/test
+	rm -f $(COVERDIR)/* test/*.o test/test
 
 .PHONY: test bench benchmarks benchmark check cover coverage

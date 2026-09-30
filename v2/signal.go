@@ -429,14 +429,13 @@ func shutdownSignalGoroutines() {
 //
 //export signalExitCallback
 func signalExitCallback(sigNum C.int) {
+	signalExit(syscall.Signal(sigNum)) // Convert numeric signal number to Signal type for use in panic() message
+}
+
+// signalExit implements signalExitCallback() without cgo types so that tests can call it (cgo is not allowed in tests).
+func signalExit(sig syscall.Signal) {
 	printEntry("signalExitCallback()")
 	ydbSigPanicCalled.Store(true) // Need "atomic" usage to avoid read/write DATA RACE issues
 	shutdownSignalGoroutines()    // Close the goroutines down with their signal notification channels
-	sig := syscall.Signal(sigNum) // Convert numeric signal number to Signal type for use in panic() message
 	panic(errorf(ydberr.SignalFatal, "Fatal signal %d (%v) occurred", sig, sig))
-}
-
-// SignalExitCallback is an exported version of signalExitCallback() for use only by FatalSignal test
-func SignalExitCallback(sigNum os.Signal) {
-	signalExitCallback(C.int(sigNum.(syscall.Signal)))
 }

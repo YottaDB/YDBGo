@@ -199,7 +199,7 @@ func TestSyslogEntry(t *testing.T) {
 // (cf. shutdownSignalGoroutines)
 // Set -fataltest to:
 //   - "real" to send the signal with syscall.Kill
-//   - "fake" to call the SignalExitCallback directly
+//   - "fake" to call signalExit() directly
 //   - "shutdownpanic" to test that path
 //
 // Only the "fake" form saves coverage data in the coverage file.
@@ -232,7 +232,7 @@ func TestFatalTest(t *testing.T) {
 	case "fake":
 		// Only the "fake" form saves coverage data in the coverage file because in the "real" form YDB exits before Go saves the coverage data.
 		ydbSigPanicCalled.Store(true) // fake this, too
-		SignalExitCallback(syscall.SIGINT)
+		signalExit(syscall.SIGINT)
 	case "goroutine":
 		ch := make(chan os.Signal, 1) // Create signal notify and signal ack channels
 		SignalNotify(ch, syscall.SIGQUIT)
