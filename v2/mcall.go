@@ -449,7 +449,7 @@ func (conn *Conn) Import(table string) (*MFunctions, error) {
 	// Now create a ydb version of the call-in table without any preallocation specs (which YDB doesn't currently support)
 	f, err := os.CreateTemp("", "YDBGo_callins_*.ci")
 	if err != nil {
-		// Not in coverage test because it only fails if the temporary directory is unusable.
+		// Only fails if the temporary directory is unusable.
 		return nil, errorf(ydberr.ImportTemp, "could not open temporary call-in table file: %s", err)
 	}
 	if DebugMode.Load() >= 1 { // In debug modes retain YDB-format temporary file for later inspection
@@ -473,7 +473,7 @@ func (conn *Conn) Import(table string) (*MFunctions, error) {
 	status := C.ydb_ci_tab_open_t(C.uint64_t(conn.tptoken.Load()), &cconn.errstr, cstr, handle)
 	tbl.handle = *handle
 	if status != YDB_OK {
-		// Not in coverage test because it should never fail since Import creates a valid call-in table
+		// Import creates a valid call-in table, so this only fails on other errors such as an invalid tptoken
 		err := conn.lastError(status).(*Error)
 		return nil, newError(err.Code, fmt.Sprintf("%s while processing call-in table:\n%s\n", err, tbl.YDBTable), newError(ydberr.ImportOpen, ""))
 	}
@@ -527,7 +527,7 @@ func (conn *Conn) callM(routine *RoutineData, args []any) (any, error) {
 		conn.prepAPI()
 		status := C.ydb_ci_tab_switch_t(C.uint64_t(conn.tptoken.Load()), &cconn.errstr, routine.Table.handle, oldhandle)
 		if status != YDB_OK {
-			// Not in coverage test because it's hard to know how to make it fail
+			// Hard to make this fail except by using an invalid tptoken
 			return "", conn.lastError(status)
 		}
 		// On return, restore table handle since we changed it. Ignore errors.
@@ -603,7 +603,6 @@ func (conn *Conn) callM(routine *RoutineData, args []any) (any, error) {
 			if typ.kind == kind && typ.pointer == pointer {
 				return
 			}
-			// The following lines not in coverage test because the current design uses pointer types for all return values.
 			asterisk := ""
 			if typ.pointer {
 				asterisk = "*"

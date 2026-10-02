@@ -15,6 +15,7 @@ package yottadb
 import (
 	"bytes"
 	"fmt"
+	"math"
 	"os"
 	"os/exec"
 	"strings"
@@ -29,6 +30,19 @@ import (
 func TestEnsureValueSize(t *testing.T) {
 	conn := SetupTest(t)
 	assert.Panics(t, func() { conn.ensureValueSize(YDB_MAX_STR + 1) })
+}
+
+// TestCalloc checks that calloc panics when C cannot allocate the requested memory.
+func TestCalloc(t *testing.T) {
+	SetupTest(t)
+	// Use the largest size_t on any platform, which C can never allocate
+	assert.PanicsWithError(t, "out of memory", func() { calloc(math.MaxUint) })
+}
+
+// TestCallCGo runs callCGo to provide test coverage as otherwise it is only run by benchmarks.
+func TestCallCGo(t *testing.T) {
+	SetupTest(t)
+	callCGo()
 }
 
 func TestZwr2Str(t *testing.T) {

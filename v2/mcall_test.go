@@ -65,6 +65,19 @@ func TestImport(t *testing.T) {
 	DebugMode.Store(1)
 	conn.MustImport("name: name^name()")
 	DebugMode.Store(originalDebugMode)
+
+	// Test that an unusable temporary directory returns an error
+	t.Run("UnusableTempDir", func(t *testing.T) {
+		t.Setenv("TMPDIR", "/nonexistent-YDBGo-directory")
+		assert.Equal(t, ydberr.ImportTemp, importer("name: name^name()"))
+	})
+
+	// Test that an error from YottaDB while opening the call-in table is returned
+	tptoken := conn.TransactionToken()
+	conn.TransactionTokenSet(tptoken + 12345)
+	code := importer("name: name^name()")
+	conn.TransactionTokenSet(tptoken)
+	assert.Equal(t, ydberr.INVTPTRANS, code)
 }
 
 func TestCallM(t *testing.T) {
@@ -161,6 +174,22 @@ func TestCallM(t *testing.T) {
 	assert.Equal(t, float64(-6.1), conn.MustImport("Add: float64 add^arithmetic(*float64, *float64)").Call("Add", &[]float64{5.2}[0], &[]float64{-11.3}[0]).(float64))
 	// Test that passing of an invalid type panics
 	assert.Panics(t, func() { conn.MustImport("Add: int add^arithmetic(int, int)").Call("Add", nil, -11) })
+	// Test that passing a type that differs from the M-call table panics, both for non-pointer and pointer parameters
+	assert.PanicsWithError(t, "parameter 1 is string but int is specified in the M-call table", func() { m.Call("Add", "5", -11) })
+	assert.PanicsWithError(t, "parameter 1 is string but *string is specified in the M-call table", func() { m.Call("AddVerbose", "x", &n, 4, "100") })
+	// Test that a *string parameter longer than its preallocation returns an error rather than truncating
+	tooLong := strings.Repeat("A", 11)
+	_, err = m.CallErr("AddVerbose", &tooLong, &n, 4, "100")
+	assert.True(t, ErrorIs(err, ydberr.InvalidStringLength), "expected InvalidStringLength but got: %v", err)
+
+	// Test that an error from YottaDB while switching call-in tables on first call is returned
+	mFresh := conn.MustImport("Add: int add^arithmetic(int, int)")
+	tptoken := conn.TransactionToken()
+	conn.TransactionTokenSet(tptoken + 12345)
+	_, err = mFresh.CallErr("Add", 5, -11)
+	conn.TransactionTokenSet(tptoken)
+	assert.True(t, ErrorIs(err, ydberr.INVTPTRANS), "expected INVTPTRANS but got: %v", err)
+	assert.Equal(t, -6, mFresh.Call("Add", 5, -11).(int)) // check that the routine still works after the failure
 
 	// Test funcs imported from a different table
 	m2 := conn.MustImport("Sub: string[10] sub^arithmetic(int32, uint32)")

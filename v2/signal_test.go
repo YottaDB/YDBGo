@@ -14,8 +14,11 @@ package yottadb
 
 import (
 	"fmt"
+	"io"
+	"log"
 	"os"
 	"runtime/debug"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -24,6 +27,7 @@ import (
 	"unsafe"
 
 	assert "github.com/stretchr/testify/require"
+	"lang.yottadb.com/go/yottadb/v2/ydberr"
 )
 
 // ---- Tests
@@ -182,6 +186,73 @@ func testSignal(sig os.Signal, tellYDB bool) {
 	}
 }
 
+// logWatcher passes log output through to the original log writer and closes found when want first appears.
+// Each log entry arrives in a single Write call, so want cannot be split across calls.
+type logWatcher struct {
+	orig  io.Writer
+	want  string
+	found chan struct{}
+	once  sync.Once
+}
+
+func (w *logWatcher) Write(p []byte) (int, error) {
+	if strings.Contains(string(p), w.want) {
+		w.once.Do(func() { close(w.found) })
+	}
+	return w.orig.Write(p)
+}
+
+// watchLog starts watching log output for want, and restores the original log writer when the test ends.
+func watchLog(t *testing.T, want string) *logWatcher {
+	w := &logWatcher{orig: log.Writer(), want: want, found: make(chan struct{})}
+	log.SetOutput(w)
+	t.Cleanup(func() { log.SetOutput(w.orig) })
+	return w
+}
+
+// wait fails the test if want does not appear in the log within a generous timeout.
+func (w *logWatcher) wait(t *testing.T) {
+	select {
+	case <-w.found:
+	case <-time.After(5 * time.Second):
+		t.Fatalf("log message %q did not appear", w.want)
+	}
+}
+
+// TestPrintEntryNoCaller checks printEntry when runtime.Caller cannot find the caller's caller.
+// That happens when printEntry is itself the goroutine's top function.
+func TestPrintEntryNoCaller(t *testing.T) {
+	SetupTest(t)
+	originalDebugMode := DebugMode.Load()
+	DebugMode.Store(1)
+	defer DebugMode.Store(originalDebugMode)
+	w := watchLog(t, "Entered  testPrintEntry\n") // without " from <file>" because the caller is unknown
+	go printEntry("testPrintEntry")
+	w.wait(t)
+}
+
+// TestNotifyChannelFull checks that a signal is dropped rather than blocking when the user's notify channel is full.
+func TestNotifyChannelFull(t *testing.T) {
+	SetupTest(t)
+	originalDebugMode := DebugMode.Load()
+	DebugMode.Store(2) // needed to log the message that this test waits for
+	defer DebugMode.Store(originalDebugMode)
+	w := watchLog(t, fmt.Sprintf("notifying user-specified channel of signal %d", syscall.SIGWINCH))
+	ch := make(chan os.Signal) // unbuffered and never read, so it is always full
+	SignalNotify(ch, syscall.SIGWINCH)
+	defer SignalReset(syscall.SIGWINCH)
+	syscall.Kill(syscall.Getpid(), syscall.SIGWINCH)
+	// The handler logs just after taking its own copy of the channel. Then it must drop the signal,
+	// even if SignalReset runs first, so no sleep is needed.
+	w.wait(t)
+}
+
+// TestShutdownSignalGoroutineBusy checks that shutdownSignalGoroutine does not block if its goroutine cannot receive.
+func TestShutdownSignalGoroutineBusy(t *testing.T) {
+	SetupTest(t)
+	shutdownSignalGoroutine(&sigInfo{}) // nil shutdownNow channel can never receive
+}
+
 // TestSyslogEntry checks that we can write an INFO-level message to syslog.
 // Verification that the message is actually in syslog must be done by an external program.
 // Note: requires an external helper program to run the test with flags: -run TestSyslog -syslog
@@ -189,25 +260,27 @@ func TestSyslogEntry(t *testing.T) {
 	if !testSyslog {
 		return
 	}
-	syslogEntry("Test of syslog functionality")
+	assert.Nil(t, syslogEntry("Test of syslog functionality"))
 }
 
 // TestFatal checks that a fatal signal exits and shuts down cleanly.
 // This forces a database shutdown so it should be run stand-alone, not with other tests.
 // Note: must be run with extra flags (cf. Makefile), e.g.: go test -run TestFatal -fataltest=fake
 //
-// The caller must check stdout for "shutdownSignalGoroutines: Channel closings complete"
-// (cf. shutdownSignalGoroutines)
+// The caller should check stdout whatever marker indicates success of each test case (cf. fatal_test in Makefile).
 //
 // Set -fataltest to:
 //   - "real" to send the signal with syscall.Kill
-//   - "fake" to call signalExit directly for coverage testing
+//   - "fake" to call signalExitCallback directly for coverage testing
 //   - "goroutine" to test signal notification via a goroutine
 //   - "shutdownpanic" or "shutdownpanic2" to test those paths
+//   - "shutdownpanicerror" to test ShutdownOnPanic re-panicking a YottaDB *Error
+//   - "callinafterxit" to test a goroutine that accesses the database after a fatal signal shut it down
+//   - "sigshutdowntimeout" to test the timeout while shutting down signal goroutines
 //
-// Only the "fake" form saves coverage data in the coverage file.
+// Every form except "real" saves coverage data in the coverage file.
 // The "real" form doesn't because YottaDB calls os.Exit() before Go saves the coverage data.
-// This means you have to call both forms: one to test coverage, and one to test that the signal actually works
+// So "fake" runs the same exit handler to capture its coverage, and "real" tests that the signal actually works.
 func TestFatalTest(t *testing.T) {
 	if fatalTest == "none" {
 		return
@@ -233,9 +306,9 @@ func TestFatalTest(t *testing.T) {
 		syscall.Kill(syscall.Getpid(), syscall.SIGINT) // Send ourselves a SIGINT
 		time.Sleep(time.Second)                        // Give signal time be picked up by goroutine
 	case "fake":
-		// Only the "fake" form saves coverage data in the coverage file because in the "real" form YDB exits before Go saves the coverage data.
+		// Unlike "real", this form saves coverage data because YDB does not exit before Go saves it.
 		ydbSigPanicCalled.Store(true) // fake this, too
-		signalExit(syscall.SIGINT)
+		signalExitCallback(2)         // SIGINT: an untyped constant because tests cannot import "C" to make a C.int
 	case "goroutine":
 		ch := make(chan os.Signal, 1) // Create signal notify and signal ack channels
 		SignalNotify(ch, syscall.SIGQUIT)
@@ -264,6 +337,38 @@ func TestFatalTest(t *testing.T) {
 			panic("test panic")
 		}()
 		time.Sleep(100 * time.Millisecond) // Give goroutine time to finish up
+	case "shutdownpanicerror":
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			defer recoverer()
+			defer ShutdownOnPanic()
+			panic(errorf(ydberr.SignalFatal, "test panic")) // a YottaDB *Error, which ShutdownOnPanic re-panics with its traceback
+		}()
+		<-done
+	case "callinafterxit":
+		// Shut down while a goroutine still holds a Conn, as if a fatal signal had shut down the database.
+		// The goroutine's next database access panics with CALLINAFTERXIT, which ShutdownOnPanic turns into a quiet exit.
+		ydbSigPanicCalled.Store(true)
+		ready, proceed, done := make(chan struct{}), make(chan struct{}), make(chan struct{})
+		go func() {
+			defer close(done)
+			defer ShutdownOnPanic()
+			conn := NewConn() // must be made before shutdown, after which NewConn panics
+			close(ready)
+			<-proceed
+			conn.Node("^test").Get()
+			t.Error("Get() after shutdown should have exited this goroutine")
+		}()
+		<-ready
+		Shutdown(dbHandle)
+		shutdownSignalGoroutines() // calling this again after shutdown takes its bypass path
+		close(proceed)
+		<-done
+	case "sigshutdowntimeout":
+		// A zero wait makes the timeout fire before the signal goroutines can all report that they have shut down
+		MaxSigShutdownWait = 0
+		Shutdown(dbHandle)
 	}
 	fmt.Printf("No panic occurred1\n")
 }

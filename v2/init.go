@@ -248,7 +248,6 @@ func _shutdown(handle *DB, force bool) error {
 	defer inInit.Unlock() // Release lock when we leave this routine
 	if force {
 		if initCount.Load() == 0 {
-			// Skip coverage-test of the next line: it would need a separate goroutine that calls ShutdownHard() while Shutdown() is already running. Tricky timing.
 			return nil // already done
 		}
 		initCount.Store(1)

@@ -73,7 +73,7 @@ func tpCallbackWrapper(tptoken C.uint64_t, errstr *C.ydb_buffer_t, handle unsafe
 	defer conn.tptoken.Store(saveToken)
 
 	if errstr != &cconn.errstr {
-		// This should not happen, so there's no way to coverage-test it.
+		// This should not happen. TestCallbackWrongErrstr calls this function directly to coverage-test it.
 		panic(errorf(ydberr.CallbackWrongGoroutine, "YDBGo design fault: transaction callback from a different connection than the one that initiated the transaction; contact YottaDB support."))
 	}
 	info.callback()

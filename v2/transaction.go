@@ -102,9 +102,7 @@ func (conn *Conn) Transaction(transID string, localsToRestore []string, callback
 		return false
 	}
 	if status != YDB_OK {
-		// This line is not tested in coverage tests as I do not know how to make ydb_tp_st return an error that is not already
-		// handled or already returned by a ydb function inside the transaction and handled there.
-		// Nevertheless, this will handle it if it occurs.
+		// An error from ydb_tp_st() itself, e.g. INVTPTRANS from an invalid tptoken (see TestTransaction).
 		panic(conn.lastError(status))
 	}
 	return true

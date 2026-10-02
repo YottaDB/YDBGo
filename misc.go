@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	//
+// Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -14,6 +14,7 @@ package yottadb
 
 import (
 	"fmt"
+	"log"
 	"log/syslog"
 	"os"
 	"runtime"
@@ -139,19 +140,27 @@ func formatINVSTRLEN(tptoken uint64, errstr *BufferT, lenalloc, lenused C.uint) 
 // syslogEntry records the given message in the syslog. Since these are rare or one-time per process type errors
 // that get recorded here, we open a new syslog handle each time to reduce complexity of single threading access
 // across goroutines.
-func syslogEntry(logMsg string) {
+// On failure it logs the error rather than panicking because callers are in shutdown paths, where a missing
+// syslog daemon (e.g. in a container) must not abort shutdown. The error is also returned for tests to check.
+func syslogEntry(logMsg string) (err error) {
+	defer func() {
+		if nil != err {
+			log.Println(err)
+		}
+	}()
 	syslogr, err := syslog.New(syslog.LOG_INFO+syslog.LOG_USER, "[YottaDB-Go-Wrapper]")
 	if nil != err {
-		panic(fmt.Sprintf("syslog.New() failed unexpectedly with error: %s", err))
+		return fmt.Errorf("syslog.New() failed unexpectedly with error: %s: while reporting error: %s", err, logMsg)
 	}
 	err = syslogr.Info(logMsg)
 	if nil != err {
-		panic(fmt.Sprintf("syslogr.Info() failed unexpectedly with error: %s", err))
+		return fmt.Errorf("syslogr.Info() failed unexpectedly with error: %s: while reporting error: %s", err, logMsg)
 	}
 	err = syslogr.Close()
 	if nil != err {
-		panic(fmt.Sprintf("syslogr.Close() failed unexpectedly with error: %s", err))
+		return fmt.Errorf("syslogr.Close() failed unexpectedly with error: %s: while reporting error: %s", err, logMsg)
 	}
+	return nil
 }
 
 // selectString returns the first string parm if the expression is true and the second if it is false

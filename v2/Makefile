@@ -16,6 +16,7 @@ tests=.
 benchtime?=1s
 short=-short
 flags=
+verbosity=/dev/null
 BENCH=
 
 perflock?=$(shell command -v perflock >/dev/null && echo perflock)
@@ -28,6 +29,24 @@ else
 endif
 
 COVERDIR ?= coverage
+
+# $(call run_test,<test args>,<quoted markers>,<exit status>) runs test/test and fails unless its output contains every marker.
+# It also fails unless test/test exits with the given status, which defaults to 0.
+# Output is captured in a variable rather than piped to grep, so Go always finishes writing its coverage counters.
+# Set verbosity=/dev/stderr to see the full test output.
+define run_test
+	@echo "test/test $(1)"; \
+	out=$$(test/test -test.timeout=5s -test.gocoverdir=$(COVERDIR) -test.v $(1) 2>&1); status=$$?; \
+	printf '%s\n' "$$out" >$(verbosity); \
+	[ $$status -eq $(or $(3),0) ] || { echo "test/test $(1) failed: exit status $$status, expected $(or $(3),0)"; exit 1; }; \
+	for m in $(2); do \
+		printf '%s\n' "$$out" | grep -qF -- "$$m" || { echo "test/test $(1) failed: missing '$$m'"; exit 1; }; \
+	done
+endef
+
+# $(call fatal_test,<fataltest name>,<quoted extra markers>[,<exit status>]) runs a TestFatal case.
+# Every case must report that its signal goroutines shut down, plus any markers proving that case's behavior ran.
+fatal_test = $(call run_test,-test.run TestFatal -fataltest=$(1),"shutdownSignalGoroutines: Channel closings complete" $(2),$(3))
 
 test:
 	go test -run $(tests) -timeout 5s $(flags)
@@ -54,17 +73,22 @@ coverage:
 	mkdir -p $(COVERDIR)
 	rm -f $(COVERDIR)/*
 	go test -c -covermode=count -o test/test
-	@# Capture coverage for several different exit tests
-	@# Run multiple times for the different tests: real=SIGINT; fake=signalExit() to capture coverage data for real; shutdownpanic test
-	for i in real fake goroutine shutdownpanic shutdownpanic2; do \
-		test/test -test.timeout=5s -test.gocoverdir=$(COVERDIR) -test.v -test.run TestFatal -fataltest=$$i 2>&1 \
-		| grep "shutdownSignalGoroutines: Channel closings complete"; \
-	done
+	@# Capture coverage for several different exit tests. Each shuts down the database so needs its own process.
+	@# The real case sends a real SIGINT but saves no coverage, since YottaDB exits first.
+	@# The fake case calls signalExitCallback() directly, to capture coverage of the same exit path.
+	@# The real and goroutine cases end in the fatal-signal panic, so they exit with status 2.
+	$(call fatal_test,real,,2)
+	$(call fatal_test,fake)
+	$(call fatal_test,goroutine,,2)
+	$(call fatal_test,shutdownpanic)
+	$(call fatal_test,shutdownpanic2)
+	$(call fatal_test,shutdownpanicerror,"Was re-paniced as:")
+	$(call fatal_test,callinafterxit,"No panic occurred1")
+	$(call fatal_test,sigshutdowntimeout,"shutdownSignalGoroutines: Timeout! Some signal goroutines did not shutdown")
 	@# Test coverage path where runtime.Goexit is called inside a transaction
-	test/test -test.timeout=5s -test.gocoverdir=$(COVERDIR) -test.v -test.run TestGoexitInTransaction -goexit 2>&1 \
-		| grep "runtime.Goexit() called inside a transaction"
+	$(call run_test,-test.run TestGoexitInTransaction -goexit,"runtime.Goexit() called inside a transaction")
 	@# Test that YDBGo creates proper errors when it cannot Init()
-	test/test -test.timeout=5s -test.gocoverdir=$(COVERDIR) -test.v -test.run TestNoInit -noinit
+	test/test -test.timeout=5s -test.gocoverdir=$(COVERDIR) -test.run TestNoInit -noinit
 	@# Run the rest of the tests
 	test/test -test.timeout=20s -test.gocoverdir=$(COVERDIR)
 	go tool covdata textfmt -i=$(COVERDIR) -o $(COVERDIR)/coverage.cov

@@ -16,9 +16,11 @@ import (
 	"errors"
 	"log"
 	"runtime"
+	"runtime/cgo"
 	"sync"
 	"testing"
 	"time"
+	"unsafe"
 
 	assert "github.com/stretchr/testify/require"
 	"lang.yottadb.com/go/yottadb/v2/ydberr"
@@ -283,4 +285,32 @@ func TestTransaction(t *testing.T) {
 		})
 	})
 	assert.Equal(t, ydberr.TPLOCK, err.(*Error).Code)
+
+	// Test that an error returned by ydb_tp_st() itself (not from inside the callback) creates a panic.
+	// An invalid tptoken makes ydb_tp_st() fail before it ever runs the callback.
+	tptoken := conn.TransactionToken()
+	conn.TransactionTokenSet(tptoken + 12345)
+	err = captureError(func() { conn.TransactionFast(nil, func() {}) })
+	conn.TransactionTokenSet(tptoken)
+	assert.True(t, ErrorIs(err, ydberr.INVTPTRANS), "expected INVTPTRANS but got: %v", err)
+}
+
+// TestCallbackWrongErrstr calls tpCallbackWrapper directly with a nil errstr.
+// This forces the CallbackWrongGoroutine design-fault check, which ydb_tp_st() never triggers.
+// The wrapper's deferred handler must catch that panic and return it via info.err and retval.
+func TestCallbackWrongErrstr(t *testing.T) {
+	conn := SetupTest(t)
+	called := false
+	info := tpInfo{conn, func() { called = true }, nil}
+	handle := cgo.NewHandle(&info)
+	defer handle.Delete()
+	tptoken := conn.TransactionToken()
+
+	// Untyped constants let this test pass C-typed arguments without importing "C", which tests may not do
+	retval := tpCallbackWrapper(0, nil, unsafe.Pointer(&handle))
+	assert.Equal(t, ydberr.CallbackWrongGoroutine, int(retval))
+	assert.False(t, called, "callback should not run when errstr is wrong")
+	err, _ := info.err.(error)
+	assert.True(t, ErrorIs(err, ydberr.CallbackWrongGoroutine), "expected CallbackWrongGoroutine but got: %v", info.err)
+	assert.Equal(t, tptoken, conn.TransactionToken(), "tptoken should be restored")
 }

@@ -448,7 +448,7 @@ func (conn *Conn) Lock(timeout time.Duration, nodes ...*Node) bool {
 	return status == YDB_OK
 }
 
-// This function is just to test CGo speed in the benchmarks
+// callCGo measures bare CGo call speed in the benchmarks. TestCallCGo also runs it for coverage.
 func callCGo() {
 	C.getfunc_ydb_lock_st()
 }

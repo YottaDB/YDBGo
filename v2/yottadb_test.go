@@ -36,7 +36,7 @@ var testDB string     // Specify path of database global directory file - otherw
 var noInit bool       // For use with special init test paths, invoked by special command: go test -run TestNoInit -noinit
 
 func init() {
-	flag.StringVar(&fatalTest, "fataltest", "none", `test a fatal signal code path; if set "real" to use syscall.Kill or "fake" to call exit handler directly`)
+	flag.StringVar(&fatalTest, "fataltest", "none", `test a fatal signal code path, e.g. "real" to use syscall.Kill or "fake" to call exit handler directly; see TestFatalTest for all values`)
 	flag.BoolVar(&testDeadlock, "deadlock", false, "test that a transaction using the wrong tptimeout causes a deadlock")
 	flag.BoolVar(&testGoexit, "goexit", false, "test that runtime.Goexit() inside a transaction callback panics with GoexitInCallback")
 	flag.BoolVar(&testSyslog, "syslog", false, "check that program can output a syslog entry")
@@ -185,7 +185,8 @@ func _testMain(m *testing.M) int {
 		if err != nil {
 			panic(err)
 		}
-		defer Shutdown(db)
+		// ShutdownHard() returns quietly if a test (e.g. TestFatal) has already shut down the database
+		defer ShutdownHard(db)
 		v1.ForceInit() // Tell v1 that v2 has done the initialization
 
 		initRandstr()

@@ -106,7 +106,9 @@ race_detector:
     # Test v2
     go get -C v2 -t
     go test -C v2 -v -race
-    go test -C v2 -v -asan
+    go test -C v2 -v -asan -skip '^TestCalloc$'
+    # Let calloc() return NULL for huge sizes so TestCalloc can check the out-of-memory panic
+    ASAN_OPTIONS=allocator_may_return_null=1 go test -C v2 -v -asan -run '^TestCalloc$'
 
 
 # ~~~ Coverage tests
@@ -117,7 +119,7 @@ v2_coverage:
     TEST_VERSION: v2
     COVERDIR: ${CI_PROJECT_DIR}/${TEST_VERSION}/cover
   script: |-
-    make -C ${TEST_VERSION} coverage
+    make -C ${TEST_VERSION} coverage verbosity=/dev/stderr
     # The following provides colored code coverage bars alongside code in gitlab views.
     # Visualization instructions: https://docs.gitlab.com/ci/testing/code_coverage/?tab=Go
     go get github.com/boumenot/gocover-cobertura

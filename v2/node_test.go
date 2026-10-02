@@ -374,6 +374,8 @@ func TestSetGet(t *testing.T) {
 	n.Set(false)
 	assert.Equal(t, "0", n.Get())
 	assert.Equal(t, false, n.GetBool())
+	// Test that setting an unsupported type panics
+	assert.PanicsWithError(t, "value ({}) must be a string, number, or []byte slice but is struct {}", func() { n.Set(struct{}{}) })
 }
 
 func TestData(t *testing.T) {

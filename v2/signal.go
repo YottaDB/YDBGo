@@ -99,19 +99,27 @@ func printEntry(funcName string) {
 
 // syslogEntry records the given message in the syslog. Since these are rare or one-time per process type errors
 // that get recorded here, we open a new syslog handle each time to reduce complexity of access across goroutines.
-func syslogEntry(logMsg string) {
+// On failure it logs the error rather than panicking because callers are in shutdown paths, where a missing
+// syslog daemon (e.g. in a container) must not abort shutdown. The error is also returned for tests to check.
+func syslogEntry(logMsg string) (err error) {
+	defer func() {
+		if err != nil {
+			log.Println(err)
+		}
+	}()
 	syslogr, err := syslog.New(syslog.LOG_INFO+syslog.LOG_USER, "[YottaDB-Go-Wrapper]")
 	if err != nil {
-		panic(errorf(ydberr.Syslog, "syslog.New() failed unexpectedly with error: %s: while reporting error: %s", err, logMsg))
+		return errorf(ydberr.Syslog, "syslog.New() failed unexpectedly with error: %s: while reporting error: %s", err, logMsg)
 	}
 	err = syslogr.Info(logMsg)
 	if err != nil {
-		panic(errorf(ydberr.Syslog, "syslogr.Info() failed unexpectedly with error: %s: while reporting error: %s", err, logMsg))
+		return errorf(ydberr.Syslog, "syslogr.Info() failed unexpectedly with error: %s: while reporting error: %s", err, logMsg)
 	}
 	err = syslogr.Close()
 	if err != nil {
-		panic(errorf(ydberr.Syslog, "syslogr.Close() failed unexpectedly with error: %s: while reporting error: %s", err, logMsg))
+		return errorf(ydberr.Syslog, "syslogr.Close() failed unexpectedly with error: %s: while reporting error: %s", err, logMsg)
 	}
+	return nil
 }
 
 // lookupYDBSignal returns a pointer to the sigInfo entry related to signal sig.
@@ -359,7 +367,6 @@ func shutdownSignalGoroutines() {
 	printEntry("shutdownSignalGoroutines")
 	shutdownSigGoroutinesMutex.Lock()
 	if shutdownSigGoroutines { // Nothing to do if already doing this
-		// Hard to coverage-test this because it would require calling shutdownSignalGoroutines() while it's already running, which is a small window
 		shutdownSigGoroutinesMutex.Unlock()
 		if DebugMode.Load() >= 2 {
 			log.Println("shutdownSignalGoroutines: Bypass shutdownSignalGoroutines as it has already run")
@@ -429,13 +436,9 @@ func shutdownSignalGoroutines() {
 //
 //export signalExitCallback
 func signalExitCallback(sigNum C.int) {
-	signalExit(syscall.Signal(sigNum)) // Convert numeric signal number to Signal type for use in panic() message
-}
-
-// signalExit implements signalExitCallback() without cgo types so that tests can call it (cgo is not allowed in tests).
-func signalExit(sig syscall.Signal) {
 	printEntry("signalExitCallback()")
 	ydbSigPanicCalled.Store(true) // Need "atomic" usage to avoid read/write DATA RACE issues
 	shutdownSignalGoroutines()    // Close the goroutines down with their signal notification channels
+	sig := syscall.Signal(sigNum) // Convert numeric signal number to Signal type for use in panic() message
 	panic(errorf(ydberr.SignalFatal, "Fatal signal %d (%v) occurred", sig, sig))
 }
