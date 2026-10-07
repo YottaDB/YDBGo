@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	//
+// Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -13,12 +13,14 @@
 package yottadb_test
 
 import (
+	"bufio"
 	"fmt"
 	"lang.yottadb.com/go/yottadb"
 	. "lang.yottadb.com/go/yottadb/internal/test_helpers"
 	"os"
 	"os/exec"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -488,18 +490,40 @@ func TestLockETimeout(t *testing.T) {
 	defer errstr.Free() // Cleanup these allocated strings when they go out-of-scope
 	errstr.Alloc(yottadb.YDB_MAX_ERRORMSG)
 
-	// Lock node n in an external process for n seconds so that we can test its lock timeout here.
-	cmd := exec.Command(os.Getenv("ydb_dist")+"/yottadb", "-r", "%XCMD", fmt.Sprintf("lock +%s:1 hang 1 lock -%s", lock2, lock2))
-	err := cmd.Start()
+	// Lock ^lock2 in an external process and hold it until this test closes the process's stdin.
+	// The process reports whether its attempt fails on stdout, so read that.
+	cmd := exec.Command(os.Getenv("ydb_dist")+"/yottadb", "-r", "%XCMD",
+		fmt.Sprintf("lock +%s:60 write $test,!  read x:60  lock -%s", lock2, lock2))
+	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		panic(err)
 	}
-	// Wait for it to get locked externally
-	for err = nil; err == nil; err = yottadb.LockE(tptoken, &errstr, locktimeout, lock2, []string{"42"}) {
-		// Pass
-	}
-	if yottadb.ErrorCode(err) != yottadb.YDB_LOCK_TIMEOUT {
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
 		panic(err)
+	}
+	cmd.Stderr = os.Stderr
+	err = cmd.Start()
+	if err != nil {
+		panic(err)
+	}
+	defer func() {
+		stdin.Close() // Tell the external process to release its lock and exit
+		cmd.Wait()
+	}()
+	// Wait for it to get locked externally
+	locked := make(chan string, 1)
+	go func() {
+		line, _ := bufio.NewReader(stdout).ReadString('\n')
+		locked <- strings.TrimSpace(line)
+	}()
+	select {
+	case line := <-locked:
+		if line != "1" {
+			t.Fatalf("External process did not get lock %s: wrote %q instead of \"1\"", lock2, line)
+		}
+	case <-time.After(2 * time.Minute):
+		t.Fatalf("External process did not report on lock %s within 2 minutes", lock2)
 	}
 	// Test that a lock timeout works for LockE()
 	err = yottadb.LockE(tptoken, &errstr, locktimeout, lock2, []string{"42"})

@@ -22,7 +22,9 @@ import (
 	"testing"
 	"time"
 
-	assert "github.com/stretchr/testify/require"
+	//lint:ignore ST1019 require is used for test errors, assert for test checks
+	assert "github.com/stretchr/testify/require"  // normally assert produces an error without exiting but this makes it exit
+	require "github.com/stretchr/testify/require" // for ensuring tests exit, like if err { panic }
 )
 
 // ---- Tests
@@ -149,25 +151,25 @@ func TestLock(t *testing.T) {
 	assert.Equal(t, false, lockExists(n.String()))
 	assert.Equal(t, false, lockExists(n2.String()))
 
-	// Lock n2 in the current process to force the yottadb process spawned below to delay exit until this process releases the n2 lock,
-	// giving this process time to confirm that n's Lock() timeout works while being by the spawned process.
-	n2.Lock()
-	cmd := exec.Command(os.Getenv("ydb_dist")+"/yottadb", "-r", "%XCMD", fmt.Sprintf("lock +%s:10 lock +%s:10  lock -%s lock -%s", n, n2, n2, n))
-	err := cmd.Start()
-	if err != nil {
-		panic(err)
-	}
+	// Lock n in an external process and hold it until this test closes the process's stdin.
+	// The spawned process reports whether its lock attempt failed by setting n=$TEST.
+	n.Set("")
+	cmd := exec.Command(os.Getenv("ydb_dist")+"/yottadb", "-r", "%XCMD", fmt.Sprintf("lock +%s:60 set %s=$test  read x:60  lock -%s", n, n, n))
+	cmd.Stderr = os.Stderr // Make subprocess errors appear in my stdout
+	stdin, err := cmd.StdinPipe()
+	require.NoError(t, err)
+	defer cmd.Wait()
+	defer stdin.Close() // Defers run last in first out, so this releases the spawned process to exit before cmd.Wait()
+	require.NoError(t, cmd.Start())
 	// Wait for it to get locked externally
-	for locked := n.Lock(0); locked; locked = n.Lock(0) {
-		n.Unlock()
+	timeout := time.Now().Add(120 * time.Second)
+	for n.Get() == "" && time.Now().Before(timeout) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if n.Get() != "1" {
+		t.Fatalf("Spawned process did not get lock %s: attempt returned %q instead of \"1\"", n, n.Get())
 	}
 	assert.Equal(t, false, n.Lock(10*time.Millisecond))
-	n2.Unlock()
-	// Wait for process to terminate before exiting test
-	err = cmd.Wait()
-	if err != nil {
-		panic(err)
-	}
 }
 
 // lockExists return whether a lock exists using YottaDB's LKE utility.
