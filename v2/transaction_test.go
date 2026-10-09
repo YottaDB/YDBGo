@@ -17,6 +17,7 @@ import (
 	"log"
 	"runtime"
 	"runtime/cgo"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -274,17 +275,15 @@ func TestTransaction(t *testing.T) {
 	assert.PanicsWithValue(t, "testString", func() { conn.TransactionFast(nil, func() { panic("testString") }) })
 
 	// Test that a transaction with any other kind of YottaDB error creates a panic as it should.
-	// In this case we force a TPLOCK error by trying to unlock a lock that was locked outside the transaction.
-	n := conn.Node("testlock")
-	n.Lock()
-	// skip the unlock line below which causes BADLOCKNEXT error (it seems that the nexted unlock worked even though it gave an error)
-	// defer n.Unlock()
+	// In this case we force a GVSUBOFLOW error by setting a global whose key exceeds the database's maximum key size.
+	const maxKeysize = 1019 // largest allowed by GDE
+	n := conn.Node("^testkey", strings.Repeat("x", maxKeysize+1))
 	err := captureError(func() {
 		conn.TransactionFast(nil, func() {
-			n.Unlock()
+			n.Set("value")
 		})
 	})
-	assert.Equal(t, ydberr.TPLOCK, err.(*Error).Code)
+	assert.Equal(t, ydberr.GVSUBOFLOW, err.(*Error).Code)
 
 	// Test that an error returned by ydb_tp_st() itself (not from inside the callback) creates a panic.
 	// An invalid tptoken makes ydb_tp_st() fail before it ever runs the callback.
