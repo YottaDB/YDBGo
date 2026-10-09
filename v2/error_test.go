@@ -67,6 +67,12 @@ func TestErrorCode(t *testing.T) {
 	assert.Equal(t, ydberr.NotYDBError, ErrorCode(nil))
 	err = &Error{Code: ydberr.INVSTRLEN, Message: "string too long"}
 	assert.Equal(t, ydberr.INVSTRLEN, ErrorCode(err))
+
+	// Ensure ErrorCode() finds a yottadb.Error wrapped by a non-YDB error
+	assert.Equal(t, ydberr.INVSTRLEN, ErrorCode(fmt.Errorf("context: %w", err)))
+	// Ensure the outermost yottadb.Error wins when one wraps another
+	wrapper := newError(ydberr.InvalidValueType, "wrapper", err)
+	assert.Equal(t, ydberr.InvalidValueType, ErrorCode(wrapper))
 }
 
 func TestLastError(t *testing.T) {

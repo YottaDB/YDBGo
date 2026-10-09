@@ -10,7 +10,7 @@
 //
 //////////////////////////////////////////////////////////////////
 
-// ydberr contains YottaDB constants generated from YottaDB source.
+// Package ydberr contains YottaDB constants generated from YottaDB source.
 package ydberr
 
 // The above line with the following import lets errorcodes.go find libyottadb

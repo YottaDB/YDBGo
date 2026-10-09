@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.	//
+// Copyright (c) 2025-2026 YottaDB LLC and/or its subsidiaries.	//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -10,8 +10,9 @@
 //								//
 //////////////////////////////////////////////////////////////////
 
-// workfreq.go: Count and report word frequencies for http://www.cs.duke.edu/csed/code/code2007/
+//go:build ignore
 
+// wordfreq.go: Count and report word frequencies for http://www.cs.duke.edu/csed/code/code2007/
 package main
 
 import (

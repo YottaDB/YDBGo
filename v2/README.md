@@ -1,6 +1,6 @@
 # YottaDB Go Wrapper v2
 
-[![Go Report Card](https://goreportcard.com/badge/lang.yottadb.com/go/yottadb/v2?style=flat-square)](https://goreportcard.com/report/lang.yottadb.com/go/yottadb/v2) | [![Go Doc](https://img.shields.io/badge/godoc-reference-blue.svg?style=flat-square)](https://godoc.org/lang.yottadb.com/go/yottadb/v2) | [![Coverage report](https://ydbgo-092cff.gitlab.io/v2/coverage.svg)](https://ydbgo-092cff.gitlab.io/v2/coverage.html)
+[![Go Doc](https://img.shields.io/badge/godoc-reference-blue.svg?style=flat-square)](https://godoc.org/lang.yottadb.com/go/yottadb/v2) | [![Lint report](https://img.shields.io/badge/lint-golangci--lint-blue.svg?style=flat-square)](https://gitlab.com/YottaDB/Lang/YDBGo/-/blob/master/v2/.golangci.yml) | [![Coverage report](https://yottadb.gitlab.io/Lang/YDBGo/v2/coverage.svg)](https://yottadb.gitlab.io/Lang/YDBGo/v2/coverage.html)
 
 YDBGo v2 is the latest and recommended Go API for YottaDB. Reference documentation is on the [Go packages website](https://pkg.go.dev/lang.yottadb.com/go/yottadb/v2).
 
@@ -224,7 +224,7 @@ Last, if you plan to commit, you should set-up pre-commit hooks.
 
 ```sh
 ln -s ../../pre-commit .git/hooks
-go install honnef.co/go/tools/cmd/staticcheck@latest
+go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0
 ```
 
 To develop the YottaDB Go wrapper itself you may wish to import a *local* version of the wrapper instead of the public wrapper on the internet. To do this, clone the wrapper, then in a separate directory create your application that uses the wrapper and use `go work` commands to point it to the wrapper on your local file system rather than the internet repository.
@@ -250,6 +250,8 @@ To test this wrapper:
 - `go build` only does a test compilation; it does not produce any files; `go install` has no effect.
 
 - To run tests, run `make test`
+
+- To run the linter: `make lint` -- this is the same linter run by the pipeline.
 
 - To run benchmarks, run `make bench`
 

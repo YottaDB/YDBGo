@@ -56,10 +56,12 @@ func (err *Error) Error() string {
 	return err.Message // The error code's name is already included in the message from YottaDB, so don't add the code
 }
 
-// ErrorCode returns the error code of err if it is an instance of yottadb.Error; otherwise returns ydberr.NotYDBError.
-// Unlike err.Code this works even if err is not an error instance.
+// ErrorCode returns the error code of the first yottadb.Error in err or its chain of wrapped errors;
+// otherwise returns ydberr.NotYDBError.
+// Unlike err.Code this works even if err is not an error instance, or is wrapped by another error.
 func ErrorCode(err any) int {
-	if e, ok := err.(*Error); ok {
+	var e *Error
+	if err2, ok := err.(error); ok && errors.As(err2, &e) {
 		return e.Code
 	}
 	return ydberr.NotYDBError

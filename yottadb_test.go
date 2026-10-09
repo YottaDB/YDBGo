@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2019 YottaDB LLC and/or its subsidiaries.	//
+// Copyright (c) 2019-2026 YottaDB LLC and/or its subsidiaries.	//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -15,7 +15,6 @@ package yottadb_test
 import (
 	"github.com/stretchr/testify/assert"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -44,7 +43,7 @@ func createDatabase() (string, bool, *log.Logger, *os.File) {
 	// database of user.
 	//
 	// Get a temporary directory to put the database in
-	test_dir, err := ioutil.TempDir("", "ydbgo")
+	test_dir, err := os.MkdirTemp("", "ydbgo")
 	if err != nil {
 		log.Fatal(err)
 	}

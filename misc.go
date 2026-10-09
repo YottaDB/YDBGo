@@ -73,7 +73,7 @@ func initkey(tptoken uint64, errstr *BufferT, dbkey *KeyT, varname string, subar
 		}
 	}
 	dbkey.Alloc(uint32(len(varname)), subcnt, maxsublen)
-	dbkey.Varnm.SetValStr(tptoken, errstr, varname)
+	err = dbkey.Varnm.SetValStr(tptoken, errstr, varname)
 	if nil != err {
 		panic(fmt.Sprintf("YDB: Unexpected error with SetValStr(): %s", err))
 	}

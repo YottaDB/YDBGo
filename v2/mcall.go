@@ -299,8 +299,7 @@ func parsePrototype(line string) (*RoutineData, error) {
 	}
 	typ, err := parseType(_retType)
 	if err != nil {
-		err.(*Error).Message = fmt.Sprintf("return type (%s) %s", retType, err)
-		return nil, err
+		return nil, newError(ErrorCode(err), fmt.Sprintf("return type (%s) %s", retType, err))
 	}
 	if _, ok := returnTypes[typ.typ]; !ok {
 		return nil, errorf(ydberr.MCallTypeUnknown, "invalid return type %s (must be string, int, int64, or float64)", retType)
@@ -313,8 +312,7 @@ func parsePrototype(line string) (*RoutineData, error) {
 		for i, typeStr := range regexp.MustCompile(`[,\)]`).Split(params, -1) {
 			typ, err = parseType(typeStr)
 			if err != nil {
-				err.(*Error).Message = fmt.Sprintf("parameter %d (%s) %s", i+1, typeStr, err)
-				return nil, err
+				return nil, newError(ErrorCode(err), fmt.Sprintf("parameter %d (%s) %s", i+1, typeStr, err))
 			}
 			if typ.typ == "" {
 				return nil, errorf(ydberr.MCallTypeMissing, "parameter %d is empty but should contain a type on", i+1)
@@ -403,8 +401,7 @@ func (conn *Conn) Import(table string) (*MFunctions, error) {
 	for i, line := range bytes.Split(prototypes, []byte{'\n'}) {
 		routine, err := parsePrototype(string(line))
 		if err != nil {
-			err := err.(*Error)
-			return nil, newError(err.Code, fmt.Sprintf("%s line %d: %s", err, i+1, bytes.TrimSpace(line)), newError(ydberr.ImportParse, "")) // wrap ImportError under err
+			return nil, newError(ErrorCode(err), fmt.Sprintf("%s line %d: %s", err, i+1, bytes.TrimSpace(line)), newError(ydberr.ImportParse, "")) // wrap ImportError under err
 		}
 		if routine == nil {
 			continue
@@ -474,8 +471,8 @@ func (conn *Conn) Import(table string) (*MFunctions, error) {
 	tbl.handle = *handle
 	if status != YDB_OK {
 		// Import creates a valid call-in table, so this only fails on other errors such as an invalid tptoken
-		err := conn.lastError(status).(*Error)
-		return nil, newError(err.Code, fmt.Sprintf("%s while processing call-in table:\n%s\n", err, tbl.YDBTable), newError(ydberr.ImportOpen, ""))
+		err := conn.lastError(status)
+		return nil, newError(ErrorCode(err), fmt.Sprintf("%s while processing call-in table:\n%s\n", err, tbl.YDBTable), newError(ydberr.ImportOpen, ""))
 	}
 
 	mfunctions := MFunctions{&tbl, conn}
@@ -504,7 +501,7 @@ func (conn *Conn) paramAlloc() unsafe.Pointer {
 //     strings using fmt.Sprintf("%v") but this may change in future for improved efficiency.
 //
 // Return value is nil if the routine is not defined to return anything.
-func (conn *Conn) callM(routine *RoutineData, args []any) (any, error) {
+func (conn *Conn) callM(routine *RoutineData, args []any) (any, error) { //nolint:gocyclo // large type switch
 	if routine == nil {
 		panic(errorf(ydberr.MCallNil, "routine data passed to Conn.CallM() must not be nil"))
 	}
@@ -591,7 +588,7 @@ func (conn *Conn) callM(routine *RoutineData, args []any) (any, error) {
 		if typ.kind == reflect.String {
 			allotStr(typ.alloc, typ.alloc)
 		}
-		conn.vpAddParam(uintptr(unsafe.Pointer(param)))
+		conn.vpAddParam(uintptr(param))
 		param = unsafe.Add(param, paramSize)
 	}
 	// Now store each parameter into the allocated paramBlock space and load it into our variadic parameter list
@@ -683,7 +680,7 @@ func (conn *Conn) callM(routine *RoutineData, args []any) (any, error) {
 		default:
 			panic(errorf(ydberr.MCallTypeUnhandled, "unhandled type (%s) in parameter %d", reflect.TypeOf(val), i+1))
 		}
-		conn.vpAddParam(uintptr(unsafe.Pointer(param)))
+		conn.vpAddParam(uintptr(param))
 		param = unsafe.Add(param, paramSize)
 	}
 
@@ -712,7 +709,7 @@ func (conn *Conn) callM(routine *RoutineData, args []any) (any, error) {
 	var retval any
 	if routine.Types[0].typ != "" {
 		typ := routine.Types[0]
-		switch typ.kind {
+		switch typ.kind { //nolint:exhaustive // default case panics on unsupported kinds
 		case reflect.String:
 			retval = fetchStr()
 		case reflect.Int:

@@ -1,8 +1,8 @@
 # YottaDB Go Wrapper v1
 
-YDBGo v1: [![Go Report Card](https://goreportcard.com/badge/lang.yottadb.com/go/yottadb?style=flat-square)](https://goreportcard.com/report/lang.yottadb.com/go/yottadb) | [![Go Doc](https://img.shields.io/badge/godoc-reference-blue.svg?style=flat-square)](https://godoc.org/lang.yottadb.com/go/yottadb) | [![Coverage report](https://ydbgo-092cff.gitlab.io/coverage.svg)](https://ydbgo-092cff.gitlab.io/coverage.html)
+YDBGo v1: [![Go Doc](https://img.shields.io/badge/godoc-reference-blue.svg?style=flat-square)](https://godoc.org/lang.yottadb.com/go/yottadb) | [![Lint report](https://img.shields.io/badge/lint-golangci--lint-blue.svg?style=flat-square)](https://gitlab.com/YottaDB/Lang/YDBGo/-/blob/master/.golangci.yml) | [![Coverage report](https://yottadb.gitlab.io/Lang/YDBGo/coverage.svg)](https://yottadb.gitlab.io/Lang/YDBGo/coverage.html)
 
-YDBGo v2: [![Go Report Card](https://goreportcard.com/badge/lang.yottadb.com/go/yottadb/v2?style=flat-square)](https://goreportcard.com/report/lang.yottadb.com/go/yottadb/v2) | [![Go Doc](https://img.shields.io/badge/godoc-reference-blue.svg?style=flat-square)](https://godoc.org/lang.yottadb.com/go/yottadb/v2) | [![Coverage report](https://ydbgo-092cff.gitlab.io/v2/coverage.svg)](https://ydbgo-092cff.gitlab.io/v2/coverage.html)
+YDBGo v2: [![Go Doc](https://img.shields.io/badge/godoc-reference-blue.svg?style=flat-square)](https://godoc.org/lang.yottadb.com/go/yottadb/v2) | [![Lint report](https://img.shields.io/badge/lint-golangci--lint-blue.svg?style=flat-square)](https://gitlab.com/YottaDB/Lang/YDBGo/-/blob/master/v2/.golangci.yml) | [![Coverage report](https://yottadb.gitlab.io/Lang/YDBGo/v2/coverage.svg)](https://yottadb.gitlab.io/Lang/YDBGo/v2/coverage.html)
 
 # Supersession Notice
 
@@ -85,7 +85,7 @@ Last, if you plan to commit, you should set-up pre-commit hooks.
 
 ```sh
 ln -s ../../pre-commit .git/hooks
-go install honnef.co/go/tools/cmd/staticcheck@latest
+go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0
 ```
 
 # Advanced Configuration

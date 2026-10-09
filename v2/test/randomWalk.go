@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.
+// Copyright (c) 2025-2026 YottaDB LLC and/or its subsidiaries.
 // All rights reserved.
 //
 //	This source code contains the intellectual property
@@ -10,29 +10,27 @@
 //
 //////////////////////////////////////////////////////////////////
 
+//go:build ignore
+
+// Run for a specified duration calling random features of the YottaDB Go Easy API.
+//
+// Creates DRIVER_THREADS goroutines, where each runs runProc() in a loop until the timeout expires.
+// Each runProc() has an equal chance of performing one of the ACTION enums listed below.
+// The goal is to run until timeout with no panics.
 package main
 
 import (
-	"bytes"
 	"flag"
 	"fmt"
 	"io"
 	"log"
 	"math/rand"
-	"runtime"
-	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"lang.yottadb.com/go/yottadb/v2"
 )
-
-// Run for a specified duration calling random features of the YottaDB Go Easy API.
-//
-// Creates DRIVER_THREADS goroutines, where each rusn runProc() in a loop until the timeout expires.
-// Each runProc() has an equal chance of performing one of the ACTION enums listed below
-// The goal is to run until timeout with no panics.
 
 const (
 	ACT_SET        = iota // Setting a global/local
@@ -51,10 +49,12 @@ const (
 )
 
 // These are set below in init() and should be treated as constants for the rest of the test
-var THREADS_TO_MAKE int
-var DRIVER_THREADS int
-var MAX_THREADS int
-var MAX_DEPTH int
+var (
+	THREADS_TO_MAKE int
+	DRIVER_THREADS  int
+	MAX_THREADS     int
+	MAX_DEPTH       int
+)
 
 func init() {
 	rand.Seed(time.Now().UTC().UnixNano())
@@ -71,8 +71,9 @@ func genNode(conn *yottadb.Conn) *yottadb.Node {
 	// randomly select one of  4 varnames
 	names := []string{"^MyGlobal1", "^MyGlobal2", "MyLocal1xx", "MyLocal2xx"}
 	varname := names[rand.Intn(len(names))]
-	var subs []any
-	for i := range rand.Intn(5) {
+	n := rand.Intn(5)
+	subs := make([]any, 0, n)
+	for i := range n {
 		subs = append(subs, fmt.Sprintf("sub%d", i))
 	}
 	return conn.Node(varname, subs...)
@@ -159,19 +160,6 @@ func runProc(conn *yottadb.Conn, depth int) {
 		}
 		wg.Wait()
 	}
-}
-
-// goid extracts the goroutine ID from the stack trace.
-// This may be used for debug printing if there are problems.
-func goid() int {
-	var buf [64]byte
-	n := runtime.Stack(buf[:], false)
-	idField := bytes.Fields(buf[:n])[1]
-	id, err := strconv.Atoi(string(idField))
-	if err != nil {
-		panic(fmt.Sprintf("cannot get goroutine id: %v", err))
-	}
-	return id
 }
 
 func main() {

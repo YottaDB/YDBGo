@@ -103,7 +103,7 @@ func _newConn() *Conn {
 		C.free(unsafe.Pointer(cn.value.buf_addr))
 		C.free(unsafe.Pointer(cn.errstr.buf_addr))
 		C.free(unsafe.Pointer(cn.vplist))
-		C.free(unsafe.Pointer(cn.paramBlock))
+		C.free(cn.paramBlock)
 		C.free(unsafe.Pointer(cn))
 	}, conn.cconn)
 	return &conn
@@ -294,7 +294,7 @@ func (conn *Conn) getValue() string {
 //   - Otherwise, return the decoded string.
 //   - Note that the length of a string in zwrite format is always greater than or equal to the string in its original, unencoded format.
 //
-// Panics on other errors because they are are all panic-worthy (e.g. invalid variable names).
+// Panics on other errors because they are all panic-worthy (e.g. invalid variable names).
 func (conn *Conn) Zwr2Str(zstr string) (string, error) {
 	cconn := conn.cconn
 	// Don't rely on setValue (below) to check length because it panics, whereas this function is supposed to return errors
@@ -332,7 +332,7 @@ func (conn *Conn) Zwr2Str(zstr string) (string, error) {
 //   - Otherwise, return the ZWRITE-formatted string.
 //   - Note that the length of a string in zwrite format is always greater than or equal to the string in its original, unencoded format.
 //
-// Panics on other errors because they are are all panic-worthy (e.g. invalid variable names).
+// Panics on other errors because they are all panic-worthy (e.g. invalid variable names).
 func (conn *Conn) Str2Zwr(str string) (string, error) {
 	cconn := conn.cconn
 	// Don't rely on setValue (below) to check length because it panics, whereas this function is supposed to return errors
@@ -357,7 +357,7 @@ func (conn *Conn) Str2Zwr(str string) (string, error) {
 
 // Check whether an entire string is printable ASCII to avoid unnecessarily calling YDB Str2Zwr().
 func printableASCII(s string) bool {
-	for i := 0; i < len(s); i++ {
+	for i := range len(s) {
 		if s[i] < ' ' || s[i] > '~' {
 			return false
 		}

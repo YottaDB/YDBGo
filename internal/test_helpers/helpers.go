@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2018-2022 YottaDB LLC and/or its subsidiaries.	//
+// Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -10,6 +10,7 @@
 //								//
 //////////////////////////////////////////////////////////////////
 
+// Package test_helpers provides helper functions shared by the YDBGo v1 tests.
 package test_helpers
 
 import (
@@ -42,9 +43,7 @@ const ValSiz uint32 = 128                       // Max size of values
 const Timeout uint64 = 10 * uint64(time.Second) // 10 second timeout (in nanoseconds)
 const DebugFlag bool = false                    // Enable/Disable some simple debugging
 
-//
 // Define assert function to validate return codes and panic is assertion fails
-//
 func Assertnoerr(err error, t *testing.T) {
 	if nil != err {
 		_, file, line, ok := runtime.Caller(1)
@@ -56,9 +55,7 @@ func Assertnoerr(err error, t *testing.T) {
 	}
 }
 
-//
 // Routine to empty the database of everything currently defined in it
-//
 func Dbdeleteall(tptoken uint64, errstr *yottadb.BufferT, errors *int, t *testing.T) {
 	var dbkey yottadb.KeyT
 
@@ -83,9 +80,7 @@ func Dbdeleteall(tptoken uint64, errstr *yottadb.BufferT, errors *int, t *testin
 	}
 }
 
-//
 // Routine to validate a lock exists - or not
-//
 func VerifyLockExists(lockvalidation []byte, errors *int, giveerror bool, t *testing.T) bool {
 	var outbuff bytes.Buffer
 	var outbuffB []byte
@@ -112,9 +107,7 @@ func VerifyLockExists(lockvalidation []byte, errors *int, giveerror bool, t *tes
 	return varexists
 }
 
-//
 // Routine to take a BufferTArray full of subscripts and turn it into a string array of the same subscripts
-//
 func Buftary2strary(tptoken uint64, errstr *yottadb.BufferT, buftary *yottadb.BufferTArray, t *testing.T) (*[]string, error) {
 	arraylen := int(buftary.ElemUsed())
 	retval := make([]string, arraylen)
@@ -126,9 +119,7 @@ func Buftary2strary(tptoken uint64, errstr *yottadb.BufferT, buftary *yottadb.Bu
 	return &retval, nil
 }
 
-//
 // Routine to compare two string arrays for equality. Returns true if they are the same (used length and strings)
-//
 func Cmpstrary(astr, bstr *[]string) bool {
 	if len(*astr) != len(*bstr) {
 		return false
@@ -141,7 +132,6 @@ func Cmpstrary(astr, bstr *[]string) bool {
 	return true
 }
 
-//
 // Routine to perform a TP transaction (TP callback routine)
 //
 // Note - below export statement is needed so this routine is known.
@@ -233,8 +223,7 @@ func Available(name string) bool {
 	return os.Getenv(name) != ""
 }
 
-// By default, we run timed tests; if we are running in a place
-//  where we expect the system will be loaded, we might skip them
+// By default, we run timed tests; if we expect the system will be loaded, we might skip them
 func RunTimedTests() bool {
 	return !Available("YDB_GO_SKIP_TIMED_TESTS")
 }

@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2025 YottaDB LLC and/or its subsidiaries.
+// Copyright (c) 2025-2026 YottaDB LLC and/or its subsidiaries.
 // All rights reserved.
 //
 //	This source code contains the intellectual property
@@ -10,13 +10,14 @@
 //
 //////////////////////////////////////////////////////////////////
 
+//go:build ignore
+
 // pseudoBank creates 1000 fake bank accounts and transfers an amount two accounts as fast as possible for 2 minutes.
 // Two random accounts are newly selected for each transfer.
 // Ten concurrent jobs are started, each doing this same thing.
 // Each job represents a different 'user' named with the single letter 'A' to 'J'.
 // Each transfer appends to list of account transactions in ^ZHIST and appends to a log of account transactions in ^ZTRNLOG.
 // After running, pseudoBank you can run `ydb -r pseudoBankDisp` to count log entries and show how many transactions occurred.
-
 package main
 
 import (
@@ -65,7 +66,7 @@ func main() {
 	waitGroup.Add(concurrent)
 	var stop atomic.Bool // set true to stop all jobs -- use atomic to ensure volatility
 	for guid := range concurrent {
-		user := string('A' + guid)
+		user := string(rune('A' + guid))
 		// Start job
 		go func() {
 			defer yottadb.ShutdownOnPanic()

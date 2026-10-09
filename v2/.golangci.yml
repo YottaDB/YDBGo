@@ -1,0 +1,50 @@
+#################################################################
+#								#
+# Copyright (c) 2026 YottaDB LLC and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+
+# golangci-lint configuration for YDBGo v2
+version: "2"
+linters:
+  default: standard   # errcheck, govet, ineffassign, staticcheck, unused
+    # ineffassign: assignments to variables whose value is never subsequently read
+    # staticcheck: large suite of bug, simplification, and style checks
+    # unused: unused constants, variables, functions, types, and struct fields
+  disable:
+    - errcheck
+  enable:             # API quality checks
+    - errname         # error types named FooError, sentinel errors named ErrFoo
+    - errorlint       # errors handled so errors.Is/As work through wrapping
+    - inamedparam     # interface methods have named params
+    - interfacebloat  # interfaces with too many methods
+    - unparam         # params that are unused or always receive the same value
+    - misspell        # common english misspellings
+    - exhaustive      # switch on an enum that misses some cases
+    - gocyclo         # Cyclomatic complexity, an alternative to cyclop
+    - intrange        # for loops that could use range n
+    - prealloc        # Slices that could be preallocated
+    - whitespace      # Blank lines at the start or end of a block
+    - wrapcheck       # Errors from other packages returned without wrapping
+    - dupword         # Repeated words like "the the" in comments or strings
+    - unconvert       # Type conversions that do nothing
+    - perfsprint      # fmt.Sprintf calls with a faster replacement
+    - revive          # with the rules below
+  settings:
+    revive:
+      rules:
+        - name: exported           # exported names documented, no stutter
+        - name: unexported-return  # exported funcs don't return unexported types
+        - name: package-comments
+    staticcheck:
+      checks: ["all", "-SA1019", "-ST1003"]
+  exclusions:
+    rules:
+      - path: _test\.go     # tests deliberately check exact error types; speed and memory tweaks aren't worth it in tests
+        linters: [errorlint, perfsprint, prealloc]

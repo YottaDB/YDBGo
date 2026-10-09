@@ -64,7 +64,6 @@ func TestNoInit(t *testing.T) {
 	}
 	Shutdown(MustInit())
 	assert.Panics(t, func() { MustInit() })
-
 }
 
 func TestInitCheck(t *testing.T) {

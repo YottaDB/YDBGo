@@ -18,6 +18,7 @@
 #	2) Runs `gofmt`
 #	3) Trims trailing whitespace
 #	4) Runs `go vet`
+#	5) Runs `golangci-lint`
 #
 set filelist = `git diff --name-only HEAD`
 set fixlist = ""
@@ -112,13 +113,12 @@ if (`expr "go1.11.0" \<= "$gover"`) then
 endif
 
 # ------------------------------------------------------------------------------------------
-# 4) Run "staticcheck" as linter
+# 5) Run "golangci-lint" as linter
 # ------------------------------------------------------------------------------------------
-# Get latest staticcheck version otherwise it can produce error `file requires newer Go version` when any imported
-# module is updated to use a Go version more recent than the Go version used to build staticcheck.
-go install honnef.co/go/tools/cmd/staticcheck@latest
-# Check with staticcheck. Config options for v1 and v2 are in their respective staticcheck.conf files.
-staticcheck || @ exitstatus = 1
-(cd v2; staticcheck) || @ exitstatus = 1
+# Checks for v1 and v2 are configured in their respective .golangci.yml files.
+# Install the version used by the pipeline, as described under "Contributing" in v2/README.md.
+which golangci-lint >& /dev/null || echo "GOLANGCI-E-MISSING : golangci-lint not found. See v2/README.md for how to install it." `false` || @ exitstatus = 1
+golangci-lint run || @ exitstatus = 1
+make -C v2 -s lint || @ exitstatus = 1
 
 exit $exitstatus

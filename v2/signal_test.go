@@ -42,7 +42,7 @@ func TestSigSegv(t *testing.T) {
 	var p uintptr
 	// The following *Sizeof(p) is needed to avoid alignment errors when trying to access badPointer when `test -race` is used
 	// The 2* is to avoid "straddles multiple allocations" error when accessing the last aligned memory address during `test -race`
-	var badPointer *string = (*string)(unsafe.Add(unsafe.Pointer(nil), -2*int(unsafe.Sizeof(p))))
+	var badPointer = (*string)(unsafe.Add(unsafe.Pointer(nil), -2*int(unsafe.Sizeof(p))))
 
 	defer debug.SetPanicOnFault(debug.SetPanicOnFault(true)) // No core - just a panic please
 	assert.Panics(t, func() { fmt.Println(*badPointer) })
@@ -199,7 +199,7 @@ func (w *logWatcher) Write(p []byte) (int, error) {
 	if strings.Contains(string(p), w.want) {
 		w.once.Do(func() { close(w.found) })
 	}
-	return w.orig.Write(p)
+	return w.orig.Write(p) //nolint:wrapcheck // pass-through writer must return the inner error unchanged
 }
 
 // watchLog starts watching log output for want, and restores the original log writer when the test ends.

@@ -164,7 +164,7 @@ func validateYDBSignal(sig os.Signal) *sigInfo {
 // [YottaDB signals]: https://docs.yottadb.com/MultiLangProgGuide/programmingnotes.html#signals
 func SignalNotify(notifyChan chan os.Signal, signals ...os.Signal) {
 	// Do-nothing hack purely to prevent goimport from removing runtime/debug from imports since it's required
-	// to make [debug.SetPanicOnFault] clickable in the the docstring above.
+	// to make [debug.SetPanicOnFault] clickable in the docstring above.
 	debug.SetPanicOnFault(debug.SetPanicOnFault(false))
 
 	// Although this routine itself does not interact with the YottaDB runtime, use of this routine has an expectation that

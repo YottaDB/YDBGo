@@ -121,7 +121,7 @@ func TestCallM(t *testing.T) {
 	assert.Equal(t, ":test:", s)
 	assert.Equal(t, 107, n)
 
-	// Temporarily set YDBRelease to 1.34 to test that special ydb_string_t handling for that verison works
+	// Temporarily set YDBRelease to 1.34 to test that special ydb_string_t handling for that version works
 	prealloc := 10
 	func() {
 		originalRelease := dbHandle.YDBRelease

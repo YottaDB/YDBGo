@@ -123,8 +123,8 @@ func Init() (*DB, error) {
 	releaseNumberStr = releaseNumberStr[1:]          // Remove starting 'r' in the release number
 	dotIndex := strings.Index(releaseNumberStr, ".") // Look for the decimal point that separates major/minor values
 	if dotIndex >= 0 {                               // Decimal point found
-		releaseMajorStr = string(releaseNumberStr[:dotIndex])
-		releaseMinorStr = string(releaseNumberStr[dotIndex+1:])
+		releaseMajorStr = releaseNumberStr[:dotIndex]
+		releaseMinorStr = releaseNumberStr[dotIndex+1:]
 	} else {
 		releaseMajorStr = releaseNumberStr // Isolate the major version number
 		releaseMinorStr = "00"

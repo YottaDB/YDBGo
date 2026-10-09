@@ -24,7 +24,7 @@ variables:
   GOLANG_VERSION: 1.24.0
 
 before_script: |-
-  apt-get update && apt-get install -y --no-install-recommends wget ca-certificates git g++ gcc libc6-dev make pkg-config && rm -rf /var/lib/apt/lists/*
+  apt-get update && apt-get install -y --no-install-recommends wget ca-certificates git g++ gcc libc6-dev make pkg-config
   export GOPROXY=https://proxy.golang.org/cached-only
   export GOPATH=/go
   export GOBIN=${GOPATH}/bin
@@ -118,8 +118,14 @@ v2_coverage:
   variables:
     TEST_VERSION: v2
     COVERDIR: ${CI_PROJECT_DIR}/${TEST_VERSION}/cover
+    GOLANG_VERSION: 1.27.1  # Coverage reporting is more granular with Go 1.27
   script: |-
-    make -C ${TEST_VERSION} coverage verbosity=/dev/stderr
+    # Run a syslog daemon so syslogEntry() covers its success path, as on developer machines.
+    apt-get install -y -qq --no-install-recommends rsyslog
+    rsyslogd
+    for i in $(seq 100); do [ -S /dev/log ] && break; sleep 0.1; done
+    [ -S /dev/log ] || { echo "rsyslogd did not create /dev/log within 10 seconds"; exit 1; }
+    make -C ${TEST_VERSION} coverage verbosity=/dev/stdout
     # The following provides colored code coverage bars alongside code in gitlab views.
     # Visualization instructions: https://docs.gitlab.com/ci/testing/code_coverage/?tab=Go
     go get github.com/boumenot/gocover-cobertura
@@ -146,6 +152,7 @@ v1_coverage:
     # Set version to . to test v1
     TEST_VERSION: .
     COVERDIR: ${CI_PROJECT_DIR}/${TEST_VERSION}/cover
+    GOLANG_VERSION: 1.27.1  # Coverage reporting is more granular with Go 1.27
   script: |-
     dir=${COVERDIR}
     mkdir -p $dir
@@ -190,10 +197,14 @@ commit-verify:
 
 lint_code:
   stage: test
+  variables:
+    GOLANG_VERSION: 1.27.1  # golangci-lint v2.13+ (which gets reasonable linting) needs go1.26+
+    GOLANGCI_LINT_VERSION: v2.14.0
   script: |-
-    go install honnef.co/go/tools/cmd/staticcheck@latest
-    staticcheck -checks inherit,-ST1017,-SA4006,-S1006,-S1005,-S1000,-S1008
-    (cd v2; staticcheck -checks -SA1019)
+    # Checks are configured in .golangci.yml (v1) and v2/.golangci.yml (v2)
+    go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@${GOLANGCI_LINT_VERSION}
+    golangci-lint run
+    make -C v2 lint verbosity=/dev/stdout
 
 error_codes:
   stage: test
@@ -206,6 +217,10 @@ build:
   script: |-
     go build -v
     go build -C v2 -v
+    # Check that the example apps still compile.
+    (cd v2; for i in test/*.go; do go build -o /dev/null "$i" || exit 1; done)
+    # Also build this one from v1's root so it uses this repo's v1, not go.mod's.
+    go build -o /dev/null v2/test/ydb_v1.go
 
 pages:
   stage: deploy

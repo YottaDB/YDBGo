@@ -10,19 +10,21 @@
 //
 //////////////////////////////////////////////////////////////////
 
+//go:build ignore
+
 // This example program grabs a list of random user data from https://randomuser.me,
 // then adds each users to the current YottaDB database.
 // Each user is added within a transaction to ensure that duplicate names do not conflict.
 // Each user is added from a separate goroutine to demonstrate concurrency.
-
 package main
 
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -43,10 +45,10 @@ type randomusers struct {
 				Number int    `json:"number"`
 				Name   string `json:"name"`
 			} `json:"street"`
-			City        string `json:"city"`
-			State       string `json:"state"`
-			Country     string `json:"country"`
-			Postcode    int    `json:"postcode"`
+			City        string          `json:"city"`
+			State       string          `json:"state"`
+			Country     string          `json:"country"`
+			Postcode    json.RawMessage `json:"postcode"` // string or number, depending on nationality
 			Coordinates struct {
 				Latitude  string `json:"latitude"`
 				Longitude string `json:"longitude"`
@@ -108,7 +110,7 @@ func main() {
 
 	fmt.Println("Response status:", resp.Status)
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		panic(err)
 	}
@@ -117,11 +119,14 @@ func main() {
 
 	var users randomusers
 	err = json.Unmarshal(body, &users)
+	if err != nil {
+		panic(err)
+	}
 	//fmt.Printf("%+v\n", users)
 	var wg sync.WaitGroup
 	for i := range users.Results {
 		wg.Add(1)
-		go saveV(conn, &users, i, &wg)
+		go saveV(&users, i, &wg)
 	}
 	wg.Wait()
 
@@ -145,11 +150,12 @@ func main() {
 		line := name + " " + gender + " " + dob + " " + id + " " + address + " " + city + " " + state + " " + country + " " + postcode
 		fmt.Println(key_number, line)
 	}
-
 }
 
-func saveV(conn yottadb.Conn, users *randomusers, i int, wg *sync.WaitGroup) {
-	defer yottadb.QuitAfterFatalSignal()
+func saveV(users *randomusers, i int, wg *sync.WaitGroup) {
+	defer yottadb.ShutdownOnPanic()
+	defer wg.Done()
+	conn := yottadb.NewConn() // each goroutine needs its own Conn
 	v := users.Results[i]
 	first_name := v.Name.First
 	last_name := v.Name.Last
@@ -160,7 +166,7 @@ func saveV(conn yottadb.Conn, users *randomusers, i int, wg *sync.WaitGroup) {
 	city := v.Location.City
 	state := v.Location.State
 	country := v.Location.Country
-	postcode := v.Location.Postcode
+	postcode := strings.Trim(string(v.Location.Postcode), `"`)
 
 	name := first_name + " " + last_name
 
@@ -170,7 +176,7 @@ func saveV(conn yottadb.Conn, users *randomusers, i int, wg *sync.WaitGroup) {
 		fmt.Printf("%s  -> %s %s %s %s %s\n", key_number, gender, first_name, last_name, dob, id)
 		fmt.Printf("    -> %s %s %s %s %v\n", street, city, state, country, postcode)
 
-		conn.Transaction("CS", []string{}, func() int {
+		conn.Transaction("CS", []string{}, func() {
 			usersNode.Child(key_number, "name").Set(name)
 			usersNode.Child(key_number, "gender").Set(gender)
 			usersNode.Child(key_number, "dob").Set(dob)
@@ -187,11 +193,8 @@ func saveV(conn yottadb.Conn, users *randomusers, i int, wg *sync.WaitGroup) {
 
 			// Dump the data
 			//fmt.Print(usersNode.Child(key_number).Dump())
-
-			return yottadb.YDB_OK
 		})
 	} else {
 		fmt.Println("found an existing user: " + name)
 	}
-	wg.Done()
 }

@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////
 //								//
-// Copyright (c) 2018-2025 YottaDB LLC and/or its subsidiaries.	//
+// Copyright (c) 2018-2026 YottaDB LLC and/or its subsidiaries.	//
 // All rights reserved.						//
 //								//
 //	This source code contains the intellectual property	//
@@ -538,7 +538,7 @@ func SetValE(tptoken uint64, errstr *BufferT, value, varname string, subary []st
 		}
 	}
 	dbkey.Alloc(uint32(len(varname)), subcnt, maxsublen)
-	dbkey.Varnm.SetValStr(tptoken, errstr, varname)
+	err = dbkey.Varnm.SetValStr(tptoken, errstr, varname)
 	if nil != err {
 		panic(fmt.Sprintf("YDB: Unexpected error with SetValStr(): %s", err))
 	}

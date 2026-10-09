@@ -46,7 +46,7 @@ type tpInfo struct {
 //     If localsToRestore[0] equals "*" then all local M locals are restored on restart. Note that since Go has its own local
 //     variables it is unlikely that you will need this feature in Go.
 //   - Returns true to indicate that the transaction logic was successful and has been committed to the database, or false if a rollback was necessary.
-//   - Panics on errors because they are are all panic-worthy (e.g. invalid variable names). See [yottadb.Error] for rationale.
+//   - Panics on errors because they are all panic-worthy (e.g. invalid variable names). See [yottadb.Error] for rationale.
 //
 // The callback function should:
 //   - Implement the required database logic taking into account key considerations for [Transaction Processing] code.
@@ -111,7 +111,7 @@ func (conn *Conn) Transaction(transID string, localsToRestore []string, callback
 // TransactionFast is a faster version of Transaction that does not ensure durability,
 // for applications that do not require durability or have alternate durability mechanisms (such as checkpoints).
 // It is implemented by setting the transID to the special name "BATCH" as discussed in [Transaction Processing].
-//   - Panics on errors because they are are all panic-worthy (e.g. invalid variable names). See [yottadb.Error] for rationale.
+//   - Panics on errors because they are all panic-worthy (e.g. invalid variable names). See [yottadb.Error] for rationale.
 //
 // [Transaction Processing]: https://docs.yottadb.com/ProgrammersGuide/langfeat.html#transaction-processing
 func (conn *Conn) TransactionFast(localsToRestore []string, callback func()) bool {

@@ -1,0 +1,23 @@
+#################################################################
+#								#
+# Copyright (c) 2026 YottaDB LLC and/or its subsidiaries.	#
+# All rights reserved.						#
+#								#
+#	This source code contains the intellectual property	#
+#	of its copyright holder(s), and is made available	#
+#	under a license.  If you do not know the terms of	#
+#	the license, please stop and do not read further.	#
+#								#
+#################################################################
+
+# golangci-lint configuration for YDBGo v1 (v2 has its own in v2/.golangci.yml)
+version: "2"
+linters:
+  default: standard   # errcheck, govet, ineffassign, staticcheck, unused
+  disable:
+    - errcheck
+    - ineffassign
+  settings:
+    staticcheck:
+      checks: ["all", "-ST1003", "-ST1023", "-ST1017", "-SA4006", "-S1006", "-S1005", "-S1000", "-S1008", "-SA1019", "-QF1004",
+        "-QF1001", "-QF1011", "-ST1020", "-SA6000"]

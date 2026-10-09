@@ -38,7 +38,7 @@ func BenchmarkDiff(b *testing.B) {
 		b.Skip()
 	}
 
-	var cpus int = -1
+	var cpus = -1
 	pathA.Store(0)
 	pathB.Store(0)
 	cpuIndex.Store(0)
@@ -46,7 +46,7 @@ func BenchmarkDiff(b *testing.B) {
 		fmt.Sscanf(arg, "-test.cpu=%d", &cpus)
 	}
 	if cpus == -1 {
-		cpus = int(runtime.NumCPU()) // Go sets -cpu to this by default, so we should, too
+		cpus = runtime.NumCPU() // Go sets -cpu to this by default, so we should, too
 	}
 	if cpus == -1 || cpus%2 != 0 {
 		panic("You must set test flag: -cpu=<even number>, preferably large like 100")

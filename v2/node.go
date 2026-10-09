@@ -51,7 +51,7 @@ func bufferIndex(buf *C.ydb_buffer_t, i int) *C.ydb_buffer_t {
 //     act on a node object passed in from another goroutine, first call [Node.Clone](conn) to make a copy of the
 //     other goroutine's node object using the current goroutine's connection `conn`. Then perform methods on that.
 //
-// Node methods panic on errors because they are are all panic-worthy (e.g. invalid variable names).
+// Node methods panic on errors because they are all panic-worthy (e.g. invalid variable names).
 // See [yottadb.Error] for error strategy and rationale.
 type Node struct {
 	// Node type wraps a C.node struct in a Go struct so Go can add methods to it.
@@ -380,7 +380,7 @@ func (n *Node) GetInt(defaultValue ...int) int {
 	val := n.Get()
 	num, err := strconv.ParseInt(val, 10, 0)
 	if err != nil {
-		if _, ok := err.(*strconv.NumError); !ok {
+		if _, ok := err.(*strconv.NumError); !ok { //nolint:errorlint // strconv never wraps *NumError
 			panic(err) // unknown error unrelated to conversion
 		}
 		if len(defaultValue) == 0 {
@@ -399,7 +399,7 @@ func (n *Node) GetBool(defaultValue ...bool) bool {
 	val := n.Get()
 	num, err := strconv.ParseInt(val, 10, 0)
 	if err != nil {
-		if _, ok := err.(*strconv.NumError); !ok {
+		if _, ok := err.(*strconv.NumError); !ok { //nolint:errorlint // strconv never wraps *NumError
 			panic(err) // unknown error unrelated to conversion
 		}
 		if len(defaultValue) == 0 {
@@ -421,7 +421,7 @@ func (n *Node) GetFloat(defaultValue ...float64) float64 {
 	val := n.Get()
 	num, err := strconv.ParseFloat(val, 64)
 	if err != nil {
-		if _, ok := err.(*strconv.NumError); !ok {
+		if _, ok := err.(*strconv.NumError); !ok { //nolint:errorlint // strconv never wraps *NumError
 			panic(err) // unknown error unrelated to conversion
 		}
 		if len(defaultValue) == 0 {
@@ -728,7 +728,7 @@ func (n *Node) Index(subscripts ...any) *Node {
 	// was only incremented in the depth 1 mutable node.
 
 	// Speed up the common case where only one subscript is supplied.
-	// (faster partly because there's no need to create newsubs array for coverted strings)
+	// (faster partly because there's no need to create newsubs array for converted strings)
 	if len(subscripts) == 1 {
 		return n.index1(subscripts[0])
 	}
@@ -1094,7 +1094,7 @@ func (n *Node) _treeNext(reverse bool) *Node {
 	if status != YDB_OK {
 		panic(n.Conn.lastError(status))
 	}
-	retNode.cnode.len = C.int(retSubs + 1) // +1 because cnode counts the varname as a subscript and ydb_node_next_st() does not
+	retNode.cnode.len = retSubs + 1 // +1 because cnode counts the varname as a subscript and ydb_node_next_st() does not
 	// if we malloced anything, make sure we take a copy of it before defer runs to free the mallocs on return
 	if malloced {
 		strings := stringArrayToAnyArray(retNode.Subscripts())
@@ -1151,7 +1151,7 @@ func (n *Node) Tree() iter.Seq[*Node] {
 			// Ensure that returned node is still a descendent of first node; i.e. all initial subscripts match
 			// Don't need to check varname (i=0) as TreeNext() doesn't search beyond varname
 			for i := 1; i < len1; i++ {
-				buf := bufferIndex(n.cnode.buffers, int(i))
+				buf := bufferIndex(n.cnode.buffers, i)
 				// Access buf string using unsafe.String because it doesn't make a time-consuming copy of the string like GoStringN does.
 				if unsafe.String((*byte)(unsafe.Pointer(buf.buf_addr)), buf.len_used) != subs1[i] {
 					return

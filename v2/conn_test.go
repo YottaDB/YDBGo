@@ -12,6 +12,7 @@
 
 package yottadb
 
+//nolint:staticcheck // ST1019: require is used for test errors, assert for test checks
 import (
 	"bytes"
 	"fmt"
@@ -22,7 +23,6 @@ import (
 	"testing"
 	"time"
 
-	//lint:ignore ST1019 require is used for test errors, assert for test checks
 	assert "github.com/stretchr/testify/require"  // normally assert produces an error without exiting but this makes it exit
 	require "github.com/stretchr/testify/require" // for ensuring tests exit, like if err { panic }
 )
