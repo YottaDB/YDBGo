@@ -69,11 +69,10 @@ check: benchtime=0.1s
 check: benchmark
 
 lint:
-	golangci-lint run >>$(verbosity)
+	golangci-lint run
 	@# Also lint the files that were excluded by their `//go:build ignore` because they're not part of a package
-	for i in test/*.go; \
-		do echo "golangci-lint run $$i" >>$(verbosity); \
-		golangci-lint run "$$i" >>$(verbosity) || exit 1; \
+	for i in test/*.go; do \
+		golangci-lint run "$$i" || exit 1; \
 	done
 
 cover: coverage
@@ -111,4 +110,4 @@ coverage:
 clean:
 	rm -f $(COVERDIR)/* test/*.o test/test
 
-.PHONY: test bench benchmarks benchmark check cover coverage
+.PHONY: test bench benchmarks benchmark check lint cover coverage

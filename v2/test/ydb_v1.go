@@ -190,75 +190,87 @@ func saveV(users *randomusers, i int, wg *sync.WaitGroup) {
 
 	name := first_name + " " + last_name
 
-	data, err := yottadb.DataE(tptoken, &errstr, "^users", []string{"index", name})
-	ec(err, errstr)
-	if data == 0 {
-		key_number, err := yottadb.IncrE(tptoken, &errstr, strconv.Itoa(1), "^users", []string{})
-		ec(err, errstr)
-
-		fmt.Printf("%v  -> %s %s %s %s %s\n", key_number, gender, first_name, last_name, dob, id)
-		fmt.Printf("    -> %s %s %s %s %v\n", street, city, state, country, postcode)
-
-		err = yottadb.TpE(yottadb.NOTTP, &errstr, func(tptoken uint64, errptr *yottadb.BufferT) int32 {
-			err = yottadb.SetValE(tptoken, &errstr, name, "^users", []string{key_number, "name"})
-			if err != nil {
-				fmt.Printf("**%s** ", err)
-				return int32(yottadb.ErrorCode(err))
-			}
-			err = yottadb.SetValE(tptoken, &errstr, gender, "^users", []string{key_number, "gender"})
-			if err != nil {
-				fmt.Printf("**%s** ", err)
-				return int32(yottadb.ErrorCode(err))
-			}
-			err = yottadb.SetValE(tptoken, &errstr, dob, "^users", []string{key_number, "dob"})
-			if err != nil {
-				fmt.Printf("**%s** ", err)
-				return int32(yottadb.ErrorCode(err))
-			}
-			err = yottadb.SetValE(tptoken, &errstr, id, "^users", []string{key_number, "id"})
-			if err != nil {
-				fmt.Printf("**%s** ", err)
-				return int32(yottadb.ErrorCode(err))
-			}
-			err = yottadb.SetValE(tptoken, &errstr, street, "^users", []string{key_number, "address"})
-			if err != nil {
-				fmt.Printf("**%s** ", err)
-				return int32(yottadb.ErrorCode(err))
-			}
-			err = yottadb.SetValE(tptoken, &errstr, city, "^users", []string{key_number, "city"})
-			if err != nil {
-				fmt.Printf("**%s** ", err)
-				return int32(yottadb.ErrorCode(err))
-			}
-			err = yottadb.SetValE(tptoken, &errstr, state, "^users", []string{key_number, "state"})
-			if err != nil {
-				fmt.Printf("**%s** ", err)
-				return int32(yottadb.ErrorCode(err))
-			}
-			err = yottadb.SetValE(tptoken, &errstr, country, "^users", []string{key_number, "country"})
-			if err != nil {
-				fmt.Printf("**%s** ", err)
-				return int32(yottadb.ErrorCode(err))
-			}
-			err = yottadb.SetValE(tptoken, &errstr, postcode, "^users", []string{key_number, "postcode"})
-			if err != nil {
-				fmt.Printf("**%s** ", err)
-				return int32(yottadb.ErrorCode(err))
-			}
-			err = yottadb.SetValE(tptoken, &errstr, "", "^users", []string{"index", name, key_number})
-			if err != nil {
-				fmt.Printf("**%s** ", err)
-				return int32(yottadb.ErrorCode(err))
-			}
-			err = yottadb.SetValE(tptoken, &errstr, key_number, "^userCount", []string{})
-			if err != nil {
-				fmt.Printf("**%s** ", err)
-				return int32(yottadb.ErrorCode(err))
-			}
+	var key_number string
+	err := yottadb.TpE(tptoken, &errstr, func(tptoken uint64, errptr *yottadb.BufferT) int32 {
+		key_number = "" // reset in case a restart follows an attempt that set it
+		// Check for duplicates inside the transaction so concurrent goroutines cannot both add the same name
+		data, err := yottadb.DataE(tptoken, &errstr, "^users", []string{"index", name})
+		if err != nil {
+			fmt.Printf("**%s** ", err)
+			return int32(yottadb.ErrorCode(err))
+		}
+		if data != 0 {
 			return yottadb.YDB_OK
-		}, "CS", []string{})
-		ec(err, errstr)
-	} else {
+		}
+		key_number, err = yottadb.IncrE(tptoken, &errstr, strconv.Itoa(1), "^users", []string{})
+		if err != nil {
+			fmt.Printf("**%s** ", err)
+			return int32(yottadb.ErrorCode(err))
+		}
+		err = yottadb.SetValE(tptoken, &errstr, name, "^users", []string{key_number, "name"})
+		if err != nil {
+			fmt.Printf("**%s** ", err)
+			return int32(yottadb.ErrorCode(err))
+		}
+		err = yottadb.SetValE(tptoken, &errstr, gender, "^users", []string{key_number, "gender"})
+		if err != nil {
+			fmt.Printf("**%s** ", err)
+			return int32(yottadb.ErrorCode(err))
+		}
+		err = yottadb.SetValE(tptoken, &errstr, dob, "^users", []string{key_number, "dob"})
+		if err != nil {
+			fmt.Printf("**%s** ", err)
+			return int32(yottadb.ErrorCode(err))
+		}
+		err = yottadb.SetValE(tptoken, &errstr, id, "^users", []string{key_number, "id"})
+		if err != nil {
+			fmt.Printf("**%s** ", err)
+			return int32(yottadb.ErrorCode(err))
+		}
+		err = yottadb.SetValE(tptoken, &errstr, street, "^users", []string{key_number, "address"})
+		if err != nil {
+			fmt.Printf("**%s** ", err)
+			return int32(yottadb.ErrorCode(err))
+		}
+		err = yottadb.SetValE(tptoken, &errstr, city, "^users", []string{key_number, "city"})
+		if err != nil {
+			fmt.Printf("**%s** ", err)
+			return int32(yottadb.ErrorCode(err))
+		}
+		err = yottadb.SetValE(tptoken, &errstr, state, "^users", []string{key_number, "state"})
+		if err != nil {
+			fmt.Printf("**%s** ", err)
+			return int32(yottadb.ErrorCode(err))
+		}
+		err = yottadb.SetValE(tptoken, &errstr, country, "^users", []string{key_number, "country"})
+		if err != nil {
+			fmt.Printf("**%s** ", err)
+			return int32(yottadb.ErrorCode(err))
+		}
+		err = yottadb.SetValE(tptoken, &errstr, postcode, "^users", []string{key_number, "postcode"})
+		if err != nil {
+			fmt.Printf("**%s** ", err)
+			return int32(yottadb.ErrorCode(err))
+		}
+		err = yottadb.SetValE(tptoken, &errstr, "", "^users", []string{"index", name, key_number})
+		if err != nil {
+			fmt.Printf("**%s** ", err)
+			return int32(yottadb.ErrorCode(err))
+		}
+		err = yottadb.SetValE(tptoken, &errstr, key_number, "^userCount", []string{})
+		if err != nil {
+			fmt.Printf("**%s** ", err)
+			return int32(yottadb.ErrorCode(err))
+		}
+		return yottadb.YDB_OK
+	}, "CS", []string{})
+	ec(err, errstr)
+
+	// Print duplicate user only after commit, because a restarted transaction would otherwise print twice
+	if key_number == "" {
 		fmt.Println("found an existing user: " + name)
+		return
 	}
+	fmt.Printf("%v  -> %s %s %s %s %s\n", key_number, gender, first_name, last_name, dob, id)
+	fmt.Printf("    -> %s %s %s %s %v\n", street, city, state, country, postcode)
 }

@@ -21,3 +21,5 @@ linters:
     staticcheck:
       checks: ["all", "-ST1003", "-ST1023", "-ST1017", "-SA4006", "-S1006", "-S1005", "-S1000", "-S1008", "-SA1019", "-QF1004",
         "-QF1001", "-QF1011", "-ST1020", "-SA6000"]
+output:
+  show-stats: false

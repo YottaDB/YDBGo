@@ -171,30 +171,37 @@ func saveV(users *randomusers, i int, wg *sync.WaitGroup) {
 	name := first_name + " " + last_name
 
 	usersNode := conn.Node("^users")
-	if usersNode.Child("index", name).HasNone() {
-		key_number := usersNode.Incr(1)
-		fmt.Printf("%s  -> %s %s %s %s %s\n", key_number, gender, first_name, last_name, dob, id)
-		fmt.Printf("    -> %s %s %s %s %v\n", street, city, state, country, postcode)
+	var key_number string
+	conn.Transaction("CS", []string{}, func() {
+		key_number = "" // reset in case a restart follows an attempt that set it
+		// Check for duplicates inside the transaction so concurrent goroutines cannot both add the same name
+		if !usersNode.Child("index", name).HasNone() {
+			return
+		}
+		key_number = usersNode.Incr(1)
+		usersNode.Child(key_number, "name").Set(name)
+		usersNode.Child(key_number, "gender").Set(gender)
+		usersNode.Child(key_number, "dob").Set(dob)
+		usersNode.Child(key_number, "id").Set(id)
+		usersNode.Child(key_number, "address").Set(street)
+		usersNode.Child(key_number, "city").Set(city)
+		usersNode.Child(key_number, "state").Set(state)
+		usersNode.Child(key_number, "country").Set(country)
+		usersNode.Child(key_number, "postcode").Set(postcode)
+		usersNode.Child("index", name, key_number).Set("")
 
-		conn.Transaction("CS", []string{}, func() {
-			usersNode.Child(key_number, "name").Set(name)
-			usersNode.Child(key_number, "gender").Set(gender)
-			usersNode.Child(key_number, "dob").Set(dob)
-			usersNode.Child(key_number, "id").Set(id)
-			usersNode.Child(key_number, "address").Set(street)
-			usersNode.Child(key_number, "city").Set(city)
-			usersNode.Child(key_number, "state").Set(state)
-			usersNode.Child(key_number, "country").Set(country)
-			usersNode.Child(key_number, "postcode").Set(postcode)
-			usersNode.Child("index", name, key_number).Set("")
+		// This intentionally causes a conflict
+		conn.Node("^userCount").Set(key_number)
 
-			// This intentionally causes a conflict
-			conn.Node("^userCount").Set(key_number)
+		// Dump the data
+		//fmt.Print(usersNode.Child(key_number).Dump())
+	})
 
-			// Dump the data
-			//fmt.Print(usersNode.Child(key_number).Dump())
-		})
-	} else {
+	// Print duplicate user only after commit, because a restarted transaction would otherwise print twice
+	if key_number == "" {
 		fmt.Println("found an existing user: " + name)
+		return
 	}
+	fmt.Printf("%s  -> %s %s %s %s %s\n", key_number, gender, first_name, last_name, dob, id)
+	fmt.Printf("    -> %s %s %s %s %v\n", street, city, state, country, postcode)
 }

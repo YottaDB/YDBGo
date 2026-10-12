@@ -48,3 +48,5 @@ linters:
     rules:
       - path: _test\.go     # tests deliberately check exact error types; speed and memory tweaks aren't worth it in tests
         linters: [errorlint, perfsprint, prealloc]
+output:
+  show-stats: false

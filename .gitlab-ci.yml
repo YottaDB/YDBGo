@@ -204,7 +204,7 @@ lint_code:
     # Checks are configured in .golangci.yml (v1) and v2/.golangci.yml (v2)
     go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@${GOLANGCI_LINT_VERSION}
     golangci-lint run
-    make -C v2 lint verbosity=/dev/stdout
+    make -C v2 lint
 
 error_codes:
   stage: test
